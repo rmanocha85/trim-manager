@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<!-- saved from url=(0061)file:///C:/Users/rmano/Downloads/TRIM-Patient-Manager_14.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TRIM Patient Manager</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#f0ede6;--surface:#fff;--border:#d4cfc6;--border-light:#e8e4de;
+  --text:#1c1a17;--muted:#7a7468;--accent:#2d5a3d;--accent-light:#e6efe8;
+  --accent-hover:#1e3f2b;--danger:#7a1e1e;--danger-light:#fdf0f0;
+  --warning:#7a5a1e;--warning-light:#fdf6e6;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--r:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+header{background:var(--accent);color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:200;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+header h1{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.1em;text-transform:uppercase}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.save-status{font-size:11px;opacity:.75;font-family:var(--mono)}
+
+.btn{font-family:var(--sans);font-size:13px;font-weight:500;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.btn-white{background:#fff;color:var(--accent)}.btn-white:hover{background:var(--accent-light)}
+.btn-gw{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25)}.btn-gw:hover{background:rgba(255,255,255,.22)}
+.btn-green{background:var(--accent);color:#fff}.btn-green:hover{background:var(--accent-hover)}
+.btn-outline{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}.btn-outline:hover{background:var(--accent-light)}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{background:#5e1717}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}.btn-ghost:hover{background:var(--border-light);color:var(--text)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+.tabs-bar{background:#fff;border-bottom:2px solid var(--border);padding:0 24px;display:flex;gap:2px}
+.tab-btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:12px 16px;border:none;background:transparent;cursor:pointer;color:var(--muted);border-bottom:2.5px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab-btn:hover{color:var(--text)}.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.panel{display:none;padding:22px 24px}.panel.active{display:block}
+
+.stats-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:12px 18px;flex:1;min-width:110px}
+.stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:3px;font-family:var(--mono)}
+.stat-value{font-size:24px;font-weight:600}
+.stat-value.warn{color:var(--warning)}.stat-value.err{color:var(--danger)}
+
+.banner{padding:9px 14px;border-radius:var(--r);font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.b-warn{background:var(--warning-light);color:var(--warning);border:1px solid #e8c870}
+.b-err{background:var(--danger-light);color:var(--danger);border:1px solid #e8a0a0}
+.b-info{background:var(--accent-light);color:var(--accent);border:1px solid #a8c8b0}
+
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.card h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px;font-family:var(--mono)}
+.card p{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+
+.fg5{display:grid;grid-template-columns:1.8fr 1.1fr 0.65fr 0.65fr 1.2fr auto;gap:8px;align-items:end}
+.fg{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.fgrp{display:flex;flex-direction:column;gap:4px}
+.flbl{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.inp{font-family:var(--sans);font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text);transition:border-color .15s;width:100%}
+.inp:focus{outline:none;border-color:var(--accent)}
+.sel{font-family:var(--sans);font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text);cursor:pointer;width:100%}
+.sel:focus{outline:none;border-color:var(--accent)}
+
+.usec{background:#fff;border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.uhdr{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--accent);cursor:pointer;user-select:none}
+.uhdr-l{display:flex;align-items:center;gap:8px}
+.unm{font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:#fff}
+.ucnt{font-size:11px;background:rgba(255,255,255,.2);color:#fff;padding:2px 7px;border-radius:10px;font-family:var(--mono)}
+.uchev{color:rgba(255,255,255,.7);font-size:11px;transition:transform .2s}
+.uchev.open{transform:rotate(90deg)}
+
+.ptbl{width:100%;border-collapse:collapse}
+.ptbl th{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-family:var(--mono);padding:7px 10px;text-align:left;background:#faf9f7;border-bottom:1px solid var(--border-light);font-weight:500}
+.ptbl td{padding:7px 10px;border-bottom:1px solid var(--border-light);font-size:13px;vertical-align:middle}
+.ptbl tr:last-child td{border-bottom:none}
+.ptbl tr:hover td{background:#faf9f7}
+.pnm{font-weight:500}.pphn{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.prm{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);padding:2px 6px;border-radius:4px;display:inline-block}
+.pcd{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:500}
+.pact{display:flex;gap:5px}
+.einp{font-family:var(--sans);font-size:12px;padding:3px 7px;border:1.5px solid var(--accent);border-radius:4px;width:100%}
+.einp:focus{outline:none}
+
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-ov.open{opacity:1;pointer-events:all}
+.modal{background:#fff;border-radius:10px;padding:26px;width:400px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25);transform:translateY(8px);transition:transform .2s}
+.modal-ov.open .modal{transform:translateY(0)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:7px}
+.modal p{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5}
+.modal-act{display:flex;gap:8px;justify-content:flex-end}
+
+/* DATE CHIPS */
+.dchip{display:inline-flex;align-items:flex-start;gap:0;background:var(--accent-light);border:1.5px solid var(--accent);border-radius:8px;padding:0;overflow:hidden;min-width:90px}
+.dchip-info{flex:1;padding:6px 10px}
+.dchip-date{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent);display:block}
+.dchip-dow{font-size:11px;color:var(--muted);display:block;margin-top:1px}
+.dchip-seen{font-size:11px;color:var(--accent);display:block;margin-top:2px;font-family:var(--mono)}
+.dchip-del{background:none;border:none;border-left:1px solid rgba(45,90,61,.2);cursor:pointer;color:var(--danger);font-size:16px;padding:0 8px;align-self:stretch;display:flex;align-items:center}
+.dchip-edit{background:none;border:none;border-left:1px solid rgba(45,90,61,.2);cursor:pointer;color:var(--accent);font-size:13px;padding:0 7px;align-self:stretch;display:flex;align-items:center;opacity:.7}
+.dchip-edit:hover{opacity:1;background:rgba(45,90,61,.08)}
+
+/* CALENDAR PICKER */
+.cal-wrap{background:#fff;border:1.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px;max-width:320px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-nav button{background:none;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer;font-size:13px;color:var(--text)}
+.cal-nav button:hover{background:var(--bg)}
+.cal-month-lbl{font-weight:600;font-size:14px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-dh{text-align:center;font-size:10px;font-family:var(--mono);color:var(--muted);padding:3px 0;text-transform:uppercase}
+.cal-day{text-align:center;font-size:13px;padding:6px 4px;border-radius:5px;cursor:pointer;transition:all .12s;border:1px solid transparent}
+.cal-day:hover{background:var(--accent-light);color:var(--accent)}
+.cal-day.today{border-color:var(--accent);color:var(--accent);font-weight:600}
+.cal-day.selected{background:var(--accent);color:#fff;font-weight:600}
+.cal-day.empty{cursor:default}
+.cal-day.empty:hover{background:none}
+.cal-day.already{background:var(--accent-light);color:var(--accent);font-weight:600;cursor:default}
+
+/* Seen count modal */
+.seen-modal{background:#fff;border-radius:10px;padding:26px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25);transform:translateY(8px);transition:transform .2s}
+.modal-ov.open .seen-modal{transform:translateY(0)}
+
+/* ═══ PRINT RESET — kill browser default yellow on inputs ═══ */
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;background-color:transparent}
+  html,body{background:#fff !important}
+  input,select,textarea,button{
+    background:#fff !important;background-color:#fff !important;
+    -webkit-appearance:none;border:none !important;
+    box-shadow:none !important;color:#000 !important;
+  }
+  body > *{display:none !important}
+  #print-trim{display:block !important}
+  #print-billing{display:none !important}
+  @page{size:letter portrait;margin:.28in .28in .28in .28in}
+}
+body.pb > *{display:none !important}
+body.pb #print-billing{display:block !important}
+body.pb #print-trim{display:none !important}
+@media print{
+  body.pb > *{display:none !important}
+  body.pb #print-billing{display:block !important}
+  body.pb #print-trim{display:none !important}
+}
+
+/* ══ TRIM LIST print ══ */
+#print-trim{display:none;font-family:Arial,sans-serif;background:#fff}
+.tpage{width:100%;page-break-after:always;background:#fff}
+.tpage:last-child{page-break-after:avoid}
+
+.t-datehdr{
+  border:1px solid #000;padding:3px 10px;font-size:9px;font-weight:bold;
+  margin-bottom:3px;text-align:center;background:#fff;
+}
+.t-datehdr span{font-size:10px;font-weight:bold}
+.t-dateline{border-bottom:1.5px solid #000;width:200px;display:inline-block;margin-left:6px;vertical-align:bottom}
+
+.t-uhdr{
+  background:#d0d0d0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  font-weight:bold;padding:2px 5px;
+  border:1px solid #000;
+  margin-top:3px;margin-bottom:-1px;
+  display:flex;align-items:center;gap:6px;
+}
+
+.t-row{
+  display:flex;align-items:stretch;
+  border:1px solid #000;
+  margin-top:-1px;
+  background:#fff !important;
+}
+.t-nm{
+  border-right:1px solid #000;padding:1px 3px;
+  display:flex;align-items:center;font-weight:bold;line-height:1.2;
+  word-break:break-word;background:#fff !important;flex-shrink:0;
+  white-space:nowrap;overflow:hidden;
+}
+.t-bill{
+  flex:1;padding:1px 4px;border-right:1px solid #000;
+  display:flex;align-items:center;gap:0;white-space:nowrap;background:#fff !important;
+}
+.t-bill span{margin-right:5px}
+.t-bill .sep{margin-right:8px}
+.t-icd{
+  padding:1px 3px;display:flex;align-items:center;
+  font-weight:bold;line-height:1.3;background:#fff !important;flex-shrink:0;width:72px;
+}
+
+/* ══ TRIM BILLING print ══ */
+#print-billing{display:none;font-family:Arial,sans-serif;background:#fff}
+.bpage{width:100%;page-break-after:always;background:#fff}
+.bpage:last-child{page-break-after:avoid}
+.btbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.btbl th,.btbl td{border:.75px solid #000;padding:0;vertical-align:middle;background:#fff}
+.bnh{
+  width:105px;font-size:7px;font-weight:bold;text-align:left;
+  padding:2px 3px;background:#e0e0e0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+.bdh{
+  width:29px;font-size:5.5px;font-weight:bold;text-align:center;
+  padding:1px 0;background:#e0e0e0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  height:34px;vertical-align:middle;line-height:1.3;
+}
+.bdh.empty{background:#fff !important;color:#fff}
+.bdh-date{display:block;font-size:6px;font-weight:bold}
+.bdh-dow{display:block;font-size:5.5px;color:#444}
+.bdh-seen{display:block;font-size:5.5px;color:#222;font-weight:bold}
+.buh td{background:#d0d0d0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:bold;font-size:7px;text-align:left;padding:2px 4px}
+.bpn{
+  font-size:6.5px;font-weight:bold;text-align:left;padding:1px 3px;
+  height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  width:105px;max-width:105px;background:#fff !important;
+}
+.bc{width:29px;height:14px;background:#fff !important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⬛ TRIM Patient Manager</h1>
+  <div class="hdr-right">
+    <span class="save-status" id="ss" style="color: rgba(255, 200, 100, 0.9);">Loaded locally — connect Google Drive to sync across devices</span>
+    <button class="btn btn-gw btn-sm" id="btn-connect" onclick="gConnect()">Connect Google Drive</button>
+    <button class="btn btn-white btn-sm" onclick="printTrim()">🖨 TRIM List</button>
+    <button class="btn btn-gw btn-sm" onclick="printBilling()">🖨 TRIM Billing</button>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="showTab(&#39;patients&#39;,this)">Patients</button>
+  <button class="tab-btn" onclick="showTab(&#39;billing-dates&#39;,this)">Billing Dates</button>
+  <button class="tab-btn" onclick="showTab(&#39;units&#39;,this)">Units</button>
+</div>
+
+<!-- PATIENTS -->
+<div id="tab-patients" class="panel active">
+  <div class="stats-row" id="stats">
+    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value ">25</div></div>
+    <div class="stat-card"><div class="stat-label">Capacity</div><div class="stat-value">110</div></div>
+    <div class="stat-card"><div class="stat-label">Used</div><div class="stat-value ">23%</div></div>
+    <div class="stat-card"><div class="stat-label">Date Slots</div><div class="stat-value">3/17</div></div></div>
+  <div id="lbanner"></div>
+  <div class="card">
+    <h3>+ Add New Patient</h3>
+    <div class="fg5">
+      <div class="fgrp"><label class="flbl">Last, First Name</label><input class="inp" id="in-name" placeholder="e.g. Anderson, David"></div>
+      <div class="fgrp"><label class="flbl">PHN</label><input class="inp" id="in-phn" placeholder="e.g. 9074148095"></div>
+      <div class="fgrp"><label class="flbl">Unit</label><select class="sel" id="in-unit"><option value="">— Select Unit —</option><option value="cedar">CEDAR</option><option value="cherry">CHERRY</option><option value="hatzic">HATZIC</option><option value="fern">FERN</option><option value="dewdney">DEWDNEY</option><option value="deroche">DEROCHE</option><option value="silver">SILVER</option><option value="stave">STAVE</option></select></div>
+      <div class="fgrp"><label class="flbl">Room #</label><input class="inp" id="in-room" placeholder="e.g. 1502"></div>
+      <div class="fgrp"><label class="flbl">ICD Codes</label><input class="inp" id="in-codes" placeholder="e.g. 290 401 V15"></div>
+      <button class="btn btn-green" onclick="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
+    </div>
+  </div>
+  <div id="ulist"><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;cedar&#39;)">
+        <div class="uhdr-l"><span class="unm">CEDAR</span><span class="ucnt">3 patients</span></div>
+        <span class="uchev open" id="chev-cedar">▶</span>
+      </div>
+      <div id="ub-cedar">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">1401</span></td>
+                <td><div class="pnm">Harsh, Ronald</div><div class="pphn">9048596186</div></td>
+                <td><span class="pphn">9048596186</span></td>
+                <td><span class="pcd">V15 401 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774734998278&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774734998278&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1402</span></td>
+                <td><div class="pnm">Tannler, Brian</div><div class="pphn">9127810796</div></td>
+                <td><span class="pphn">9127810796</span></td>
+                <td><span class="pcd">290.0 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774734945712&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774734945712&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1405</span></td>
+                <td><div class="pnm">Schiller, Valda</div><div class="pphn">9073813010</div></td>
+                <td><span class="pphn">9073813010</span></td>
+                <td><span class="pcd">250 298 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774734959022&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774734959022&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;cherry&#39;)">
+        <div class="uhdr-l"><span class="unm">CHERRY</span><span class="ucnt">3 patients</span></div>
+        <span class="uchev open" id="chev-cherry">▶</span>
+      </div>
+      <div id="ub-cherry">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">1201</span></td>
+                <td><div class="pnm">Bosshart, Marlies</div><div class="pphn">9064374199</div></td>
+                <td><span class="pphn">9064374199</span></td>
+                <td><span class="pcd">331 V15 311</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735017039&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735017039&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1203</span></td>
+                <td><div class="pnm">Pongracz, Patricia</div><div class="pphn">9067505652</div></td>
+                <td><span class="pphn">9067505652</span></td>
+                <td><span class="pcd">290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735034481&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735034481&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1204</span></td>
+                <td><div class="pnm">Nichols, Kelly</div><div class="pphn">9054261216</div></td>
+                <td><span class="pphn">9054261216</span></td>
+                <td><span class="pcd">491.2  401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735047547&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735047547&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;hatzic&#39;)">
+        <div class="uhdr-l"><span class="unm">HATZIC</span><span class="ucnt">3 patients</span></div>
+        <span class="uchev open" id="chev-hatzic">▶</span>
+      </div>
+      <div id="ub-hatzic">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">2202</span></td>
+                <td><div class="pnm">Hertslet, Crystal</div><div class="pphn">9034851301</div></td>
+                <td><span class="pphn">9034851301</span></td>
+                <td><span class="pcd">428 436 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735343477&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735343477&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2412-2</span></td>
+                <td><div class="pnm">Currie, Lorna</div><div class="pphn">9063914645</div></td>
+                <td><span class="pphn">9063914645</span></td>
+                <td><span class="pcd">298</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735326871&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735326871&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2512</span></td>
+                <td><div class="pnm">Bennet, Daniel</div><div class="pphn">9038158457</div></td>
+                <td><span class="pphn">9038158457</span></td>
+                <td><span class="pcd">340 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735293466&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735293466&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;fern&#39;)">
+        <div class="uhdr-l"><span class="unm">FERN</span><span class="ucnt">3 patients</span></div>
+        <span class="uchev open" id="chev-fern">▶</span>
+      </div>
+      <div id="ub-fern">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">2403</span></td>
+                <td><div class="pnm">Peters, Patricia</div><div class="pphn">9019405761</div></td>
+                <td><span class="pphn">9019405761</span></td>
+                <td><span class="pcd">250 401 321</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735241187&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735241187&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2501</span></td>
+                <td><div class="pnm">Robinson, William</div><div class="pphn">9087381203</div></td>
+                <td><span class="pphn">9087381203</span></td>
+                <td><span class="pcd">428.1 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735251660&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735251660&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2512</span></td>
+                <td><div class="pnm">Carlson, Barbara</div><div class="pphn">9038158457</div></td>
+                <td><span class="pphn">9038158457</span></td>
+                <td><span class="pcd">340 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735309680&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735309680&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;dewdney&#39;)">
+        <div class="uhdr-l"><span class="unm">DEWDNEY</span><span class="ucnt">3 patients</span></div>
+        <span class="uchev open" id="chev-dewdney">▶</span>
+      </div>
+      <div id="ub-dewdney">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">2104</span></td>
+                <td><div class="pnm">Horniak, William</div><div class="pphn">9034808919</div></td>
+                <td><span class="pphn">9034808919</span></td>
+                <td><span class="pcd">295</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735501245&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735501245&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2108</span></td>
+                <td><div class="pnm">Vitalia, Emilio</div><div class="pphn">9014735126</div></td>
+                <td><span class="pphn">9014735126</span></td>
+                <td><span class="pcd">331</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735513263&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735513263&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2116</span></td>
+                <td><div class="pnm">Wadhwani, Shyam</div><div class="pphn">9123059215</div></td>
+                <td><span class="pphn">9123059215</span></td>
+                <td><span class="pcd">298 250 414</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735526437&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735526437&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;deroche&#39;)">
+        <div class="uhdr-l"><span class="unm">DEROCHE</span><span class="ucnt">3 patients</span></div>
+        <span class="uchev open" id="chev-deroche">▶</span>
+      </div>
+      <div id="ub-deroche">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">2603</span></td>
+                <td><div class="pnm">Blakely, Mary</div><div class="pphn">9072790931</div></td>
+                <td><span class="pphn">9072790931</span></td>
+                <td><span class="pcd">311 290 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735376913&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735376913&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2604</span></td>
+                <td><div class="pnm">Ferris, June</div><div class="pphn">9106258069</div></td>
+                <td><span class="pphn">9106258069</span></td>
+                <td><span class="pcd">290 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735465610&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735465610&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2609</span></td>
+                <td><div class="pnm">Seddon, Murray</div><div class="pphn">9048436146</div></td>
+                <td><span class="pphn">9048436146</span></td>
+                <td><span class="pcd">153 V66</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735451428&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735451428&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;silver&#39;)">
+        <div class="uhdr-l"><span class="unm">SILVER</span><span class="ucnt">3 patients</span></div>
+        <span class="uchev open" id="chev-silver">▶</span>
+      </div>
+      <div id="ub-silver">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">3401</span></td>
+                <td><div class="pnm">Ruetz, Maureen</div><div class="pphn">9089867269</div></td>
+                <td><span class="pphn">9089867269</span></td>
+                <td><span class="pcd">250 401 311</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735556668&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735556668&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3405</span></td>
+                <td><div class="pnm">Bellward, Harvey</div><div class="pphn">9021491814</div></td>
+                <td><span class="pphn">9021491814</span></td>
+                <td><span class="pcd">436 331 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735571058&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735571058&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3406</span></td>
+                <td><div class="pnm">Lloyd, Margaret</div><div class="pphn">9042171456</div></td>
+                <td><span class="pphn">9042171456</span></td>
+                <td><span class="pcd">516.3 332 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735582254&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735582254&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div><div class="usec">
+      <div class="uhdr" onclick="toggleU(&#39;stave&#39;)">
+        <div class="uhdr-l"><span class="unm">STAVE</span><span class="ucnt">4 patients</span></div>
+        <span class="uchev open" id="chev-stave">▶</span>
+      </div>
+      <div id="ub-stave">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            
+            
+              <tr>
+                <td><span class="prm">3204</span></td>
+                <td><div class="pnm">Limpright, Miriam</div><div class="pphn">9013287916</div></td>
+                <td><span class="pphn">9013287916</span></td>
+                <td><span class="pcd">401 298</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735600062&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735600062&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3205</span></td>
+                <td><div class="pnm">Kostka, Henryk</div><div class="pphn">9129729478</div></td>
+                <td><span class="pphn">9129729478</span></td>
+                <td><span class="pcd">290 303</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774738706582&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774738706582&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3301</span></td>
+                <td><div class="pnm">Rissling, Dorothy</div><div class="pphn">9029652481</div></td>
+                <td><span class="pphn">9029652481</span></td>
+                <td><span class="pcd">295 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735610448&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735610448&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3304</span></td>
+                <td><div class="pnm">Dornan, Beverley</div><div class="pphn">9070189487</div></td>
+                <td><span class="pphn">9070189487</span></td>
+                <td><span class="pcd">401 332</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735621663&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735621663&#39;)">✕</button></div></td>
+              </tr>
+          </tbody>
+        </table>
+      </div>
+    </div></div>
+</div>
+
+<!-- BILLING DATES -->
+<div id="tab-billing-dates" class="panel">
+  <div class="card">
+    <h3>TRIM Billing — Visit Dates (max 17)</h3>
+    <p>Click a date on the calendar to add it. Each date can also record how many patients you saw in office that day — shown as (x) below the day.</p>
+
+    <!-- Calendar -->
+    <div class="cal-wrap">
+      <div class="cal-nav">
+        <button onclick="calPrev()">‹ Prev</button>
+        <span class="cal-month-lbl" id="cal-lbl">March 2026</span>
+        <button onclick="calNext()">Next ›</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"><div class="cal-dh">Su</div><div class="cal-dh">Mo</div><div class="cal-dh">Tu</div><div class="cal-dh">We</div><div class="cal-dh">Th</div><div class="cal-dh">Fr</div><div class="cal-dh">Sa</div><div class="cal-day " onclick="calSelectDay(1)">1</div><div class="cal-day " onclick="calSelectDay(2)">2</div><div class="cal-day " onclick="calSelectDay(3)">3</div><div class="cal-day " onclick="calSelectDay(4)">4</div><div class="cal-day already" title="Already added">5</div><div class="cal-day " onclick="calSelectDay(6)">6</div><div class="cal-day " onclick="calSelectDay(7)">7</div><div class="cal-day " onclick="calSelectDay(8)">8</div><div class="cal-day " onclick="calSelectDay(9)">9</div><div class="cal-day " onclick="calSelectDay(10)">10</div><div class="cal-day " onclick="calSelectDay(11)">11</div><div class="cal-day already" title="Already added">12</div><div class="cal-day " onclick="calSelectDay(13)">13</div><div class="cal-day " onclick="calSelectDay(14)">14</div><div class="cal-day " onclick="calSelectDay(15)">15</div><div class="cal-day " onclick="calSelectDay(16)">16</div><div class="cal-day " onclick="calSelectDay(17)">17</div><div class="cal-day " onclick="calSelectDay(18)">18</div><div class="cal-day " onclick="calSelectDay(19)">19</div><div class="cal-day " onclick="calSelectDay(20)">20</div><div class="cal-day " onclick="calSelectDay(21)">21</div><div class="cal-day " onclick="calSelectDay(22)">22</div><div class="cal-day " onclick="calSelectDay(23)">23</div><div class="cal-day " onclick="calSelectDay(24)">24</div><div class="cal-day " onclick="calSelectDay(25)">25</div><div class="cal-day already" title="Already added">26</div><div class="cal-day " onclick="calSelectDay(27)">27</div><div class="cal-day today" onclick="calSelectDay(28)">28</div><div class="cal-day " onclick="calSelectDay(29)">29</div><div class="cal-day " onclick="calSelectDay(30)">30</div><div class="cal-day " onclick="calSelectDay(31)">31</div></div>
+    </div>
+
+    <div id="dlist">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-family:var(--mono);margin-top:4px">3 / 17 SLOTS USED</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      
+        <div class="dchip">
+          <div class="dchip-info">
+            <span class="dchip-date">Mar 5</span>
+            <span class="dchip-dow">Thu</span>
+            <span class="dchip-seen">(10)</span>
+          </div>
+          <button class="dchip-edit" onclick="editSeen(&#39;1774739349915&#39;)" title="Edit patients seen">✏</button>
+          <button class="dchip-del" onclick="removeDate(&#39;1774739349915&#39;)" title="Remove">×</button>
+        </div>
+        <div class="dchip">
+          <div class="dchip-info">
+            <span class="dchip-date">Mar 12</span>
+            <span class="dchip-dow">Thu</span>
+            <span class="dchip-seen">(5)</span>
+          </div>
+          <button class="dchip-edit" onclick="editSeen(&#39;1774739347311&#39;)" title="Edit patients seen">✏</button>
+          <button class="dchip-del" onclick="removeDate(&#39;1774739347311&#39;)" title="Remove">×</button>
+        </div>
+        <div class="dchip">
+          <div class="dchip-info">
+            <span class="dchip-date">Mar 26</span>
+            <span class="dchip-dow">Thu</span>
+            <span class="dchip-seen">(10)</span>
+          </div>
+          <button class="dchip-edit" onclick="editSeen(&#39;1774739344012&#39;)" title="Edit patients seen">✏</button>
+          <button class="dchip-del" onclick="removeDate(&#39;1774739344012&#39;)" title="Remove">×</button>
+        </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="clearDates()">Clear All Dates</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+<!-- UNITS -->
+<div id="tab-units" class="panel">
+  <div class="card">
+    <h3>Manage Units</h3>
+    <div class="fg" style="margin-bottom:14px">
+      <div class="fgrp" style="flex:1"><label class="flbl">Unit Name</label><input class="inp" id="in-un" placeholder="e.g. MAPLE"></div>
+      <div class="fgrp" style="width:68px"><label class="flbl">Floor</label><input class="inp" id="in-uf" placeholder="1"></div>
+      <button class="btn btn-green" onclick="addUnit()">Add Unit</button>
+    </div>
+    <div id="umng"></div>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal-ov" id="delmv">
+  <div class="modal">
+    <h3>Remove Patient</h3>
+    <p id="delmsg">Remove this patient?</p>
+    <div class="modal-act">
+      <button class="btn btn-ghost" onclick="closeModal(&#39;delmv&#39;)">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDel()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEEN COUNT MODAL -->
+<div class="modal-ov" id="seenmv">
+  <div class="seen-modal">
+    <h3 id="seen-title">Patients Seen in Office</h3>
+    <p id="seen-subtitle" style="font-size:13px;color:var(--muted);margin-bottom:14px"></p>
+    <div class="fgrp" style="margin-bottom:18px">
+      <label class="flbl">How many patients did you see in the office this day? (optional)</label>
+      <input class="inp" id="seen-count" type="number" min="0" placeholder="e.g. 3" style="max-width:120px;margin-top:6px">
+    </div>
+    <div class="modal-act">
+      <button class="btn btn-ghost" onclick="cancelSeen()">Cancel</button>
+      <button class="btn btn-green" onclick="confirmSeen()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="print-trim"></div>
+<div id="print-billing"></div>
+
+<script>
+const MAX_P=110,MAX_D=17;
+const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
+const BILL_PAGES=[['cedar','cherry','hatzic'],['fern','dewdney','deroche'],['silver','stave']];
+const FILE_NAME='trim-patients-data.json';
+const SCOPE='https://www.googleapis.com/auth/drive.file';
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let state={
+  patients:[],
+  units:[
+    {id:'cedar',name:'CEDAR',floor:1},{id:'cherry',name:'CHERRY',floor:1},
+    {id:'hatzic',name:'HATZIC',floor:1},{id:'fern',name:'FERN',floor:2},
+    {id:'dewdney',name:'DEWDNEY',floor:2},{id:'deroche',name:'DEROCHE',floor:2},
+    {id:'silver',name:'SILVER',floor:3},{id:'stave',name:'STAVE',floor:3},
+  ],
+  billingDates:[],
+  googleConnected:false,googleToken:null,driveFileId:null
+};
+let delId=null,editId=null,pendingDateKey=null;
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
+
+// ── GOOGLE DRIVE ──
+async function gConnect(){
+  if(!window.google?.accounts){
+    await new Promise((r,j)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;s.onerror=j;document.head.appendChild(s)});
+  }
+  let cid=localStorage.getItem('trim_cid');
+  if(!cid){cid=prompt('Enter your Google OAuth Client ID:\n(console.cloud.google.com → APIs & Services → Credentials)');if(!cid)return;localStorage.setItem('trim_cid',cid.trim());cid=cid.trim();}
+  google.accounts.oauth2.initTokenClient({client_id:cid,scope:SCOPE,callback:async r=>{
+    if(r.error){alert('Auth failed: '+r.error);return}
+    state.googleToken=r.access_token;state.googleConnected=true;
+    setSS('Connected ✓',true);g('btn-connect').textContent='✓ Google Drive';
+    await loadDrive();
+  }}).requestAccessToken();
+}
+async function saveDrive(){
+  const body=JSON.stringify({patients:state.patients,units:state.units,billingDates:state.billingDates,driveFileId:state.driveFileId});
+  saveLocal();
+  if(!state.googleConnected||!state.googleToken){setSS('Saved locally',false);return}
+  setSS('Saving…',false);
+  try{
+    if(state.driveFileId){
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+    }else{
+      const m=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,mimeType:'application/json'})}).then(r=>r.json());
+      state.driveFileId=m.id;
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${m.id}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+      saveLocal();
+    }
+    setSS('Saved to Drive ✓',true);
+  }catch(e){setSS('Save failed!',false)}
+}
+async function loadDrive(){
+  setSS('Loading…',false);
+  try{
+    const list=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false&fields=files(id,name)`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
+    if(list.files?.length>0){
+      state.driveFileId=list.files[0].id;
+      const c=await fetch(`https://www.googleapis.com/drive/v3/files/${state.driveFileId}?alt=media`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
+      applyState(c);saveLocal();setSS('Loaded from Drive ✓',true);render();
+    }else{setSS('Connected — no file found yet',true)}
+  }catch(e){setSS('Load failed',false)}
+}
+function applyState(s){
+  if(s.patients)state.patients=s.patients;
+  if(s.units&&s.units.length>0)state.units=s.units;
+  if(s.billingDates)state.billingDates=s.billingDates;
+  if(s.driveFileId)state.driveFileId=s.driveFileId;
+}
+function saveLocal(){try{localStorage.setItem('trim_st',JSON.stringify(state))}catch(e){}}
+async function loadLocal(){try{const r=localStorage.getItem('trim_st');if(r)applyState(JSON.parse(r))}catch(e){}}
+function setSS(m,ok){const e=g('ss');e.textContent=m;e.style.color=ok?'rgba(255,255,255,.9)':'rgba(255,200,100,.9)'}
+
+// ── TABS ──
+function showTab(name,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  g('tab-'+name).classList.add('active');btn.classList.add('active');
+  if(name==='units')renderUMng();
+  if(name==='billing-dates'){renderCal();renderDates();}
+}
+
+// ── PATIENTS ──
+function addPatient(){
+  const name=g('in-name').value.trim();
+  const phn=g('in-phn').value.trim();
+  const unit=g('in-unit').value;
+  const room=g('in-room').value.trim();
+  const codes=g('in-codes').value.trim();
+  if(!name||!unit){alert('Please enter a name and unit.');return}
+  if(state.patients.length>=MAX_P){alert('Patient limit reached.');return}
+  state.patients.push({id:Date.now().toString(),name,phn,unit,room,codes});
+  ['in-name','in-phn','in-room','in-codes'].forEach(i=>g(i).value='');
+  saveDrive();render();
+}
+function startEdit(id){editId=id;render()}
+function cancelEdit(){editId=null;render()}
+function saveEdit(id){
+  const p=state.patients.find(x=>x.id===id);if(!p)return;
+  p.name=g(`en-${id}`).value.trim()||p.name;
+  p.phn=g(`ep-${id}`).value.trim();
+  p.unit=g(`eu-${id}`).value;
+  p.room=g(`er-${id}`).value.trim();
+  p.codes=g(`ec-${id}`).value.trim();
+  editId=null;saveDrive();render();
+}
+function promptDel(id){
+  delId=id;const p=state.patients.find(x=>x.id===id);
+  g('delmsg').textContent=`Remove "${p?.name}"?`;
+  g('delmv').classList.add('open');
+}
+function closeModal(id){g(id).classList.remove('open')}
+function confirmDel(){state.patients=state.patients.filter(p=>p.id!==delId);closeModal('delmv');delId=null;saveDrive();render()}
+
+// ── UNITS ──
+function addUnit(){
+  const name=g('in-un').value.trim().toUpperCase();
+  const floor=parseInt(g('in-uf').value)||0;
+  if(!name)return;
+  state.units.push({id:name.toLowerCase().replace(/\W+/g,'_')+'_'+Date.now(),name,floor});
+  g('in-un').value='';g('in-uf').value='';
+  saveDrive();renderUMng();populateUSel();
+}
+function delUnit(id){
+  if(state.patients.some(p=>p.unit===id)){alert('Cannot delete a unit with patients.');return}
+  state.units=state.units.filter(u=>u.id!==id);saveDrive();renderUMng();populateUSel();
+}
+
+// ── CALENDAR ──
+function calPrev(){calMonth--;if(calMonth<0){calMonth=11;calYear--}renderCal()}
+function calNext(){calMonth++;if(calMonth>11){calMonth=0;calYear++}renderCal()}
+
+function renderCal(){
+  g('cal-lbl').textContent=`${MONTHS[calMonth]} ${calYear}`;
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const today=new Date();
+  const alreadyKeys=new Set(state.billingDates.map(d=>d.sortKey));
+
+  let html='';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d=>{html+=`<div class="cal-dh">${d}</div>`});
+  for(let i=0;i<firstDay;i++) html+=`<div class="cal-day empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const sk=calYear*10000+(calMonth+1)*100+d;
+    const isToday=d===today.getDate()&&calMonth===today.getMonth()&&calYear===today.getFullYear();
+    const isSelected=alreadyKeys.has(sk);
+    const cls=isSelected?'already':isToday?'today':'';
+    if(isSelected){
+      html+=`<div class="cal-day ${cls}" title="Already added">${d}</div>`;
+    }else{
+      html+=`<div class="cal-day ${cls}" onclick="calSelectDay(${d})">${d}</div>`;
+    }
+  }
+  g('cal-grid').innerHTML=html;
+}
+
+function calSelectDay(day){
+  if(state.billingDates.length>=MAX_D){alert(`Maximum ${MAX_D} dates reached.`);return}
+  const sk=calYear*10000+(calMonth+1)*100+day;
+  if(state.billingDates.some(d=>d.sortKey===sk)){alert('Already added.');return}
+  const dow=DAYS[new Date(calYear,calMonth,day).getDay()];
+  const label=`${MONTHS_S[calMonth]} ${day}`;
+  // Show seen-count modal
+  pendingDateKey={sk,label,dow};
+  g('seen-title').textContent=`${label} (${dow})`;
+  g('seen-subtitle').textContent='Optionally record how many patients you saw in the office this day.';
+  g('seen-count').value='';
+  g('seen-count').onkeydown=function(e){if(e.key==='Enter')confirmSeen();};
+  g('seenmv').classList.add('open');
+  setTimeout(()=>g('seen-count').focus(),50);
+}
+
+function confirmSeen(){
+  if(pendingDateKey && pendingDateKey.editId){
+    // Edit mode — update existing
+    const d=state.billingDates.find(x=>x.id===pendingDateKey.editId);
+    if(d){d.seen=g('seen-count').value.trim()||'';}
+    pendingDateKey=null;
+    closeModal('seenmv');
+    saveDrive();renderDates();
+    return;
+  }
+  if(!pendingDateKey)return;
+  const cnt=g('seen-count').value.trim();
+  state.billingDates.push({
+    id:Date.now().toString(),
+    label:pendingDateKey.label,
+    dow:pendingDateKey.dow,
+    seen:cnt||'',
+    sortKey:pendingDateKey.sk
+  });
+  pendingDateKey=null;
+  closeModal('seenmv');
+  saveDrive();renderDates();renderCal();
+}
+
+function editSeen(id){
+  const d=state.billingDates.find(x=>x.id===id);if(!d)return;
+  pendingDateKey={editId:id};
+  g('seen-title').textContent=`Edit: ${d.label} (${d.dow||''})`;
+  g('seen-subtitle').textContent='Update how many patients you saw in the office this day.';
+  g('seen-count').value=d.seen||'';
+  g('seen-count').onkeydown=function(e){if(e.key==='Enter')confirmSeen();};
+  g('seenmv').classList.add('open');
+  setTimeout(()=>g('seen-count').focus(),50);
+}
+
+function cancelSeen(){
+  pendingDateKey=null;
+  closeModal('seenmv');
+}
+
+function removeDate(id){state.billingDates=state.billingDates.filter(d=>d.id!==id);saveDrive();renderDates();renderCal()}
+function clearDates(){if(!confirm('Clear all dates?'))return;state.billingDates=[];saveDrive();renderDates();renderCal()}
+
+// ESC key closes any open modal
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    if(g('seenmv').classList.contains('open')) cancelSeen();
+    if(g('delmv').classList.contains('open')) closeModal('delmv');
+  }
+});
+
+// ── RENDER ──
+function render(){renderStats();renderUList();populateUSel();renderDates()}
+
+function renderStats(){
+  const t=state.patients.length,pct=Math.round(t/MAX_P*100);
+  const vc=t>=MAX_P?'err':t>=95?'warn':'';
+  g('stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value ${vc}">${t}</div></div>
+    <div class="stat-card"><div class="stat-label">Capacity</div><div class="stat-value">${MAX_P}</div></div>
+    <div class="stat-card"><div class="stat-label">Used</div><div class="stat-value ${vc}">${pct}%</div></div>
+    <div class="stat-card"><div class="stat-label">Date Slots</div><div class="stat-value">${state.billingDates.length}/${MAX_D}</div></div>`;
+  g('lbanner').innerHTML=t>=MAX_P?`<div class="banner b-err">⚠ Patient limit of ${MAX_P} reached.</div>`:
+    t>=95?`<div class="banner b-warn">⚠ Approaching limit (${t}/${MAX_P}).</div>`:'';
+}
+
+function populateUSel(){
+  const s=g('in-unit');if(!s)return;
+  const cur=s.value;
+  s.innerHTML='<option value="">— Select Unit —</option>'+
+    state.units.map(u=>`<option value="${u.id}"${u.id===cur?' selected':''}>${u.name}</option>`).join('');
+}
+
+function renderUList(){
+  let html='';
+  state.units.forEach(unit=>{
+    const pts=state.patients.filter(p=>p.unit===unit.id).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+    html+=`<div class="usec">
+      <div class="uhdr" onclick="toggleU('${unit.id}')">
+        <div class="uhdr-l"><span class="unm">${unit.name}</span><span class="ucnt">${pts.length} patients</span></div>
+        <span class="uchev open" id="chev-${unit.id}">▶</span>
+      </div>
+      <div id="ub-${unit.id}">
+        <table class="ptbl">
+          <thead><tr><th style="width:38px">Room</th><th>Name</th><th style="width:105px">PHN</th><th style="width:120px">ICD Codes</th><th style="width:110px">Actions</th></tr></thead>
+          <tbody>
+            ${pts.length===0?`<tr><td colspan="5" style="color:var(--muted);font-style:italic;text-align:center;padding:14px">No patients</td></tr>`:''}
+            ${pts.map(p=>editId===p.id?`
+              <tr>
+                <td><input class="einp" id="er-${p.id}" value="${esc(p.room)}" style="width:50px"/></td>
+                <td><input class="einp" id="en-${p.id}" value="${esc(p.name)}"/></td>
+                <td>
+                  <input class="einp" id="ep-${p.id}" value="${esc(p.phn||'')}"/>
+                  <select class="sel" id="eu-${p.id}" style="font-size:11px;padding:3px 5px;margin-top:3px">
+                    ${state.units.map(u=>`<option value="${u.id}"${u.id===p.unit?' selected':''}>${u.name}</option>`).join('')}
+                  </select>
+                </td>
+                <td><input class="einp" id="ec-${p.id}" value="${esc(p.codes||'')}"/></td>
+                <td><div class="pact"><button class="btn btn-green btn-sm" onclick="saveEdit('${p.id}')">Save</button><button class="btn btn-ghost btn-sm" onclick="cancelEdit()">Cancel</button></div></td>
+              </tr>`:`
+              <tr>
+                <td><span class="prm">${esc(p.room)||'—'}</span></td>
+                <td><div class="pnm">${esc(p.name)}</div><div class="pphn">${esc(p.phn||'')}</div></td>
+                <td><span class="pphn">${esc(p.phn||'—')}</span></td>
+                <td><span class="pcd">${esc(p.codes)||'<span style="color:var(--muted);font-style:italic">—</span>'}</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit('${p.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel('${p.id}')">✕</button></div></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+  g('ulist').innerHTML=html||`<div class="banner b-info">No units. Add them in the Units tab.</div>`;
+}
+
+function toggleU(id){
+  const b=g('ub-'+id),c=g('chev-'+id);
+  const h=b.style.display==='none';b.style.display=h?'':'none';c.classList.toggle('open',h);
+}
+
+function renderUMng(){
+  g('umng').innerHTML=state.units.map(u=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light)">
+      <span style="flex:1;font-weight:500">${u.name}</span>
+      <span style="font-size:11px;color:var(--muted)">Floor ${u.floor||'?'}</span>
+      <span style="font-size:11px;color:var(--muted)">${state.patients.filter(p=>p.unit===u.id).length} patients</span>
+      <button class="btn btn-danger btn-sm" onclick="delUnit('${u.id}')">Delete</button>
+    </div>`).join('')||'<p style="color:var(--muted);font-size:13px">No units.</p>';
+}
+
+function renderDates(){
+  const sorted=[...state.billingDates].sort((a,b)=>a.sortKey-b.sortKey);
+  const el=g('dlist');if(!el)return;
+  if(sorted.length===0){
+    el.innerHTML=`<p style="color:var(--muted);font-size:13px;font-style:italic;margin-top:8px">No dates yet. Click a date on the calendar above to add it.</p>`;
+    return;
+  }
+  el.innerHTML=`
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-family:var(--mono);margin-top:4px">${sorted.length} / ${MAX_D} SLOTS USED</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${sorted.map(d=>`
+        <div class="dchip">
+          <div class="dchip-info">
+            <span class="dchip-date">${esc(d.label)}</span>
+            <span class="dchip-dow">${esc(d.dow||'')}</span>
+            ${d.seen?`<span class="dchip-seen">(${esc(d.seen)})</span>`:'<span class="dchip-seen" style="color:var(--muted);font-style:italic;font-family:var(--sans)">no count</span>'}
+          </div>
+          <button class="dchip-edit" onclick="editSeen('${d.id}')" title="Edit patients seen">✏</button>
+          <button class="dchip-del" onclick="removeDate('${d.id}')" title="Remove">×</button>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="clearDates()">Clear All Dates</button>
+    </div>
+    ${sorted.length>=MAX_D?`<div class="banner b-warn" style="margin-top:12px">⚠ All ${MAX_D} slots filled.</div>`:''}`;
+}
+
+// ── BUILD TRIM LIST ──
+function buildTrimList(){
+  const total=state.patients.length;
+  const perPage=Math.ceil(total/2);
+  const fp=Math.max(5.5,Math.min(8,Math.floor(760/Math.max(perPage,1))));
+  const rp=Math.max(10,Math.min(16,Math.floor(960/Math.max(perPage,1))));
+  const nmW=Math.max(148,fp*19);
+
+  let html='';
+  LIST_PAGES.forEach(uids=>{
+    let rows='';
+    uids.forEach(uid=>{
+      const unit=state.units.find(u=>u.id===uid);if(!unit)return;
+      const pts=state.patients.filter(p=>p.unit===uid).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+      if(pts.length===0)return;
+      // Unit header with unit name + room indicator
+      rows+=`<div class="t-uhdr" style="font-size:${fp+0.5}px"><span>${unit.name}</span></div>`;
+      pts.forEach(p=>{
+        // Single line: LastName, FirstName  PHN  RoomNumber
+        const parts=[esc(p.name),p.phn?esc(p.phn):'',p.room?esc(p.room):''].filter(Boolean);
+        const nameLine=parts.join('  ');
+        rows+=`<div class="t-row" style="min-height:${rp}px;background:#fff !important">
+          <div class="t-nm" style="font-size:${fp}px;width:${nmW}px;flex:0 0 ${nmW}px">${nameLine}</div>
+          <div class="t-bill" style="font-size:${fp}px">
+            <span>114</span><span>115</span><span>127</span><span>200</span>
+            <span class="sep">13334</span><span class="sep">14077</span>
+            <span>x</span><span>1</span><span class="sep">2</span>
+            <span>start:&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span>end:&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span>R:</span>
+          </div>
+          <div class="t-icd" style="font-size:${fp}px">${esc(p.codes||'')}</div>
+        </div>`;
+      });
+    });
+    html+=`<div class="tpage">
+      <div class="t-datehdr"><span>TRIM Date:</span><span class="t-dateline"></span></div>
+      ${rows}
+    </div>`;
+  });
+  g('print-trim').innerHTML=html||'<p>No patients.</p>';
+}
+
+// ── BUILD TRIM BILLING ──
+function buildTrimBilling(){
+  const sorted=[...state.billingDates].sort((a,b)=>a.sortKey-b.sortKey);
+  const cols=Array.from({length:MAX_D},(_,i)=>sorted[i]||null);
+
+  let html='';
+  BILL_PAGES.forEach(uids=>{
+    const hdr=cols.map(d=>{
+      if(!d)return`<th class="bdh empty"></th>`;
+      return`<th class="bdh">
+        <span class="bdh-date">${esc(d.label)}</span>
+        <span class="bdh-dow">${esc(d.dow||'')}</span>
+        ${d.seen?`<span class="bdh-seen">(${esc(d.seen)})</span>`:'<span class="bdh-seen">&nbsp;</span>'}
+      </th>`;
+    }).join('');
+
+    let body='';
+    uids.forEach(uid=>{
+      const unit=state.units.find(u=>u.id===uid);if(!unit)return;
+      const pts=state.patients.filter(p=>p.unit===uid).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+      if(pts.length===0)return;
+      body+=`<tr class="buh"><td colspan="${MAX_D+1}">${unit.name}</td></tr>`;
+      pts.forEach(p=>{
+        // Billing: name + room only (no PHN)
+        const lbl=p.room?`${esc(p.name)}  ${esc(p.room)}`:`${esc(p.name)}`;
+        body+=`<tr><td class="bpn">${lbl}</td>${cols.map(()=>`<td class="bc"></td>`).join('')}</tr>`;
+      });
+    });
+
+    html+=`<div class="bpage">
+      <table class="btbl">
+        <thead><tr><th class="bnh">Patient</th>${hdr}</tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>`;
+  });
+  g('print-billing').innerHTML=html||'<p>No patients.</p>';
+}
+
+// ── PRINT ──
+function todayStr(){
+  const d=new Date();
+  const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const yr=d.getFullYear();
+  const mon=months[d.getMonth()];
+  const day=String(d.getDate()).padStart(2,'0');
+  return`${yr}-${mon}-${day}`;
+}
+function printTrim(){
+  buildTrimList();
+  document.body.classList.remove('pb');
+  document.title=`TRIM List ${todayStr()}`;
+  setTimeout(()=>{window.print();setTimeout(()=>{document.title='TRIM Patient Manager'},1000)},120);
+}
+function printBilling(){
+  buildTrimBilling();
+  document.body.classList.add('pb');
+  document.title=`TRIM Billing ${todayStr()}`;
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{document.body.classList.remove('pb');document.title='TRIM Patient Manager'},600);
+  },120);
+}
+
+// ── UTILS ──
+function g(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+// ── INIT ──
+async function init(){
+  await loadLocal();
+  renderCal();
+  render();
+  setSS('Loaded locally — connect Google Drive to sync across devices',false);
+}
+init();
+</script>
+
+
+</body></html>
