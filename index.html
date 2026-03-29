@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- saved from url=(0061)file:///C:/Users/rmano/Downloads/TRIM-Patient-Manager_14.html -->
+<!-- saved from url=(0061)file:///C:/Users/rmano/Downloads/TRIM-Patient-Manager_15.html -->
 <html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -233,11 +233,11 @@ body.pb #print-trim{display:none !important}
 <!-- PATIENTS -->
 <div id="tab-patients" class="panel active">
   <div class="stats-row" id="stats">
-    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value ">25</div></div>
+    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value warn">95</div></div>
     <div class="stat-card"><div class="stat-label">Capacity</div><div class="stat-value">110</div></div>
-    <div class="stat-card"><div class="stat-label">Used</div><div class="stat-value ">23%</div></div>
-    <div class="stat-card"><div class="stat-label">Date Slots</div><div class="stat-value">3/17</div></div></div>
-  <div id="lbanner"></div>
+    <div class="stat-card"><div class="stat-label">Used</div><div class="stat-value warn">86%</div></div>
+    <div class="stat-card"><div class="stat-label">Date Slots</div><div class="stat-value">0/17</div></div></div>
+  <div id="lbanner"><div class="banner b-warn">⚠ Approaching limit (95/110).</div></div>
   <div class="card">
     <h3>+ Add New Patient</h3>
     <div class="fg5">
@@ -251,7 +251,7 @@ body.pb #print-trim{display:none !important}
   </div>
   <div id="ulist"><div class="usec">
       <div class="uhdr" onclick="toggleU(&#39;cedar&#39;)">
-        <div class="uhdr-l"><span class="unm">CEDAR</span><span class="ucnt">3 patients</span></div>
+        <div class="uhdr-l"><span class="unm">CEDAR</span><span class="ucnt">13 patients</span></div>
         <span class="uchev open" id="chev-cedar">▶</span>
       </div>
       <div id="ub-cedar">
@@ -261,32 +261,102 @@ body.pb #print-trim{display:none !important}
             
             
               <tr>
-                <td><span class="prm">1401</span></td>
-                <td><div class="pnm">Harsh, Ronald</div><div class="pphn">9048596186</div></td>
-                <td><span class="pphn">9048596186</span></td>
-                <td><span class="pcd">V15 401 290</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774734998278&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774734998278&#39;)">✕</button></div></td>
-              </tr>
-              <tr>
                 <td><span class="prm">1402</span></td>
                 <td><div class="pnm">Tannler, Brian</div><div class="pphn">9127810796</div></td>
                 <td><span class="pphn">9127810796</span></td>
                 <td><span class="pcd">290.0 401</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774734945712&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774734945712&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p001&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p001&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">1405</span></td>
                 <td><div class="pnm">Schiller, Valda</div><div class="pphn">9073813010</div></td>
                 <td><span class="pphn">9073813010</span></td>
                 <td><span class="pcd">250 298 401</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774734959022&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774734959022&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p002&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p002&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1406</span></td>
+                <td><div class="pnm">Harsh, Ronald</div><div class="pphn">9048596186</div></td>
+                <td><span class="pphn">9048596186</span></td>
+                <td><span class="pcd">V15 401 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p003&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p003&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1407</span></td>
+                <td><div class="pnm">Lowe, Deanna</div><div class="pphn">9024327811</div></td>
+                <td><span class="pphn">9024327811</span></td>
+                <td><span class="pcd">428 496</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p004&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p004&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1408</span></td>
+                <td><div class="pnm">Harsh, Sandra</div><div class="pphn">9048596193</div></td>
+                <td><span class="pphn">9048596193</span></td>
+                <td><span class="pcd">290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p005&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p005&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1410</span></td>
+                <td><div class="pnm">Lazar, Marta</div><div class="pphn">9125017016</div></td>
+                <td><span class="pphn">9125017016</span></td>
+                <td><span class="pcd">250 428 436</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p006&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p006&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1411</span></td>
+                <td><div class="pnm">Landels, Judith</div><div class="pphn">9061480326</div></td>
+                <td><span class="pphn">9061480326</span></td>
+                <td><span class="pcd">496 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p007&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p007&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1501</span></td>
+                <td><div class="pnm">Passmore, Justina</div><div class="pphn">9129069283</div></td>
+                <td><span class="pphn">9129069283</span></td>
+                <td><span class="pcd">V15 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p008&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p008&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1502</span></td>
+                <td><div class="pnm">Anderson, David</div><div class="pphn">9074148095</div></td>
+                <td><span class="pphn">9074148095</span></td>
+                <td><span class="pcd">250 303 338</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p009&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p009&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1505</span></td>
+                <td><div class="pnm">Giles, Patricia</div><div class="pphn">9058535755</div></td>
+                <td><span class="pphn">9058535755</span></td>
+                <td><span class="pcd">250 585</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p010&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p010&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1505</span></td>
+                <td><div class="pnm">Cicecki, Artin</div><div class="pphn">9832968475</div></td>
+                <td><span class="pphn">9832968475</span></td>
+                <td><span class="pcd">298 428</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p011&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p011&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1510</span></td>
+                <td><div class="pnm">Stewart, Michael</div><div class="pphn">9048630153</div></td>
+                <td><span class="pphn">9048630153</span></td>
+                <td><span class="pcd">250 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p012&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p012&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1511</span></td>
+                <td><div class="pnm">West, Teresa</div><div class="pphn">9052303862</div></td>
+                <td><span class="pphn">9052303862</span></td>
+                <td><span class="pcd">401 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p013&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p013&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
       </div>
     </div><div class="usec">
       <div class="uhdr" onclick="toggleU(&#39;cherry&#39;)">
-        <div class="uhdr-l"><span class="unm">CHERRY</span><span class="ucnt">3 patients</span></div>
+        <div class="uhdr-l"><span class="unm">CHERRY</span><span class="ucnt">11 patients</span></div>
         <span class="uchev open" id="chev-cherry">▶</span>
       </div>
       <div id="ub-cherry">
@@ -300,21 +370,77 @@ body.pb #print-trim{display:none !important}
                 <td><div class="pnm">Bosshart, Marlies</div><div class="pphn">9064374199</div></td>
                 <td><span class="pphn">9064374199</span></td>
                 <td><span class="pcd">331 V15 311</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735017039&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735017039&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p014&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p014&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">1203</span></td>
                 <td><div class="pnm">Pongracz, Patricia</div><div class="pphn">9067505652</div></td>
                 <td><span class="pphn">9067505652</span></td>
-                <td><span class="pcd">290.0</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735034481&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735034481&#39;)">✕</button></div></td>
+                <td><span class="pcd">290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p015&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p015&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">1204</span></td>
                 <td><div class="pnm">Nichols, Kelly</div><div class="pphn">9054261216</div></td>
                 <td><span class="pphn">9054261216</span></td>
-                <td><span class="pcd">491.2  401</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735047547&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735047547&#39;)">✕</button></div></td>
+                <td><span class="pcd">491.2 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p016&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p016&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1212</span></td>
+                <td><div class="pnm">Savoy, Daphne</div><div class="pphn">9876820675</div></td>
+                <td><span class="pphn">9876820675</span></td>
+                <td><span class="pcd">436 571</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p017&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p017&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1301</span></td>
+                <td><div class="pnm">Ruppert, Gerd</div><div class="pphn">9043549531</div></td>
+                <td><span class="pphn">9043549531</span></td>
+                <td><span class="pcd">250 290 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p018&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p018&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1301-B</span></td>
+                <td><div class="pnm">Kelly, George</div><div class="pphn">9085952611</div></td>
+                <td><span class="pphn">9085952611</span></td>
+                <td><span class="pcd">290 303</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p019&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p019&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1302</span></td>
+                <td><div class="pnm">May, Gary</div><div class="pphn">9025247638</div></td>
+                <td><span class="pphn">9025247638</span></td>
+                <td><span class="pcd">290 303</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p020&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p020&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1303</span></td>
+                <td><div class="pnm">Daoust, Henry</div><div class="pphn">9126168296</div></td>
+                <td><span class="pphn">9126168296</span></td>
+                <td><span class="pcd">290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p021&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p021&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1308</span></td>
+                <td><div class="pnm">Patenaude, Josee</div><div class="pphn">9041589088</div></td>
+                <td><span class="pphn">9041589088</span></td>
+                <td><span class="pcd">250 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p022&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p022&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1311</span></td>
+                <td><div class="pnm">Frost, Michael</div><div class="pphn">9023039548</div></td>
+                <td><span class="pphn">9023039548</span></td>
+                <td><span class="pcd">290 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p023&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p023&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">1312</span></td>
+                <td><div class="pnm">Ravelo, Manolito</div><div class="pphn">9138373971</div></td>
+                <td><span class="pphn">9138373971</span></td>
+                <td><span class="pcd">428 436 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p024&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p024&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
@@ -335,28 +461,28 @@ body.pb #print-trim{display:none !important}
                 <td><div class="pnm">Hertslet, Crystal</div><div class="pphn">9034851301</div></td>
                 <td><span class="pphn">9034851301</span></td>
                 <td><span class="pcd">428 436 V15</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735343477&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735343477&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p025&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p025&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">2412-2</span></td>
                 <td><div class="pnm">Currie, Lorna</div><div class="pphn">9063914645</div></td>
                 <td><span class="pphn">9063914645</span></td>
-                <td><span class="pcd">298</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735326871&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735326871&#39;)">✕</button></div></td>
+                <td><span class="pcd">401 290 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p026&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p026&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">2512</span></td>
                 <td><div class="pnm">Bennet, Daniel</div><div class="pphn">9038158457</div></td>
                 <td><span class="pphn">9038158457</span></td>
                 <td><span class="pcd">340 V15</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735293466&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735293466&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p027&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p027&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
       </div>
     </div><div class="usec">
       <div class="uhdr" onclick="toggleU(&#39;fern&#39;)">
-        <div class="uhdr-l"><span class="unm">FERN</span><span class="ucnt">3 patients</span></div>
+        <div class="uhdr-l"><span class="unm">FERN</span><span class="ucnt">10 patients</span></div>
         <span class="uchev open" id="chev-fern">▶</span>
       </div>
       <div id="ub-fern">
@@ -370,28 +496,77 @@ body.pb #print-trim{display:none !important}
                 <td><div class="pnm">Peters, Patricia</div><div class="pphn">9019405761</div></td>
                 <td><span class="pphn">9019405761</span></td>
                 <td><span class="pcd">250 401 321</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735241187&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735241187&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p028&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p028&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2404</span></td>
+                <td><div class="pnm">Dyall, Walter</div><div class="pphn">9820893149</div></td>
+                <td><span class="pphn">9820893149</span></td>
+                <td><span class="pcd">401 V15 427</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p029&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p029&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2407</span></td>
+                <td><div class="pnm">Walsh, John</div><div class="pphn">9103539612</div></td>
+                <td><span class="pphn">9103539612</span></td>
+                <td><span class="pcd">491.2 298</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p030&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p030&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2408</span></td>
+                <td><div class="pnm">Mcintyre, Yvonne</div><div class="pphn">9121623731</div></td>
+                <td><span class="pphn">9121623731</span></td>
+                <td><span class="pcd">295 401 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p031&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p031&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2412-1</span></td>
+                <td><div class="pnm">Johnson, Heather</div><div class="pphn">9087939539</div></td>
+                <td><span class="pphn">9087939539</span></td>
+                <td><span class="pcd">428 250</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p037&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p037&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">2501</span></td>
                 <td><div class="pnm">Robinson, William</div><div class="pphn">9087381203</div></td>
                 <td><span class="pphn">9087381203</span></td>
                 <td><span class="pcd">428.1 290</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735251660&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735251660&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p032&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p032&#39;)">✕</button></div></td>
               </tr>
               <tr>
-                <td><span class="prm">2512</span></td>
-                <td><div class="pnm">Carlson, Barbara</div><div class="pphn">9038158457</div></td>
-                <td><span class="pphn">9038158457</span></td>
-                <td><span class="pcd">340 V15</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735309680&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735309680&#39;)">✕</button></div></td>
+                <td><span class="prm">2502</span></td>
+                <td><div class="pnm">Jacobsen, Sharyl</div><div class="pphn">9023808522</div></td>
+                <td><span class="pphn">9023808522</span></td>
+                <td><span class="pcd">298</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p033&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p033&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2504</span></td>
+                <td><div class="pnm">Tufford, Brian</div><div class="pphn">9029547864</div></td>
+                <td><span class="pphn">9029547864</span></td>
+                <td><span class="pcd">491.2 298</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p034&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p034&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2506</span></td>
+                <td><div class="pnm">Manville, Ted</div><div class="pphn">9131651959</div></td>
+                <td><span class="pphn">9131651959</span></td>
+                <td><span class="pcd">428 585 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p035&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p035&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2511</span></td>
+                <td><div class="pnm">Carlson, Barbara</div><div class="pphn">9069343901</div></td>
+                <td><span class="pphn">9069343901</span></td>
+                <td><span class="pcd">401 427 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p036&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p036&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
       </div>
     </div><div class="usec">
       <div class="uhdr" onclick="toggleU(&#39;dewdney&#39;)">
-        <div class="uhdr-l"><span class="unm">DEWDNEY</span><span class="ucnt">3 patients</span></div>
+        <div class="uhdr-l"><span class="unm">DEWDNEY</span><span class="ucnt">23 patients</span></div>
         <span class="uchev open" id="chev-dewdney">▶</span>
       </div>
       <div id="ub-dewdney">
@@ -401,32 +576,172 @@ body.pb #print-trim{display:none !important}
             
             
               <tr>
+                <td><span class="prm">2103</span></td>
+                <td><div class="pnm">Tatla, Harbans</div><div class="pphn">9092842724</div></td>
+                <td><span class="pphn">9092842724</span></td>
+                <td><span class="pcd">250 290 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p050&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p050&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
                 <td><span class="prm">2104</span></td>
                 <td><div class="pnm">Horniak, William</div><div class="pphn">9034808919</div></td>
                 <td><span class="pphn">9034808919</span></td>
                 <td><span class="pcd">295</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735501245&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735501245&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p051&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p051&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2105</span></td>
+                <td><div class="pnm">Beddows, Susan</div><div class="pphn"></div></td>
+                <td><span class="pphn">—</span></td>
+                <td><span class="pcd"><span style="color:var(--muted);font-style:italic">—</span></span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p052&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p052&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2106</span></td>
+                <td><div class="pnm">Primrose, Kenneth</div><div class="pphn">9090510314</div></td>
+                <td><span class="pphn">9090510314</span></td>
+                <td><span class="pcd">298 331</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p053&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p053&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">2108</span></td>
                 <td><div class="pnm">Vitalia, Emilio</div><div class="pphn">9014735126</div></td>
                 <td><span class="pphn">9014735126</span></td>
                 <td><span class="pcd">331</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735513263&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735513263&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p054&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p054&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2109</span></td>
+                <td><div class="pnm">Ceratozi-Hiseni, Sami</div><div class="pphn">9894981858</div></td>
+                <td><span class="pphn">9894981858</span></td>
+                <td><span class="pcd">250 401 298</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p055&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p055&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2114</span></td>
+                <td><div class="pnm">Perry, Dolores</div><div class="pphn">9074680582</div></td>
+                <td><span class="pphn">9074680582</span></td>
+                <td><span class="pcd">250 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p056&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p056&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">2116</span></td>
                 <td><div class="pnm">Wadhwani, Shyam</div><div class="pphn">9123059215</div></td>
                 <td><span class="pphn">9123059215</span></td>
                 <td><span class="pcd">298 250 414</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735526437&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735526437&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p057&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p057&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2118</span></td>
+                <td><div class="pnm">Hicks, Delores</div><div class="pphn">9061019388</div></td>
+                <td><span class="pphn">9061019388</span></td>
+                <td><span class="pcd">290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p058&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p058&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2119</span></td>
+                <td><div class="pnm">Riley, Patrick</div><div class="pphn">9064159346</div></td>
+                <td><span class="pphn">9064159346</span></td>
+                <td><span class="pcd">401 298 496</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p059&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p059&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2122</span></td>
+                <td><div class="pnm">Harsley, Ronald</div><div class="pphn">9090132174</div></td>
+                <td><span class="pphn">9090132174</span></td>
+                <td><span class="pcd">290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p060&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p060&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2203</span></td>
+                <td><div class="pnm">Bassett, Anne</div><div class="pphn">9043492656</div></td>
+                <td><span class="pphn">9043492656</span></td>
+                <td><span class="pcd">V15 290 250</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p038&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p038&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2204</span></td>
+                <td><div class="pnm">Payne, Heather</div><div class="pphn">9894857259</div></td>
+                <td><span class="pphn">9894857259</span></td>
+                <td><span class="pcd">290 516.3</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p039&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p039&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2207</span></td>
+                <td><div class="pnm">Sobolik, Mona</div><div class="pphn">9034082635</div></td>
+                <td><span class="pphn">9034082635</span></td>
+                <td><span class="pcd">298 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p040&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p040&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2208</span></td>
+                <td><div class="pnm">Mclean, Donna</div><div class="pphn">9034092708</div></td>
+                <td><span class="pphn">9034092708</span></td>
+                <td><span class="pcd">401 V15 305</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p041&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p041&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2209</span></td>
+                <td><div class="pnm">Clements, Cara</div><div class="pphn">9128978121</div></td>
+                <td><span class="pphn">9128978121</span></td>
+                <td><span class="pcd">401 278</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p042&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p042&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2210</span></td>
+                <td><div class="pnm">Selezinka, Brian</div><div class="pphn">9079502057</div></td>
+                <td><span class="pphn">9079502057</span></td>
+                <td><span class="pcd">401 414 298</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p043&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p043&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2302</span></td>
+                <td><div class="pnm">Modrijan, Marjan</div><div class="pphn">9063435208</div></td>
+                <td><span class="pphn">9063435208</span></td>
+                <td><span class="pcd">331 V15 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p044&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p044&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2303</span></td>
+                <td><div class="pnm">Hasiri, Shokoh</div><div class="pphn">9147592826</div></td>
+                <td><span class="pphn">9147592826</span></td>
+                <td><span class="pcd">290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p045&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p045&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2304</span></td>
+                <td><div class="pnm">Sandhu, Sujan</div><div class="pphn">9891979244</div></td>
+                <td><span class="pphn">9891979244</span></td>
+                <td><span class="pcd">290 250</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p046&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p046&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2306</span></td>
+                <td><div class="pnm">Behnke, Dianne</div><div class="pphn">9052853452</div></td>
+                <td><span class="pphn">9052853452</span></td>
+                <td><span class="pcd">401 298 340</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p047&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p047&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2309</span></td>
+                <td><div class="pnm">Patch, Ronald</div><div class="pphn">9016295818</div></td>
+                <td><span class="pphn">9016295818</span></td>
+                <td><span class="pcd">250 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p048&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p048&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2312</span></td>
+                <td><div class="pnm">Carlisle, Karen</div><div class="pphn">9139120862</div></td>
+                <td><span class="pphn">9139120862</span></td>
+                <td><span class="pcd">436 440 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p049&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p049&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
       </div>
     </div><div class="usec">
       <div class="uhdr" onclick="toggleU(&#39;deroche&#39;)">
-        <div class="uhdr-l"><span class="unm">DEROCHE</span><span class="ucnt">3 patients</span></div>
+        <div class="uhdr-l"><span class="unm">DEROCHE</span><span class="ucnt">12 patients</span></div>
         <span class="uchev open" id="chev-deroche">▶</span>
       </div>
       <div id="ub-deroche">
@@ -440,28 +755,91 @@ body.pb #print-trim{display:none !important}
                 <td><div class="pnm">Blakely, Mary</div><div class="pphn">9072790931</div></td>
                 <td><span class="pphn">9072790931</span></td>
                 <td><span class="pcd">311 290 401</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735376913&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735376913&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p061&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p061&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">2604</span></td>
                 <td><div class="pnm">Ferris, June</div><div class="pphn">9106258069</div></td>
                 <td><span class="pphn">9106258069</span></td>
                 <td><span class="pcd">290 V15</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735465610&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735465610&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p062&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p062&#39;)">✕</button></div></td>
               </tr>
               <tr>
-                <td><span class="prm">2609</span></td>
-                <td><div class="pnm">Seddon, Murray</div><div class="pphn">9048436146</div></td>
-                <td><span class="pphn">9048436146</span></td>
-                <td><span class="pcd">153 V66</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735451428&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735451428&#39;)">✕</button></div></td>
+                <td><span class="prm">2607</span></td>
+                <td><div class="pnm">Manley, Gloria</div><div class="pphn">9085908245</div></td>
+                <td><span class="pphn">9085908245</span></td>
+                <td><span class="pcd">290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p063&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p063&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2610</span></td>
+                <td><div class="pnm">Harriman, Pamela</div><div class="pphn">9052393703</div></td>
+                <td><span class="pphn">9052393703</span></td>
+                <td><span class="pcd">250 401 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p064&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p064&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2615</span></td>
+                <td><div class="pnm">Kinealy, Sharon</div><div class="pphn">9086935403</div></td>
+                <td><span class="pphn">9086935403</span></td>
+                <td><span class="pcd">290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p065&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p065&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2616</span></td>
+                <td><div class="pnm">Dunford, Judith</div><div class="pphn">9127132819</div></td>
+                <td><span class="pphn">9127132819</span></td>
+                <td><span class="pcd">298 427</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p066&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p066&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2618</span></td>
+                <td><div class="pnm">Pilling, Margaret</div><div class="pphn">9075120837</div></td>
+                <td><span class="pphn">9075120837</span></td>
+                <td><span class="pcd">298 427</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p067&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p067&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2620</span></td>
+                <td><div class="pnm">Proball, Arjin</div><div class="pphn">9131521753</div></td>
+                <td><span class="pphn">9131521753</span></td>
+                <td><span class="pcd">298 303</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p068&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p068&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2622</span></td>
+                <td><div class="pnm">Sandhar, Naseeb</div><div class="pphn">9136750806</div></td>
+                <td><span class="pphn">9136750806</span></td>
+                <td><span class="pcd">250 331</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p069&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p069&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2623</span></td>
+                <td><div class="pnm">Reyes, Humberto</div><div class="pphn">9803804109</div></td>
+                <td><span class="pphn">9803804109</span></td>
+                <td><span class="pcd">290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p070&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p070&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2624</span></td>
+                <td><div class="pnm">Ng, Beverley</div><div class="pphn">9054057143</div></td>
+                <td><span class="pphn">9054057143</span></td>
+                <td><span class="pcd">250 298 331</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p071&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p071&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">2626</span></td>
+                <td><div class="pnm">Dyall, Walter</div><div class="pphn">9820893149</div></td>
+                <td><span class="pphn">9820893149</span></td>
+                <td><span class="pcd">401 V15 427</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p072&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p072&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
       </div>
     </div><div class="usec">
       <div class="uhdr" onclick="toggleU(&#39;silver&#39;)">
-        <div class="uhdr-l"><span class="unm">SILVER</span><span class="ucnt">3 patients</span></div>
+        <div class="uhdr-l"><span class="unm">SILVER</span><span class="ucnt">10 patients</span></div>
         <span class="uchev open" id="chev-silver">▶</span>
       </div>
       <div id="ub-silver">
@@ -475,28 +853,77 @@ body.pb #print-trim{display:none !important}
                 <td><div class="pnm">Ruetz, Maureen</div><div class="pphn">9089867269</div></td>
                 <td><span class="pphn">9089867269</span></td>
                 <td><span class="pcd">250 401 311</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735556668&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735556668&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p073&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p073&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3402-1</span></td>
+                <td><div class="pnm">Atkinson, Kathleen</div><div class="pphn">9750878312</div></td>
+                <td><span class="pphn">9750878312</span></td>
+                <td><span class="pcd">436 401 V15</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p074&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p074&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3404</span></td>
+                <td><div class="pnm">Dry, Linda</div><div class="pphn">9078393078</div></td>
+                <td><span class="pphn">9078393078</span></td>
+                <td><span class="pcd">290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p075&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p075&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">3405</span></td>
                 <td><div class="pnm">Bellward, Harvey</div><div class="pphn">9021491814</div></td>
                 <td><span class="pphn">9021491814</span></td>
                 <td><span class="pcd">436 331 V15</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735571058&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735571058&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p076&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p076&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">3406</span></td>
                 <td><div class="pnm">Lloyd, Margaret</div><div class="pphn">9042171456</div></td>
                 <td><span class="pphn">9042171456</span></td>
                 <td><span class="pcd">516.3 332 V15</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735582254&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735582254&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p077&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p077&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3409</span></td>
+                <td><div class="pnm">Wilson, Joan</div><div class="pphn">9040783917</div></td>
+                <td><span class="pphn">9040783917</span></td>
+                <td><span class="pcd">250 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p078&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p078&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3412 A</span></td>
+                <td><div class="pnm">Pennier, Gregory</div><div class="pphn">9121585171</div></td>
+                <td><span class="pphn">9121585171</span></td>
+                <td><span class="pcd">290 434 496</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p079&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p079&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3412 B</span></td>
+                <td><div class="pnm">Zalavany, Andras</div><div class="pphn">9064179362</div></td>
+                <td><span class="pphn">9064179362</span></td>
+                <td><span class="pcd">428 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p080&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p080&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3412</span></td>
+                <td><div class="pnm">Taylor, Frank</div><div class="pphn">9065635616</div></td>
+                <td><span class="pphn">9065635616</span></td>
+                <td><span class="pcd">290 585 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p081&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p081&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3512</span></td>
+                <td><div class="pnm">Kyne, Craig</div><div class="pphn">9079378401</div></td>
+                <td><span class="pphn">9079378401</span></td>
+                <td><span class="pcd">290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p082&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p082&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
       </div>
     </div><div class="usec">
       <div class="uhdr" onclick="toggleU(&#39;stave&#39;)">
-        <div class="uhdr-l"><span class="unm">STAVE</span><span class="ucnt">4 patients</span></div>
+        <div class="uhdr-l"><span class="unm">STAVE</span><span class="ucnt">13 patients</span></div>
         <span class="uchev open" id="chev-stave">▶</span>
       </div>
       <div id="ub-stave">
@@ -506,32 +933,95 @@ body.pb #print-trim{display:none !important}
             
             
               <tr>
+                <td><span class="prm">3201</span></td>
+                <td><div class="pnm">Goulah, Dennis</div><div class="pphn">9054137527</div></td>
+                <td><span class="pphn">9054137527</span></td>
+                <td><span class="pcd">571 290.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p083&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p083&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3202</span></td>
+                <td><div class="pnm">Fairweather, Margaret</div><div class="pphn">9014937604</div></td>
+                <td><span class="pphn">9014937604</span></td>
+                <td><span class="pcd">V66</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p084&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p084&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
                 <td><span class="prm">3204</span></td>
                 <td><div class="pnm">Limpright, Miriam</div><div class="pphn">9013287916</div></td>
                 <td><span class="pphn">9013287916</span></td>
                 <td><span class="pcd">401 298</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735600062&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735600062&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p085&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p085&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">3205</span></td>
                 <td><div class="pnm">Kostka, Henryk</div><div class="pphn">9129729478</div></td>
                 <td><span class="pphn">9129729478</span></td>
                 <td><span class="pcd">290 303</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774738706582&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774738706582&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p086&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p086&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3207</span></td>
+                <td><div class="pnm">Blackwood, Helen</div><div class="pphn">9138975691</div></td>
+                <td><span class="pphn">9138975691</span></td>
+                <td><span class="pcd">250 401.1</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p087&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p087&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3210</span></td>
+                <td><div class="pnm">Dodd, Patrick</div><div class="pphn">9090462657</div></td>
+                <td><span class="pphn">9090462657</span></td>
+                <td><span class="pcd">161.9</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p088&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p088&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3212</span></td>
+                <td><div class="pnm">Rayne, Iris</div><div class="pphn">9083471586</div></td>
+                <td><span class="pphn">9083471586</span></td>
+                <td><span class="pcd">340 290</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p089&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p089&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">3301</span></td>
                 <td><div class="pnm">Rissling, Dorothy</div><div class="pphn">9029652481</div></td>
                 <td><span class="pphn">9029652481</span></td>
                 <td><span class="pcd">295 V15</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735610448&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735610448&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p090&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p090&#39;)">✕</button></div></td>
               </tr>
               <tr>
                 <td><span class="prm">3304</span></td>
                 <td><div class="pnm">Dornan, Beverley</div><div class="pphn">9070189487</div></td>
                 <td><span class="pphn">9070189487</span></td>
                 <td><span class="pcd">401 332</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;1774735621663&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;1774735621663&#39;)">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p091&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p091&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3309</span></td>
+                <td><div class="pnm">Besco, Bernadette</div><div class="pphn">9129729478</div></td>
+                <td><span class="pphn">9129729478</span></td>
+                <td><span class="pcd">298 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p092&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p092&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3310</span></td>
+                <td><div class="pnm">Zamrykut, Anna</div><div class="pphn">9127652396</div></td>
+                <td><span class="pphn">9127652396</span></td>
+                <td><span class="pcd">401 332.0</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p093&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p093&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3311</span></td>
+                <td><div class="pnm">Diprimo, Robert</div><div class="pphn">9142192426</div></td>
+                <td><span class="pphn">9142192426</span></td>
+                <td><span class="pcd">496 401</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p094&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p094&#39;)">✕</button></div></td>
+              </tr>
+              <tr>
+                <td><span class="prm">3312</span></td>
+                <td><div class="pnm">Atzinger, Aloys</div><div class="pphn"></div></td>
+                <td><span class="pphn">—</span></td>
+                <td><span class="pcd">V66.7</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm" onclick="startEdit(&#39;p095&#39;)">Edit</button><button class="btn btn-danger btn-sm" onclick="promptDel(&#39;p095&#39;)">✕</button></div></td>
               </tr>
           </tbody>
         </table>
@@ -552,45 +1042,10 @@ body.pb #print-trim{display:none !important}
         <span class="cal-month-lbl" id="cal-lbl">March 2026</span>
         <button onclick="calNext()">Next ›</button>
       </div>
-      <div class="cal-grid" id="cal-grid"><div class="cal-dh">Su</div><div class="cal-dh">Mo</div><div class="cal-dh">Tu</div><div class="cal-dh">We</div><div class="cal-dh">Th</div><div class="cal-dh">Fr</div><div class="cal-dh">Sa</div><div class="cal-day " onclick="calSelectDay(1)">1</div><div class="cal-day " onclick="calSelectDay(2)">2</div><div class="cal-day " onclick="calSelectDay(3)">3</div><div class="cal-day " onclick="calSelectDay(4)">4</div><div class="cal-day already" title="Already added">5</div><div class="cal-day " onclick="calSelectDay(6)">6</div><div class="cal-day " onclick="calSelectDay(7)">7</div><div class="cal-day " onclick="calSelectDay(8)">8</div><div class="cal-day " onclick="calSelectDay(9)">9</div><div class="cal-day " onclick="calSelectDay(10)">10</div><div class="cal-day " onclick="calSelectDay(11)">11</div><div class="cal-day already" title="Already added">12</div><div class="cal-day " onclick="calSelectDay(13)">13</div><div class="cal-day " onclick="calSelectDay(14)">14</div><div class="cal-day " onclick="calSelectDay(15)">15</div><div class="cal-day " onclick="calSelectDay(16)">16</div><div class="cal-day " onclick="calSelectDay(17)">17</div><div class="cal-day " onclick="calSelectDay(18)">18</div><div class="cal-day " onclick="calSelectDay(19)">19</div><div class="cal-day " onclick="calSelectDay(20)">20</div><div class="cal-day " onclick="calSelectDay(21)">21</div><div class="cal-day " onclick="calSelectDay(22)">22</div><div class="cal-day " onclick="calSelectDay(23)">23</div><div class="cal-day " onclick="calSelectDay(24)">24</div><div class="cal-day " onclick="calSelectDay(25)">25</div><div class="cal-day already" title="Already added">26</div><div class="cal-day " onclick="calSelectDay(27)">27</div><div class="cal-day today" onclick="calSelectDay(28)">28</div><div class="cal-day " onclick="calSelectDay(29)">29</div><div class="cal-day " onclick="calSelectDay(30)">30</div><div class="cal-day " onclick="calSelectDay(31)">31</div></div>
+      <div class="cal-grid" id="cal-grid"><div class="cal-dh">Su</div><div class="cal-dh">Mo</div><div class="cal-dh">Tu</div><div class="cal-dh">We</div><div class="cal-dh">Th</div><div class="cal-dh">Fr</div><div class="cal-dh">Sa</div><div class="cal-day " onclick="calSelectDay(1)">1</div><div class="cal-day " onclick="calSelectDay(2)">2</div><div class="cal-day " onclick="calSelectDay(3)">3</div><div class="cal-day " onclick="calSelectDay(4)">4</div><div class="cal-day " onclick="calSelectDay(5)">5</div><div class="cal-day " onclick="calSelectDay(6)">6</div><div class="cal-day " onclick="calSelectDay(7)">7</div><div class="cal-day " onclick="calSelectDay(8)">8</div><div class="cal-day " onclick="calSelectDay(9)">9</div><div class="cal-day " onclick="calSelectDay(10)">10</div><div class="cal-day " onclick="calSelectDay(11)">11</div><div class="cal-day " onclick="calSelectDay(12)">12</div><div class="cal-day " onclick="calSelectDay(13)">13</div><div class="cal-day " onclick="calSelectDay(14)">14</div><div class="cal-day " onclick="calSelectDay(15)">15</div><div class="cal-day " onclick="calSelectDay(16)">16</div><div class="cal-day " onclick="calSelectDay(17)">17</div><div class="cal-day " onclick="calSelectDay(18)">18</div><div class="cal-day " onclick="calSelectDay(19)">19</div><div class="cal-day " onclick="calSelectDay(20)">20</div><div class="cal-day " onclick="calSelectDay(21)">21</div><div class="cal-day " onclick="calSelectDay(22)">22</div><div class="cal-day " onclick="calSelectDay(23)">23</div><div class="cal-day " onclick="calSelectDay(24)">24</div><div class="cal-day " onclick="calSelectDay(25)">25</div><div class="cal-day " onclick="calSelectDay(26)">26</div><div class="cal-day " onclick="calSelectDay(27)">27</div><div class="cal-day today" onclick="calSelectDay(28)">28</div><div class="cal-day " onclick="calSelectDay(29)">29</div><div class="cal-day " onclick="calSelectDay(30)">30</div><div class="cal-day " onclick="calSelectDay(31)">31</div></div>
     </div>
 
-    <div id="dlist">
-    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-family:var(--mono);margin-top:4px">3 / 17 SLOTS USED</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px">
-      
-        <div class="dchip">
-          <div class="dchip-info">
-            <span class="dchip-date">Mar 5</span>
-            <span class="dchip-dow">Thu</span>
-            <span class="dchip-seen">(10)</span>
-          </div>
-          <button class="dchip-edit" onclick="editSeen(&#39;1774739349915&#39;)" title="Edit patients seen">✏</button>
-          <button class="dchip-del" onclick="removeDate(&#39;1774739349915&#39;)" title="Remove">×</button>
-        </div>
-        <div class="dchip">
-          <div class="dchip-info">
-            <span class="dchip-date">Mar 12</span>
-            <span class="dchip-dow">Thu</span>
-            <span class="dchip-seen">(5)</span>
-          </div>
-          <button class="dchip-edit" onclick="editSeen(&#39;1774739347311&#39;)" title="Edit patients seen">✏</button>
-          <button class="dchip-del" onclick="removeDate(&#39;1774739347311&#39;)" title="Remove">×</button>
-        </div>
-        <div class="dchip">
-          <div class="dchip-info">
-            <span class="dchip-date">Mar 26</span>
-            <span class="dchip-dow">Thu</span>
-            <span class="dchip-seen">(10)</span>
-          </div>
-          <button class="dchip-edit" onclick="editSeen(&#39;1774739344012&#39;)" title="Edit patients seen">✏</button>
-          <button class="dchip-del" onclick="removeDate(&#39;1774739344012&#39;)" title="Remove">×</button>
-        </div>
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px">
-      <button class="btn btn-ghost btn-sm" onclick="clearDates()">Clear All Dates</button>
-    </div>
-    </div>
+    <div id="dlist"><p style="color:var(--muted);font-size:13px;font-style:italic;margin-top:8px">No dates yet. Click a date on the calendar above to add it.</p></div>
   </div>
 </div>
 
@@ -700,8 +1155,14 @@ async function loadDrive(){
     if(list.files?.length>0){
       state.driveFileId=list.files[0].id;
       const c=await fetch(`https://www.googleapis.com/drive/v3/files/${state.driveFileId}?alt=media`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
-      applyState(c);saveLocal();setSS('Loaded from Drive ✓',true);render();
-    }else{setSS('Connected — no file found yet',true)}
+      applyState(c);
+      if(state.patients.length===0) state.patients=DEFAULT_PATIENTS.map(p=>({...p}));
+      saveLocal();setSS('Loaded from Drive ✓',true);render();
+    }else{
+      if(state.patients.length===0) state.patients=DEFAULT_PATIENTS.map(p=>({...p}));
+      setSS('Connected — saving patients to Drive…',true);
+      saveDrive();render();
+    }
   }catch(e){setSS('Load failed',false)}
 }
 function applyState(s){
@@ -711,8 +1172,128 @@ function applyState(s){
   if(s.driveFileId)state.driveFileId=s.driveFileId;
 }
 function saveLocal(){try{localStorage.setItem('trim_st',JSON.stringify(state))}catch(e){}}
-async function loadLocal(){try{const r=localStorage.getItem('trim_st');if(r)applyState(JSON.parse(r))}catch(e){}}
+async function loadLocal(){
+  try{
+    const r=localStorage.getItem('trim_st');
+    if(r){
+      applyState(JSON.parse(r));
+    }
+    // If still no patients, load defaults
+    if(state.patients.length===0){
+      state.patients=DEFAULT_PATIENTS.map(p=>({...p}));
+    }
+  }catch(e){
+    if(state.patients.length===0) state.patients=DEFAULT_PATIENTS.map(p=>({...p}));
+  }
+}
 function setSS(m,ok){const e=g('ss');e.textContent=m;e.style.color=ok?'rgba(255,255,255,.9)':'rgba(255,200,100,.9)'}
+
+// ── DEFAULT PATIENTS (pre-loaded from TRIM List + Billing docs) ──
+const DEFAULT_PATIENTS=[
+  // CEDAR (rooms 14xx, 15xx)
+  {id:'p001',name:'Tannler, Brian',phn:'9127810796',unit:'cedar',room:'1402',codes:'290.0 401'},
+  {id:'p002',name:'Schiller, Valda',phn:'9073813010',unit:'cedar',room:'1405',codes:'250 298 401'},
+  {id:'p003',name:'Harsh, Ronald',phn:'9048596186',unit:'cedar',room:'1406',codes:'V15 401 290'},
+  {id:'p004',name:'Lowe, Deanna',phn:'9024327811',unit:'cedar',room:'1407',codes:'428 496'},
+  {id:'p005',name:'Harsh, Sandra',phn:'9048596193',unit:'cedar',room:'1408',codes:'290'},
+  {id:'p006',name:'Lazar, Marta',phn:'9125017016',unit:'cedar',room:'1410',codes:'250 428 436'},
+  {id:'p007',name:'Landels, Judith',phn:'9061480326',unit:'cedar',room:'1411',codes:'496 401'},
+  {id:'p008',name:'Passmore, Justina',phn:'9129069283',unit:'cedar',room:'1501',codes:'V15 290'},
+  {id:'p009',name:'Anderson, David',phn:'9074148095',unit:'cedar',room:'1502',codes:'250 303 338'},
+  {id:'p010',name:'Giles, Patricia',phn:'9058535755',unit:'cedar',room:'1505',codes:'250 585'},
+  {id:'p011',name:'Cicecki, Artin',phn:'9832968475',unit:'cedar',room:'1505',codes:'298 428'},
+  {id:'p012',name:'Stewart, Michael',phn:'9048630153',unit:'cedar',room:'1510',codes:'250 401'},
+  {id:'p013',name:'West, Teresa',phn:'9052303862',unit:'cedar',room:'1511',codes:'401 V15'},
+  // CHERRY (rooms 12xx, 13xx)
+  {id:'p014',name:'Bosshart, Marlies',phn:'9064374199',unit:'cherry',room:'1201',codes:'331 V15 311'},
+  {id:'p015',name:'Pongracz, Patricia',phn:'9067505652',unit:'cherry',room:'1203',codes:'290'},
+  {id:'p016',name:'Nichols, Kelly',phn:'9054261216',unit:'cherry',room:'1204',codes:'491.2 401'},
+  {id:'p017',name:'Savoy, Daphne',phn:'9876820675',unit:'cherry',room:'1212',codes:'436 571'},
+  {id:'p018',name:'Ruppert, Gerd',phn:'9043549531',unit:'cherry',room:'1301',codes:'250 290 V15'},
+  {id:'p019',name:'Kelly, George',phn:'9085952611',unit:'cherry',room:'1301-B',codes:'290 303'},
+  {id:'p020',name:'May, Gary',phn:'9025247638',unit:'cherry',room:'1302',codes:'290 303'},
+  {id:'p021',name:'Daoust, Henry',phn:'9126168296',unit:'cherry',room:'1303',codes:'290.0'},
+  {id:'p022',name:'Patenaude, Josee',phn:'9041589088',unit:'cherry',room:'1308',codes:'250 V15'},
+  {id:'p023',name:'Frost, Michael',phn:'9023039548',unit:'cherry',room:'1311',codes:'290 401'},
+  {id:'p024',name:'Ravelo, Manolito',phn:'9138373971',unit:'cherry',room:'1312',codes:'428 436 290'},
+  // HATZIC
+  {id:'p025',name:'Hertslet, Crystal',phn:'9034851301',unit:'hatzic',room:'2202',codes:'428 436 V15'},
+  {id:'p026',name:'Currie, Lorna',phn:'9063914645',unit:'hatzic',room:'2412-2',codes:'401 290 V15'},
+  {id:'p027',name:'Bennet, Daniel',phn:'9038158457',unit:'hatzic',room:'2512',codes:'340 V15'},
+  // FERN (rooms 24xx, 25xx)
+  {id:'p028',name:'Peters, Patricia',phn:'9019405761',unit:'fern',room:'2403',codes:'250 401 321'},
+  {id:'p029',name:'Dyall, Walter',phn:'9820893149',unit:'fern',room:'2404',codes:'401 V15 427'},
+  {id:'p030',name:'Walsh, John',phn:'9103539612',unit:'fern',room:'2407',codes:'491.2 298'},
+  {id:'p031',name:'Mcintyre, Yvonne',phn:'9121623731',unit:'fern',room:'2408',codes:'295 401 V15'},
+  {id:'p032',name:'Robinson, William',phn:'9087381203',unit:'fern',room:'2501',codes:'428.1 290'},
+  {id:'p033',name:'Jacobsen, Sharyl',phn:'9023808522',unit:'fern',room:'2502',codes:'298'},
+  {id:'p034',name:'Tufford, Brian',phn:'9029547864',unit:'fern',room:'2504',codes:'491.2 298'},
+  {id:'p035',name:'Manville, Ted',phn:'9131651959',unit:'fern',room:'2506',codes:'428 585 V15'},
+  {id:'p036',name:'Carlson, Barbara',phn:'9069343901',unit:'fern',room:'2511',codes:'401 427 V15'},
+  {id:'p037',name:'Johnson, Heather',phn:'9087939539',unit:'fern',room:'2412-1',codes:'428 250'},
+  // DEWDNEY (rooms 21xx, 22xx, 23xx)
+  {id:'p038',name:'Bassett, Anne',phn:'9043492656',unit:'dewdney',room:'2203',codes:'V15 290 250'},
+  {id:'p039',name:'Payne, Heather',phn:'9894857259',unit:'dewdney',room:'2204',codes:'290 516.3'},
+  {id:'p040',name:'Sobolik, Mona',phn:'9034082635',unit:'dewdney',room:'2207',codes:'298 V15'},
+  {id:'p041',name:'Mclean, Donna',phn:'9034092708',unit:'dewdney',room:'2208',codes:'401 V15 305'},
+  {id:'p042',name:'Clements, Cara',phn:'9128978121',unit:'dewdney',room:'2209',codes:'401 278'},
+  {id:'p043',name:'Selezinka, Brian',phn:'9079502057',unit:'dewdney',room:'2210',codes:'401 414 298'},
+  {id:'p044',name:'Modrijan, Marjan',phn:'9063435208',unit:'dewdney',room:'2302',codes:'331 V15 401'},
+  {id:'p045',name:'Hasiri, Shokoh',phn:'9147592826',unit:'dewdney',room:'2303',codes:'290'},
+  {id:'p046',name:'Sandhu, Sujan',phn:'9891979244',unit:'dewdney',room:'2304',codes:'290 250'},
+  {id:'p047',name:'Behnke, Dianne',phn:'9052853452',unit:'dewdney',room:'2306',codes:'401 298 340'},
+  {id:'p048',name:'Patch, Ronald',phn:'9016295818',unit:'dewdney',room:'2309',codes:'250 290'},
+  {id:'p049',name:'Carlisle, Karen',phn:'9139120862',unit:'dewdney',room:'2312',codes:'436 440 V15'},
+  {id:'p050',name:'Tatla, Harbans',phn:'9092842724',unit:'dewdney',room:'2103',codes:'250 290 V15'},
+  {id:'p051',name:'Horniak, William',phn:'9034808919',unit:'dewdney',room:'2104',codes:'295'},
+  {id:'p052',name:'Beddows, Susan',phn:'',unit:'dewdney',room:'2105',codes:''},
+  {id:'p053',name:'Primrose, Kenneth',phn:'9090510314',unit:'dewdney',room:'2106',codes:'298 331'},
+  {id:'p054',name:'Vitalia, Emilio',phn:'9014735126',unit:'dewdney',room:'2108',codes:'331'},
+  {id:'p055',name:'Ceratozi-Hiseni, Sami',phn:'9894981858',unit:'dewdney',room:'2109',codes:'250 401 298'},
+  {id:'p056',name:'Perry, Dolores',phn:'9074680582',unit:'dewdney',room:'2114',codes:'250 290'},
+  {id:'p057',name:'Wadhwani, Shyam',phn:'9123059215',unit:'dewdney',room:'2116',codes:'298 250 414'},
+  {id:'p058',name:'Hicks, Delores',phn:'9061019388',unit:'dewdney',room:'2118',codes:'290'},
+  {id:'p059',name:'Riley, Patrick',phn:'9064159346',unit:'dewdney',room:'2119',codes:'401 298 496'},
+  {id:'p060',name:'Harsley, Ronald',phn:'9090132174',unit:'dewdney',room:'2122',codes:'290.0'},
+  // DEROCHE (rooms 26xx)
+  {id:'p061',name:'Blakely, Mary',phn:'9072790931',unit:'deroche',room:'2603',codes:'311 290 401'},
+  {id:'p062',name:'Ferris, June',phn:'9106258069',unit:'deroche',room:'2604',codes:'290 V15'},
+  {id:'p063',name:'Manley, Gloria',phn:'9085908245',unit:'deroche',room:'2607',codes:'290.0'},
+  {id:'p064',name:'Harriman, Pamela',phn:'9052393703',unit:'deroche',room:'2610',codes:'250 401 V15'},
+  {id:'p065',name:'Kinealy, Sharon',phn:'9086935403',unit:'deroche',room:'2615',codes:'290.0'},
+  {id:'p066',name:'Dunford, Judith',phn:'9127132819',unit:'deroche',room:'2616',codes:'298 427'},
+  {id:'p067',name:'Pilling, Margaret',phn:'9075120837',unit:'deroche',room:'2618',codes:'298 427'},
+  {id:'p068',name:'Proball, Arjin',phn:'9131521753',unit:'deroche',room:'2620',codes:'298 303'},
+  {id:'p069',name:'Sandhar, Naseeb',phn:'9136750806',unit:'deroche',room:'2622',codes:'250 331'},
+  {id:'p070',name:'Reyes, Humberto',phn:'9803804109',unit:'deroche',room:'2623',codes:'290'},
+  {id:'p071',name:'Ng, Beverley',phn:'9054057143',unit:'deroche',room:'2624',codes:'250 298 331'},
+  {id:'p072',name:'Dyall, Walter',phn:'9820893149',unit:'deroche',room:'2626',codes:'401 V15 427'},
+  // SILVER (rooms 34xx, 35xx)
+  {id:'p073',name:'Ruetz, Maureen',phn:'9089867269',unit:'silver',room:'3401',codes:'250 401 311'},
+  {id:'p074',name:'Atkinson, Kathleen',phn:'9750878312',unit:'silver',room:'3402-1',codes:'436 401 V15'},
+  {id:'p075',name:'Dry, Linda',phn:'9078393078',unit:'silver',room:'3404',codes:'290.0'},
+  {id:'p076',name:'Bellward, Harvey',phn:'9021491814',unit:'silver',room:'3405',codes:'436 331 V15'},
+  {id:'p077',name:'Lloyd, Margaret',phn:'9042171456',unit:'silver',room:'3406',codes:'516.3 332 V15'},
+  {id:'p078',name:'Wilson, Joan',phn:'9040783917',unit:'silver',room:'3409',codes:'250 401'},
+  {id:'p079',name:'Pennier, Gregory',phn:'9121585171',unit:'silver',room:'3412 A',codes:'290 434 496'},
+  {id:'p080',name:'Zalavany, Andras',phn:'9064179362',unit:'silver',room:'3412 B',codes:'428 290'},
+  {id:'p081',name:'Taylor, Frank',phn:'9065635616',unit:'silver',room:'3412',codes:'290 585 401'},
+  {id:'p082',name:'Kyne, Craig',phn:'9079378401',unit:'silver',room:'3512',codes:'290.0'},
+  // STAVE (rooms 32xx, 33xx)
+  {id:'p083',name:'Goulah, Dennis',phn:'9054137527',unit:'stave',room:'3201',codes:'571 290.0'},
+  {id:'p084',name:'Fairweather, Margaret',phn:'9014937604',unit:'stave',room:'3202',codes:'V66'},
+  {id:'p085',name:'Limpright, Miriam',phn:'9013287916',unit:'stave',room:'3204',codes:'401 298'},
+  {id:'p086',name:'Kostka, Henryk',phn:'9129729478',unit:'stave',room:'3205',codes:'290 303'},
+  {id:'p087',name:'Blackwood, Helen',phn:'9138975691',unit:'stave',room:'3207',codes:'250 401.1'},
+  {id:'p088',name:'Dodd, Patrick',phn:'9090462657',unit:'stave',room:'3210',codes:'161.9'},
+  {id:'p089',name:'Rayne, Iris',phn:'9083471586',unit:'stave',room:'3212',codes:'340 290'},
+  {id:'p090',name:'Rissling, Dorothy',phn:'9029652481',unit:'stave',room:'3301',codes:'295 V15'},
+  {id:'p091',name:'Dornan, Beverley',phn:'9070189487',unit:'stave',room:'3304',codes:'401 332'},
+  {id:'p092',name:'Besco, Bernadette',phn:'9129729478',unit:'stave',room:'3309',codes:'298 401'},
+  {id:'p093',name:'Zamrykut, Anna',phn:'9127652396',unit:'stave',room:'3310',codes:'401 332.0'},
+  {id:'p094',name:'Diprimo, Robert',phn:'9142192426',unit:'stave',room:'3311',codes:'496 401'},
+  {id:'p095',name:'Atzinger, Aloys',phn:'',unit:'stave',room:'3312',codes:'V66.7'},
+];
 
 // ── TABS ──
 function showTab(name,btn){
