@@ -318,7 +318,7 @@ const MAX_P=110,MAX_D=17;
 const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
 const BILL_PAGES=[['cedar','cherry','hatzic'],['fern','dewdney','deroche'],['silver','stave']];
 const FILE_NAME='trim-patients-data.json';
-const SCOPE='https://www.googleapis.com/auth/drive.file';
+const SCOPE='https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive';
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -367,19 +367,32 @@ async function forceSyncFromDrive(){
 async function saveDrive(){
   const body=JSON.stringify({patients:state.patients,units:state.units,billingDates:state.billingDates,driveFileId:state.driveFileId});
   saveLocal();
-  if(!state.googleConnected||!state.googleToken){setSS('Saved locally',false);return}
-  setSS('Saving…',false);
+  if(!state.googleConnected||!state.googleToken){setSS('Saved locally only',false);return}
+  setSS('Saving to Drive…',false);
   try{
-    if(state.driveFileId){
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
-    }else{
-      const m=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,mimeType:'application/json'})}).then(r=>r.json());
+    let fileId=state.driveFileId;
+    if(fileId){
+      const patchRes=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+      if(!patchRes.ok){
+        const err=await patchRes.json();
+        console.error('Patch failed:',err);
+        // File may have been deleted — try creating new
+        fileId=null;
+        state.driveFileId=null;
+      }
+    }
+    if(!fileId){
+      const metaRes=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,mimeType:'application/json'})});
+      if(!metaRes.ok){const err=await metaRes.json();console.error('Create failed:',err);setSS('Save failed! Check console.',false);return}
+      const m=await metaRes.json();
       state.driveFileId=m.id;
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${m.id}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+      console.log('Created new Drive file:',m.id);
+      const uploadRes=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${m.id}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+      if(!uploadRes.ok){const err=await uploadRes.json();console.error('Upload failed:',err);setSS('Save failed! Check console.',false);return}
       saveLocal();
     }
     setSS('Saved to Drive ✓',true);
-  }catch(e){setSS('Save failed!',false)}
+  }catch(e){setSS('Save failed! '+e.message,false);console.error('saveDrive error:',e)}
 }
 async function loadDrive(){
   setSS('Loading…',false);
