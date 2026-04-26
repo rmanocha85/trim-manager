@@ -147,7 +147,7 @@ body.pb #print-trim{display:none !important}
 .tpage:last-child{page-break-after:avoid}
 
 .t-datehdr{
-  border:1px solid #000;padding:3px 10px;font-size:9px;font-weight:bold;
+  padding:3px 10px;font-size:9px;font-weight:bold;
   margin-bottom:3px;text-align:center;background:#fff;
 }
 .t-datehdr span{font-size:10px;font-weight:bold}
@@ -219,6 +219,7 @@ body.pb #print-trim{display:none !important}
   <div class="hdr-right">
     <span class="save-status" id="ss">Loading…</span>
     <button class="btn btn-gw btn-sm" id="btn-connect" onclick="gConnect()">Connect Google Drive</button>
+    <button class="btn btn-gw btn-sm" onclick="forceSyncFromDrive()" id="btn-sync" style="display:none">🔄 Sync from Drive</button>
     <button class="btn btn-white btn-sm" onclick="printTrim()">🖨 TRIM List</button>
     <button class="btn btn-gw btn-sm" onclick="printBilling()">🖨 TRIM Billing</button>
   </div>
@@ -346,9 +347,22 @@ async function gConnect(){
   google.accounts.oauth2.initTokenClient({client_id:cid,scope:SCOPE,callback:async r=>{
     if(r.error){alert('Auth failed: '+r.error);return}
     state.googleToken=r.access_token;state.googleConnected=true;
-    setSS('Connected ✓',true);g('btn-connect').textContent='✓ Google Drive';
+    setSS('Connected — loading from Drive…',true);
+    g('btn-connect').textContent='✓ Connected';
+    g('btn-sync').style.display='inline-flex';
     await loadDrive();
   }}).requestAccessToken();
+}
+
+async function forceSyncFromDrive(){
+  if(!state.googleConnected||!state.googleToken){
+    alert('Please connect Google Drive first.');return;
+  }
+  setSS('Force syncing from Drive…',false);
+  // Clear local state completely first
+  state.patients=[];
+  state.billingDates=[];
+  await loadDrive();
 }
 async function saveDrive(){
   const body=JSON.stringify({patients:state.patients,units:state.units,billingDates:state.billingDates,driveFileId:state.driveFileId});
@@ -800,8 +814,8 @@ function buildTrimList(){
             <span>114</span><span>115</span><span>127</span><span>200</span>
             <span class="sep">13334</span><span class="sep">14077</span>
             <span>x</span><span>1</span><span class="sep">2</span>
-            <span>start:&nbsp;&nbsp;&nbsp;&nbsp;</span>
-            <span>end:&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span>start:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span>end:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
             <span>R:</span>
           </div>
           <div class="t-icd" style="font-size:${fp}px">${esc(p.codes||'')}</div>
