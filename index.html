@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lets get this done</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#f0ede6;--surface:#fff;--border:#d4cfc6;--border-light:#e8e4de;
+  --text:#1c1a17;--muted:#7a7468;--accent:#2d5a3d;--accent-light:#e6efe8;
+  --accent-hover:#1e3f2b;--danger:#7a1e1e;--danger-light:#fdf0f0;
+  --warning:#7a5a1e;--warning-light:#fdf6e6;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;--r:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* PRE-AUTH SHELL — expose only the app name and Drive sign-in control. */
+body:not(.drive-connected) .hdr-right > :not(#btn-connect),
+body:not(.drive-connected) .tabs-bar,
+body:not(.drive-connected) .panel,
+body:not(.drive-connected) #history-banner,
+body:not(.drive-connected) .modal-ov{
+  display:none !important;
+}
+
+header{background:var(--accent);color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:200;box-shadow:0 2px 10px rgba(0,0,0,.2)}
+header h1{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:.1em;text-transform:uppercase}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.save-status{font-size:11px;opacity:.75;font-family:var(--mono)}
+
+.btn{font-family:var(--sans);font-size:13px;font-weight:500;border:none;border-radius:6px;padding:7px 14px;cursor:pointer;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.btn-white{background:#fff;color:var(--accent)}.btn-white:hover{background:var(--accent-light)}
+.btn-gw{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25)}.btn-gw:hover{background:rgba(255,255,255,.22)}
+.btn-green{background:var(--accent);color:#fff}.btn-green:hover{background:var(--accent-hover)}
+.btn-outline{background:transparent;color:var(--accent);border:1.5px solid var(--accent)}.btn-outline:hover{background:var(--accent-light)}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{background:#5e1717}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}.btn-ghost:hover{background:var(--border-light);color:var(--text)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+.tabs-bar{background:#fff;border-bottom:2px solid var(--border);padding:0 24px;display:flex;gap:2px}
+.tab-btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:12px 16px;border:none;background:transparent;cursor:pointer;color:var(--muted);border-bottom:2.5px solid transparent;margin-bottom:-2px;transition:all .15s}
+.tab-btn:hover{color:var(--text)}.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.panel{display:none;padding:22px 24px}.panel.active{display:block}
+
+.stats-row{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:12px 18px;flex:1;min-width:110px}
+.stat-label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:3px;font-family:var(--mono)}
+.stat-value{font-size:24px;font-weight:600}
+.stat-value.warn{color:var(--warning)}.stat-value.err{color:var(--danger)}
+
+.banner{padding:9px 14px;border-radius:var(--r);font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.b-warn{background:var(--warning-light);color:var(--warning);border:1px solid #e8c870}
+.b-err{background:var(--danger-light);color:var(--danger);border:1px solid #e8a0a0}
+.b-info{background:var(--accent-light);color:var(--accent);border:1px solid #a8c8b0}
+
+.card{background:#fff;border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.card h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:14px;font-family:var(--mono)}
+.card p{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+
+.fg5{display:grid;grid-template-columns:1.8fr 1.1fr 0.65fr 0.65fr 1.2fr auto;gap:8px;align-items:end}
+.fg{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.fgrp{display:flex;flex-direction:column;gap:4px}
+.flbl{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.inp{font-family:var(--sans);font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text);transition:border-color .15s;width:100%}
+.inp:focus{outline:none;border-color:var(--accent)}
+.sel{font-family:var(--sans);font-size:13px;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;background:#fff;color:var(--text);cursor:pointer;width:100%}
+.sel:focus{outline:none;border-color:var(--accent)}
+
+.usec{background:#fff;border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden}
+.uhdr{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--accent);cursor:pointer;user-select:none}
+.uhdr-l{display:flex;align-items:center;gap:8px}
+.unm{font-family:var(--mono);font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:#fff}
+.ucnt{font-size:11px;background:rgba(255,255,255,.2);color:#fff;padding:2px 7px;border-radius:10px;font-family:var(--mono)}
+.uchev{color:rgba(255,255,255,.7);font-size:11px;transition:transform .2s}
+.uchev.open{transform:rotate(90deg)}
+
+.ptbl{width:100%;border-collapse:collapse}
+.ptbl th{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-family:var(--mono);padding:7px 10px;text-align:left;background:#faf9f7;border-bottom:1px solid var(--border-light);font-weight:500}
+.ptbl td{padding:7px 10px;border-bottom:1px solid var(--border-light);font-size:13px;vertical-align:middle}
+.ptbl tr:last-child td{border-bottom:none}
+.ptbl tr:hover td{background:#faf9f7}
+.pnm{font-weight:500}.pnm a{color:var(--text);text-decoration:none;font-weight:500}.pnm a:hover{color:var(--accent);text-decoration:underline}
+.pphn{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.prm{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);padding:2px 6px;border-radius:4px;display:inline-block}
+.pcd{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:500}
+.pact{display:flex;gap:5px}
+.einp{font-family:var(--sans);font-size:12px;padding:3px 7px;border:1.5px solid var(--accent);border-radius:4px;width:100%}
+.einp:focus{outline:none}
+
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-ov.open{opacity:1;pointer-events:all}
+.modal{background:#fff;border-radius:10px;padding:26px;width:400px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25);transform:translateY(8px);transition:transform .2s}
+.modal-ov.open .modal{transform:translateY(0)}
+.modal h3{font-size:15px;font-weight:600;margin-bottom:7px}
+.modal p{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5}
+.modal-act{display:flex;gap:8px;justify-content:flex-end}
+
+/* DATE CHIPS */
+.dchip{display:inline-flex;align-items:flex-start;gap:0;background:var(--accent-light);border:1.5px solid var(--accent);border-radius:8px;padding:0;overflow:hidden;min-width:90px}
+.dchip-info{flex:1;padding:6px 10px}
+.dchip-date{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--accent);display:block}
+.dchip-dow{font-size:11px;color:var(--muted);display:block;margin-top:1px}
+.dchip-seen{font-size:11px;color:var(--accent);display:block;margin-top:2px;font-family:var(--mono)}
+.dchip-del{background:none;border:none;border-left:1px solid rgba(45,90,61,.2);cursor:pointer;color:var(--danger);font-size:16px;padding:0 8px;align-self:stretch;display:flex;align-items:center}
+.dchip-edit{background:none;border:none;border-left:1px solid rgba(45,90,61,.2);cursor:pointer;color:var(--accent);font-size:13px;padding:0 7px;align-self:stretch;display:flex;align-items:center;opacity:.7}
+.dchip-edit:hover{opacity:1;background:rgba(45,90,61,.08)}
+
+/* EDIT LOCK — everything that requires an active Drive connection */
+body:not(.drive-connected) .needs-connect,
+body.history-mode .needs-connect{
+  opacity:.45;
+  pointer-events:none;
+  cursor:not-allowed;
+  filter:grayscale(40%);
+}
+.connect-hint{
+  display:none;
+  font-size:11px;
+  color:var(--warning);
+  background:var(--warning-light);
+  border:1px solid #e8c870;
+  border-radius:6px;
+  padding:6px 10px;
+  margin-bottom:12px;
+  align-items:center;
+  gap:6px;
+}
+body:not(.drive-connected) .connect-hint{display:flex}
+body.history-mode .connect-hint{display:flex}
+
+/* CALENDAR PICKER */
+.cal-wrap{background:#fff;border:1.5px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px;max-width:320px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-nav button{background:none;border:1px solid var(--border);border-radius:5px;padding:4px 10px;cursor:pointer;font-size:13px;color:var(--text)}
+.cal-nav button:hover{background:var(--bg)}
+.cal-month-lbl{font-weight:600;font-size:14px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cal-dh{text-align:center;font-size:10px;font-family:var(--mono);color:var(--muted);padding:3px 0;text-transform:uppercase}
+.cal-day{text-align:center;font-size:13px;padding:6px 4px;border-radius:5px;cursor:pointer;transition:all .12s;border:1px solid transparent}
+.cal-day:hover{background:var(--accent-light);color:var(--accent)}
+.cal-day.today{border-color:var(--accent);color:var(--accent);font-weight:600}
+.cal-day.selected{background:var(--accent);color:#fff;font-weight:600}
+.cal-day.empty{cursor:default}
+.cal-day.empty:hover{background:none}
+.cal-day.already{background:var(--accent-light);color:var(--accent);font-weight:600;cursor:default}
+
+/* Seen count modal */
+.seen-modal{background:#fff;border-radius:10px;padding:26px;width:340px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25);transform:translateY(8px);transition:transform .2s}
+.modal-ov.open .seen-modal{transform:translateY(0)}
+
+/* ═══ PRINT RESET — kill browser default yellow on inputs ═══ */
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;background-color:transparent}
+  html,body{background:#fff !important}
+  input,select,textarea,button{
+    background:#fff !important;background-color:#fff !important;
+    -webkit-appearance:none;border:none !important;
+    box-shadow:none !important;color:#000 !important;
+  }
+  body > *{display:none !important}
+  #print-trim{display:block !important}
+  #print-billing{display:none !important}
+  @page{size:letter portrait;margin:.28in .28in .28in .28in}
+}
+body.pb > *{display:none !important}
+body.pb #print-billing{display:block !important}
+body.pb #print-trim{display:none !important}
+@media print{
+  body.pb > *{display:none !important}
+  body.pb #print-billing{display:block !important}
+  body.pb #print-trim{display:none !important}
+}
+
+/* ══ TRIM LIST print ══ */
+#print-trim{display:none;font-family:Arial,sans-serif;background:#fff}
+.tpage{width:100%;page-break-after:always;background:#fff}
+.tpage:last-child{page-break-after:avoid}
+
+.t-datehdr{
+  padding:3px 10px;font-size:9px;font-weight:bold;
+  margin-bottom:3px;text-align:center;background:#fff;
+}
+.t-datehdr span{font-size:10px;font-weight:bold}
+.t-dateline{border-bottom:1.5px solid #000;width:200px;display:inline-block;margin-left:6px;vertical-align:bottom}
+
+.t-uhdr{
+  background:#d0d0d0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  font-weight:bold;padding:2px 5px;
+  border:1px solid #000;
+  margin-top:3px;margin-bottom:-1px;
+  display:flex;align-items:center;gap:6px;
+}
+
+.t-row{
+  display:flex;align-items:stretch;
+  border:1px solid #000;
+  margin-top:-1px;
+  background:#fff !important;
+}
+.t-nm{
+  border-right:1px solid #000;padding:1px 3px;
+  display:flex;align-items:center;font-weight:bold;line-height:1.2;
+  word-break:break-word;background:#fff !important;flex-shrink:0;
+  white-space:nowrap;overflow:hidden;
+}
+.t-bill{
+  flex:1;padding:1px 4px;border-right:1px solid #000;
+  display:flex;align-items:center;gap:0;white-space:nowrap;background:#fff !important;
+}
+.t-bill span{margin-right:5px}
+.t-bill .sep{margin-right:8px}
+.t-icd{
+  padding:1px 3px;display:flex;align-items:center;
+  font-weight:bold;line-height:1.3;background:#fff !important;flex-shrink:0;width:72px;
+}
+
+/* ══ TRIM BILLING print ══ */
+#print-billing{display:none;font-family:Arial,sans-serif;background:#fff}
+.bpage{width:100%;page-break-after:always;background:#fff}
+.bpage:last-child{page-break-after:avoid}
+.btbl{width:100%;border-collapse:collapse;table-layout:fixed}
+.btbl th,.btbl td{border:.75px solid #000;padding:0;vertical-align:middle;background:#fff}
+.bnh{
+  width:105px;font-size:7px;font-weight:bold;text-align:left;
+  padding:2px 3px;background:#e0e0e0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+.bdh{
+  width:29px;font-size:5.5px;font-weight:bold;text-align:center;
+  padding:1px 0;background:#e0e0e0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  height:34px;vertical-align:middle;line-height:1.3;
+}
+.bdh.empty{background:#fff !important;color:#fff}
+.bdh-date{display:block;font-size:6px;font-weight:bold}
+.bdh-dow{display:block;font-size:5.5px;color:#444}
+.bdh-seen{display:block;font-size:5.5px;color:#222;font-weight:bold}
+.buh td{background:#d0d0d0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-weight:bold;font-size:7px;text-align:left;padding:2px 4px}
+.bpn{
+  font-size:var(--bf,9px);font-weight:bold;text-align:left;padding:1px 3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  width:105px;max-width:105px;background:#fff !important;
+}
+.bc{width:29px;background:#fff !important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="app-title">Lets get this done</h1>
+  <div class="hdr-right">
+    <span class="save-status" id="ss">Loading…</span>
+    <button class="btn btn-gw btn-sm" id="btn-connect" onclick="gConnect()">Connect Google Drive</button>
+    <button class="btn btn-gw btn-sm" onclick="forceSyncFromDrive()" id="btn-sync" style="display:none">🔄 Sync from Drive</button>
+    <button class="btn btn-white btn-sm" onclick="printTrim()">🖨 TRIM List</button>
+    <button class="btn btn-gw btn-sm" onclick="printBilling()">🖨 TRIM Billing</button>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="showTab('patients',this)">Patients</button>
+  <button class="tab-btn" onclick="showTab('billing-dates',this)">Billing Dates</button>
+  <button class="tab-btn" onclick="showTab('units',this)">Units</button>
+  <button class="tab-btn" onclick="showTab('history',this)">📅 Past Lists</button>
+</div>
+
+<div id="history-banner" style="display:none;background:#7a5a1e;color:white;padding:8px 24px;font-size:13px;font-weight:500;display:none;align-items:center;justify-content:space-between">
+  <span id="history-banner-text"></span>
+  <button class="btn btn-white btn-sm" onclick="exitHistoryView()">Return to Today (Live)</button>
+</div>
+
+<!-- PATIENTS -->
+<div id="tab-patients" class="panel active">
+  <div class="stats-row" id="stats"></div>
+  <div id="lbanner"></div>
+  <div class="connect-hint">🔒 Editing is disabled until the live Drive roster is active.</div>
+  <div class="card needs-connect">
+    <h3>+ Add New Patient</h3>
+    <div style="display:grid;grid-template-columns:1.6fr 1fr 0.6fr 0.6fr 1fr 1fr auto;gap:8px;align-items:end">
+      <div class="fgrp"><label class="flbl">Last, First Name</label><input class="inp" id="in-name" placeholder="e.g. Last, First"/></div>
+      <div class="fgrp"><label class="flbl">PHN</label><input class="inp" id="in-phn" placeholder="e.g. 1234567890"/></div>
+      <div class="fgrp"><label class="flbl">Unit</label><select class="sel" id="in-unit"></select></div>
+      <div class="fgrp"><label class="flbl">Room #</label><input class="inp" id="in-room" placeholder="e.g. 1502"/></div>
+      <div class="fgrp"><label class="flbl">ICD Codes</label><input class="inp" id="in-codes" placeholder="e.g. 290 401 V15"/></div>
+      <div class="fgrp"><label class="flbl">AVA EMR #</label><input class="inp" id="in-ava" placeholder="e.g. 1234567"/></div>
+      <button class="btn btn-green" onclick="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
+    </div>
+  </div>
+  <div id="ulist"></div>
+</div>
+
+<!-- BILLING DATES -->
+<div id="tab-billing-dates" class="panel">
+  <div class="card">
+    <h3>TRIM Billing — Visit Dates (max 17)</h3>
+    <p>Click a date on the calendar to add it. Each date can also record how many patients you saw in office that day — shown as (x) below the day.</p>
+    <div class="connect-hint">🔒 Connect Google Drive to add or edit visit dates.</div>
+
+    <!-- Calendar -->
+    <div class="cal-wrap needs-connect">
+      <div class="cal-nav">
+        <button onclick="calPrev()">‹ Prev</button>
+        <span class="cal-month-lbl" id="cal-lbl"></span>
+        <button onclick="calNext()">Next ›</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+    <div id="dlist"></div>
+  </div>
+</div>
+
+<!-- UNITS -->
+<div id="tab-units" class="panel">
+  <div class="card">
+    <h3>Manage Units</h3>
+    <div class="connect-hint">🔒 Connect Google Drive to add or remove units.</div>
+    <div class="fg needs-connect" style="margin-bottom:14px">
+      <div class="fgrp" style="flex:1"><label class="flbl">Unit Name</label><input class="inp" id="in-un" placeholder="e.g. MAPLE"/></div>
+      <div class="fgrp" style="width:68px"><label class="flbl">Floor</label><input class="inp" id="in-uf" placeholder="1"/></div>
+      <button class="btn btn-green" onclick="addUnit()">Add Unit</button>
+    </div>
+    <div id="umng"></div>
+  </div>
+</div>
+
+<!-- HISTORY / PAST LISTS -->
+<div id="tab-history" class="panel">
+  <div class="card needs-connect">
+    <h3>📅 Past Daily Lists</h3>
+    <p>A read-only copy of your patient list is automatically saved the first time you connect each day. Pick a past date below to view and print that day's list — you can't edit a past list, only today's live one.</p>
+    <div id="snapshot-list" style="margin-top:14px">
+      <p style="color:var(--muted);font-size:13px;font-style:italic">Connect Google Drive to see past lists.</p>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal-ov" id="delmv">
+  <div class="modal">
+    <h3>Remove Patient</h3>
+    <p id="delmsg">Remove this patient?</p>
+    <div class="modal-act">
+      <button class="btn btn-ghost" onclick="closeModal('delmv')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDel()">Remove</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEEN COUNT MODAL -->
+<div class="modal-ov" id="seenmv">
+  <div class="seen-modal">
+    <h3 id="seen-title">Patients Seen in Office</h3>
+    <p id="seen-subtitle" style="font-size:13px;color:var(--muted);margin-bottom:14px"></p>
+    <div class="fgrp" style="margin-bottom:18px">
+      <label class="flbl">How many patients did you see in the office this day? (optional)</label>
+      <input class="inp" id="seen-count" type="number" min="0" placeholder="e.g. 3" style="max-width:120px;margin-top:6px"/>
+    </div>
+    <div class="modal-act">
+      <button class="btn btn-ghost" onclick="cancelSeen()">Cancel</button>
+      <button class="btn btn-green" onclick="confirmSeen()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="print-trim"></div>
+<div id="print-billing"></div>
+
+<script>
+const MAX_P=110,MAX_D=17;
+const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
+const FILE_NAME='trim-patients-data.json';
+const SCOPE='https://www.googleapis.com/auth/drive.file';
+const OAUTH_CLIENT_ID='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
+const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+let state={
+  patients:[],
+  units:[
+    {id:'cedar',name:'CEDAR',floor:1},{id:'cherry',name:'CHERRY',floor:1},
+    {id:'hatzic',name:'HATZIC',floor:1},{id:'fern',name:'FERN',floor:2},
+    {id:'dewdney',name:'DEWDNEY',floor:2},{id:'deroche',name:'DEROCHE',floor:2},
+    {id:'silver',name:'SILVER',floor:3},{id:'stave',name:'STAVE',floor:3},
+  ],
+  billingDates:[],
+  googleConnected:false,googleToken:null,driveFileId:null
+};
+let delId=null,editId=null,pendingDateKey=null;
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
+
+// ── GOOGLE DRIVE ──
+function showPreAuthShell(){
+  document.body.classList.remove('drive-connected');
+  g('app-title').textContent='Lets get this done';
+  document.title='Lets get this done';
+  g('btn-connect').textContent='Connect Google Drive';
+  g('btn-sync').style.display='none';
+}
+function showAuthenticatedShell(){
+  document.body.classList.add('drive-connected');
+  g('app-title').textContent='⬛ TRIM Patient Manager';
+  document.title='TRIM Patient Manager';
+  g('btn-connect').textContent='✓ Connected';
+  g('btn-sync').style.display='inline-flex';
+}
+async function gConnect(){
+  if(!window.google?.accounts){
+    await new Promise((r,j)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;s.onerror=j;document.head.appendChild(s)});
+  }
+  google.accounts.oauth2.initTokenClient({client_id:OAUTH_CLIENT_ID,scope:SCOPE,callback:async r=>{
+    if(r.error){alert('Auth failed: '+r.error);return}
+    state.googleToken=r.access_token;state.googleConnected=true;
+    setSS('Connected — loading from Drive…',true);
+    const loaded=await loadDrive();
+    if(!loaded){
+      state.googleConnected=false;state.googleToken=null;
+      showPreAuthShell();
+      alert('Google Drive connected, but the patient roster could not be loaded. No patient information has been displayed.');
+      return;
+    }
+    showAuthenticatedShell();
+  }}).requestAccessToken();
+}
+
+async function forceSyncFromDrive(){
+  if(!state.googleConnected||!state.googleToken){
+    alert('Please connect Google Drive first.');return;
+  }
+  setSS('Force syncing from Drive…',false);
+  // Clear local state completely first
+  state.patients=[];
+  state.billingDates=[];
+  const loaded=await loadDrive();
+  if(!loaded){
+    state.googleConnected=false;state.googleToken=null;
+    showPreAuthShell();
+    alert('The roster could not be refreshed. The app has been locked until you reconnect.');
+  }
+}
+async function saveDrive(){
+  const body=JSON.stringify({patients:state.patients,units:state.units,billingDates:state.billingDates,driveFileId:state.driveFileId});
+  saveLocal();
+  if(!state.googleConnected||!state.googleToken){setSS('Not connected to Drive',false);return false}
+  setSS('Saving to Drive…',false);
+  try{
+    let fileId=state.driveFileId;
+    if(fileId){
+      const patchRes=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+      if(!patchRes.ok){
+        const err=await patchRes.json();
+        console.error('Patch failed:',err);
+        // File may have been deleted — try creating new
+        fileId=null;
+        state.driveFileId=null;
+      }
+    }
+    if(!fileId){
+      const metaRes=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,mimeType:'application/json'})});
+      if(!metaRes.ok){const err=await metaRes.json();console.error('Create failed:',err);setSS('Save failed! Check console.',false);return false}
+      const m=await metaRes.json();
+      state.driveFileId=m.id;
+      console.log('Created new Drive file:',m.id);
+      const uploadRes=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${m.id}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+      if(!uploadRes.ok){const err=await uploadRes.json();console.error('Upload failed:',err);setSS('Save failed! Check console.',false);return false}
+      saveLocal();
+    }
+    setSS('Saved to Drive ✓',true);
+    return true;
+  }catch(e){setSS('Save failed! '+e.message,false);console.error('saveDrive error:',e);return false}
+}
+async function loadDrive(){
+  setSS('Loading…',false);
+  try{
+    const listRes=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false&fields=files(id,name)`,{headers:{'Authorization':'Bearer '+state.googleToken}});
+    if(!listRes.ok)throw new Error(`Drive file lookup failed (${listRes.status})`);
+    const list=await listRes.json();
+    if(list.files?.length>0){
+      const loadedFileId=list.files[0].id;
+      const contentRes=await fetch(`https://www.googleapis.com/drive/v3/files/${loadedFileId}?alt=media`,{headers:{'Authorization':'Bearer '+state.googleToken}});
+      if(!contentRes.ok)throw new Error(`Drive roster load failed (${contentRes.status})`);
+      const c=await contentRes.json();
+      if(!Array.isArray(c.patients)||!Array.isArray(c.units)||!Array.isArray(c.billingDates)){
+        throw new Error('Drive roster has an invalid structure');
+      }
+      // Drive ALWAYS wins — completely replace local state with Drive data
+      state.patients=c.patients;
+      state.units=c.units;
+      state.billingDates=c.billingDates;
+      state.driveFileId=loadedFileId;
+      saveLocal();setSS('Loaded from Drive ✓',true);render();
+      await maybeSaveDailySnapshot();
+    }else{
+      state.patients=[];
+      state.billingDates=[];
+      state.driveFileId=null;
+      setSS('Connected — saving patients to Drive…',true);
+      const saved=await saveDrive();
+      if(!saved)throw new Error('Could not create the Drive roster');
+      render();
+    }
+    return true;
+  }catch(e){setSS('Load failed',false);console.error(e);return false}
+}
+// ── DAILY SNAPSHOTS (read-only history for past-day printing) ──
+const SNAPSHOT_FOLDER='TRIM Snapshots';
+let snapshotFolderId=null;
+
+async function getOrCreateSnapshotFolder(){
+  if(snapshotFolderId) return snapshotFolderId;
+  const q=`name='${SNAPSHOT_FOLDER}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const list=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
+  if(list.files?.length>0){ snapshotFolderId=list.files[0].id; return snapshotFolderId; }
+  const created=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name:SNAPSHOT_FOLDER,mimeType:'application/vnd.google-apps.folder'})}).then(r=>r.json());
+  snapshotFolderId=created.id;
+  return snapshotFolderId;
+}
+
+function todaySnapshotName(){
+  const d=new Date();
+  const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  return `trim-patients-${d.getFullYear()}-${months[d.getMonth()]}-${String(d.getDate()).padStart(2,'0')}.json`;
+}
+
+// Called once per successful connect. Saves a read-only copy of whatever the
+// live list looked like the FIRST time we connect on a given day — i.e. it
+// captures yesterday's final state, before any of today's edits happen.
+async function maybeSaveDailySnapshot(){
+  try{
+    const name=todaySnapshotName();
+    const folderId=await getOrCreateSnapshotFolder();
+    const q=`name='${name}' and '${folderId}' in parents and trashed=false`;
+    const existing=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
+    if(existing.files?.length>0) return; // already snapshotted today, never overwrite
+    const body=JSON.stringify({patients:state.patients,units:state.units,billingDates:state.billingDates,snapshotDate:name});
+    const meta=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/json',parents:[folderId]})}).then(r=>r.json());
+    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
+    console.log('Daily snapshot saved:',name);
+  }catch(e){console.error('Snapshot save failed (non-blocking):',e)}
+}
+
+async function listSnapshots(){
+  const folderId=await getOrCreateSnapshotFolder();
+  const q=`'${folderId}' in parents and trashed=false`;
+  const list=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=name desc&fields=files(id,name)`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
+  return list.files||[];
+}
+
+async function loadSnapshot(fileId){
+  return fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
+}
+
+// Never retain patient data in browser storage. Drive is the only roster source.
+function saveLocal(){try{localStorage.removeItem('trim_st')}catch(e){}}
+async function loadLocal(){
+  // Remove legacy cached rosters left by earlier versions of the app.
+  try{localStorage.removeItem('trim_st');localStorage.removeItem('trim_cid')}catch(e){}
+  state.patients=[];
+  state.billingDates=[];
+  state.driveFileId=null;
+}
+function setSS(m,ok){const e=g('ss');e.textContent=m;e.style.color=ok?'rgba(255,255,255,.9)':'rgba(255,200,100,.9)'}
+
+// ── TABS ──
+function showTab(name,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  g('tab-'+name).classList.add('active');btn.classList.add('active');
+  if(name==='units')renderUMng();
+  if(name==='billing-dates'){renderCal();renderDates();}
+  if(name==='history')renderSnapshotList();
+}
+
+async function renderSnapshotList(){
+  const el=g('snapshot-list');
+  if(!state.googleConnected||!state.googleToken){
+    el.innerHTML=`<p style="color:var(--muted);font-size:13px;font-style:italic">Connect Google Drive to see past lists.</p>`;
+    return;
+  }
+  el.innerHTML=`<p style="color:var(--muted);font-size:13px;font-style:italic">Loading…</p>`;
+  try{
+    const files=await listSnapshots();
+    if(files.length===0){
+      el.innerHTML=`<p style="color:var(--muted);font-size:13px;font-style:italic">No past snapshots yet — one gets saved automatically the next time you connect on a new day.</p>`;
+      return;
+    }
+    el.innerHTML=files.map(f=>{
+      const label=f.name.replace('trim-patients-','').replace('.json','');
+      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light)">
+        <span style="flex:1;font-weight:500;font-family:var(--mono)">${esc(label)}</span>
+        <button class="btn btn-outline btn-sm" onclick="viewSnapshot('${f.id}','${esc(label)}')">View &amp; Print</button>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML=`<p style="color:var(--danger);font-size:13px">Failed to load past lists.</p>`;
+    console.error(e);
+  }
+}
+
+let inHistoryView=false;
+let liveStateBackup=null;
+
+async function viewSnapshot(fileId,label){
+  if(!state.googleConnected||!state.googleToken){alert('Please connect Google Drive first.');return}
+  try{
+    const data=await loadSnapshot(fileId);
+    // Back up the live state so we can restore it exactly
+    liveStateBackup={patients:state.patients,units:state.units,billingDates:state.billingDates};
+    if(data.patients) state.patients=data.patients;
+    if(data.units && data.units.length>0) state.units=data.units;
+    if(data.billingDates) state.billingDates=data.billingDates;
+    inHistoryView=true;
+    document.body.classList.add('history-mode');
+    g('history-banner').style.display='flex';
+    g('history-banner-text').textContent=`📅 Viewing: ${label} (read-only — editing disabled)`;
+    showTab('patients', document.querySelector(".tab-btn[onclick*='patients']"));
+    render();
+  }catch(e){
+    alert('Could not load that snapshot.');console.error(e);
+  }
+}
+
+function exitHistoryView(){
+  if(!inHistoryView||!liveStateBackup)return;
+  state.patients=liveStateBackup.patients;
+  state.units=liveStateBackup.units;
+  state.billingDates=liveStateBackup.billingDates;
+  liveStateBackup=null;
+  inHistoryView=false;
+  document.body.classList.remove('history-mode');
+  g('history-banner').style.display='none';
+  render();
+}
+
+// ── PATIENTS ──
+function addPatient(){
+  const name=g('in-name').value.trim();
+  const phn=g('in-phn').value.trim();
+  const unit=g('in-unit').value;
+  const room=g('in-room').value.trim();
+  const codes=g('in-codes').value.trim();
+  const ava=g('in-ava').value.trim();
+  if(!name||!unit){alert('Please enter a name and unit.');return}
+  if(state.patients.length>=MAX_P){alert('Patient limit reached.');return}
+  state.patients.push({id:Date.now().toString(),name,phn,unit,room,codes,ava});
+  ['in-name','in-phn','in-room','in-codes','in-ava'].forEach(i=>g(i).value='');
+  saveDrive();render();
+}
+function startEdit(id){editId=id;render()}
+function cancelEdit(){editId=null;render()}
+function saveEdit(id){
+  const p=state.patients.find(x=>x.id===id);if(!p)return;
+  p.name=g(`en-${id}`).value.trim()||p.name;
+  p.phn=g(`ep-${id}`).value.trim();
+  p.unit=g(`eu-${id}`).value;
+  p.room=g(`er-${id}`).value.trim();
+  p.codes=g(`ec-${id}`).value.trim();
+  p.ava=g(`ea-${id}`).value.trim();
+  editId=null;saveDrive();render();
+}
+function promptDel(id){
+  delId=id;const p=state.patients.find(x=>x.id===id);
+  g('delmsg').textContent=`Remove "${p?.name}"?`;
+  g('delmv').classList.add('open');
+}
+function closeModal(id){g(id).classList.remove('open')}
+function confirmDel(){state.patients=state.patients.filter(p=>p.id!==delId);closeModal('delmv');delId=null;saveDrive();render()}
+
+// ── UNITS ──
+function addUnit(){
+  const name=g('in-un').value.trim().toUpperCase();
+  const floor=parseInt(g('in-uf').value)||0;
+  if(!name)return;
+  state.units.push({id:name.toLowerCase().replace(/\W+/g,'_')+'_'+Date.now(),name,floor});
+  g('in-un').value='';g('in-uf').value='';
+  saveDrive();renderUMng();populateUSel();
+}
+function delUnit(id){
+  if(state.patients.some(p=>p.unit===id)){alert('Cannot delete a unit with patients.');return}
+  state.units=state.units.filter(u=>u.id!==id);saveDrive();renderUMng();populateUSel();
+}
+
+// ── CALENDAR ──
+function calPrev(){calMonth--;if(calMonth<0){calMonth=11;calYear--}renderCal()}
+function calNext(){calMonth++;if(calMonth>11){calMonth=0;calYear++}renderCal()}
+
+function renderCal(){
+  g('cal-lbl').textContent=`${MONTHS[calMonth]} ${calYear}`;
+  const firstDay=new Date(calYear,calMonth,1).getDay();
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const today=new Date();
+  const alreadyKeys=new Set(state.billingDates.map(d=>d.sortKey));
+
+  let html='';
+  ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d=>{html+=`<div class="cal-dh">${d}</div>`});
+  for(let i=0;i<firstDay;i++) html+=`<div class="cal-day empty"></div>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const sk=calYear*10000+(calMonth+1)*100+d;
+    const isToday=d===today.getDate()&&calMonth===today.getMonth()&&calYear===today.getFullYear();
+    const isSelected=alreadyKeys.has(sk);
+    const cls=isSelected?'already':isToday?'today':'';
+    if(isSelected){
+      html+=`<div class="cal-day ${cls}" title="Already added">${d}</div>`;
+    }else{
+      html+=`<div class="cal-day ${cls}" onclick="calSelectDay(${d})">${d}</div>`;
+    }
+  }
+  g('cal-grid').innerHTML=html;
+}
+
+function calSelectDay(day){
+  if(state.billingDates.length>=MAX_D){alert(`Maximum ${MAX_D} dates reached.`);return}
+  const sk=calYear*10000+(calMonth+1)*100+day;
+  if(state.billingDates.some(d=>d.sortKey===sk)){alert('Already added.');return}
+  const dow=DAYS[new Date(calYear,calMonth,day).getDay()];
+  const label=`${MONTHS_S[calMonth]} ${day}`;
+  // Show seen-count modal
+  pendingDateKey={sk,label,dow};
+  g('seen-title').textContent=`${label} (${dow})`;
+  g('seen-subtitle').textContent='Optionally record how many patients you saw in the office this day.';
+  g('seen-count').value='';
+  g('seen-count').onkeydown=function(e){if(e.key==='Enter')confirmSeen();};
+  g('seenmv').classList.add('open');
+  setTimeout(()=>g('seen-count').focus(),50);
+}
+
+function confirmSeen(){
+  if(pendingDateKey && pendingDateKey.editId){
+    // Edit mode — update existing
+    const d=state.billingDates.find(x=>x.id===pendingDateKey.editId);
+    if(d){d.seen=g('seen-count').value.trim()||'';}
+    pendingDateKey=null;
+    closeModal('seenmv');
+    saveDrive();renderDates();
+    return;
+  }
+  if(!pendingDateKey)return;
+  const cnt=g('seen-count').value.trim();
+  state.billingDates.push({
+    id:Date.now().toString(),
+    label:pendingDateKey.label,
+    dow:pendingDateKey.dow,
+    seen:cnt||'',
+    sortKey:pendingDateKey.sk
+  });
+  pendingDateKey=null;
+  closeModal('seenmv');
+  saveDrive();renderDates();renderCal();
+}
+
+function editSeen(id){
+  const d=state.billingDates.find(x=>x.id===id);if(!d)return;
+  pendingDateKey={editId:id};
+  g('seen-title').textContent=`Edit: ${d.label} (${d.dow||''})`;
+  g('seen-subtitle').textContent='Update how many patients you saw in the office this day.';
+  g('seen-count').value=d.seen||'';
+  g('seen-count').onkeydown=function(e){if(e.key==='Enter')confirmSeen();};
+  g('seenmv').classList.add('open');
+  setTimeout(()=>g('seen-count').focus(),50);
+}
+
+function cancelSeen(){
+  pendingDateKey=null;
+  closeModal('seenmv');
+}
+
+function removeDate(id){state.billingDates=state.billingDates.filter(d=>d.id!==id);saveDrive();renderDates();renderCal()}
+function clearDates(){if(!confirm('Clear all dates?'))return;state.billingDates=[];saveDrive();renderDates();renderCal()}
+
+// ESC key closes any open modal
+document.addEventListener('keydown',function(e){
+  if(e.key==='Escape'){
+    if(g('seenmv').classList.contains('open')) cancelSeen();
+    if(g('delmv').classList.contains('open')) closeModal('delmv');
+  }
+});
+
+// ── RENDER ──
+function render(){renderStats();renderUList();populateUSel();renderDates()}
+
+function renderStats(){
+  const t=state.patients.length,pct=Math.round(t/MAX_P*100);
+  const vc=t>=MAX_P?'err':t>=95?'warn':'';
+  g('stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value ${vc}">${t}</div></div>
+    <div class="stat-card"><div class="stat-label">Capacity</div><div class="stat-value">${MAX_P}</div></div>
+    <div class="stat-card"><div class="stat-label">Used</div><div class="stat-value ${vc}">${pct}%</div></div>
+    <div class="stat-card"><div class="stat-label">Date Slots</div><div class="stat-value">${state.billingDates.length}/${MAX_D}</div></div>`;
+  g('lbanner').innerHTML=t>=MAX_P?`<div class="banner b-err">⚠ Patient limit of ${MAX_P} reached.</div>`:
+    t>=95?`<div class="banner b-warn">⚠ Approaching limit (${t}/${MAX_P}).</div>`:'';
+}
+
+function populateUSel(){
+  const s=g('in-unit');if(!s)return;
+  const cur=s.value;
+  s.innerHTML='<option value="">— Select Unit —</option>'+
+    state.units.map(u=>`<option value="${u.id}"${u.id===cur?' selected':''}>${u.name}</option>`).join('');
+}
+
+function renderUList(){
+  let html='';
+  state.units.forEach(unit=>{
+    const pts=state.patients.filter(p=>p.unit===unit.id).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+    html+=`<div class="usec">
+      <div class="uhdr" onclick="toggleU('${unit.id}')">
+        <div class="uhdr-l"><span class="unm">${unit.name}</span><span class="ucnt">${pts.length} patients</span></div>
+        <span class="uchev open" id="chev-${unit.id}">▶</span>
+      </div>
+      <div id="ub-${unit.id}">
+        <table class="ptbl">
+          <thead><tr>
+            <th style="width:38px">Room</th>
+            <th>Name</th>
+            <th style="width:105px">PHN</th>
+            <th style="width:80px">AVA #</th>
+            <th style="width:120px">ICD Codes</th>
+            <th style="width:110px">Actions</th>
+          </tr></thead>
+          <tbody>
+            ${pts.length===0?`<tr><td colspan="6" style="color:var(--muted);font-style:italic;text-align:center;padding:14px">No patients</td></tr>`:''}
+            ${pts.map(p=>editId===p.id?`
+              <tr>
+                <td><input class="einp" id="er-${p.id}" value="${esc(p.room)}" style="width:50px"/></td>
+                <td><input class="einp" id="en-${p.id}" value="${esc(p.name)}"/></td>
+                <td>
+                  <input class="einp" id="ep-${p.id}" value="${esc(p.phn||'')}"/>
+                  <select class="sel" id="eu-${p.id}" style="font-size:11px;padding:3px 5px;margin-top:3px">
+                    ${state.units.map(u=>`<option value="${u.id}"${u.id===p.unit?' selected':''}>${u.name}</option>`).join('')}
+                  </select>
+                </td>
+                <td><input class="einp" id="ea-${p.id}" value="${esc(p.ava||'')}" placeholder="AVA #"/></td>
+                <td><input class="einp" id="ec-${p.id}" value="${esc(p.codes||'')}"/></td>
+                <td><div class="pact"><button class="btn btn-green btn-sm" onclick="saveEdit('${p.id}')">Save</button><button class="btn btn-ghost btn-sm" onclick="cancelEdit()">Cancel</button></div></td>
+              </tr>`:`
+              <tr>
+                <td><span class="prm">${esc(p.room)||'—'}</span></td>
+                <td>
+                  <div class="pnm">${p.ava?`<a href="https://www.avaemr.ca/patients/${esc(p.ava)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:`${esc(p.name)}`}</div>
+                  <div class="pphn">${esc(p.phn||'')}</div>
+                </td>
+                <td><span class="pphn">${esc(p.phn||'—')}</span></td>
+                <td><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(p.ava||'—')}</span></td>
+                <td><span class="pcd">${esc(p.codes)||'<span style="color:var(--muted);font-style:italic">—</span>'}</span></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm needs-connect" onclick="startEdit('${p.id}')">Edit</button><button class="btn btn-danger btn-sm needs-connect" onclick="promptDel('${p.id}')">✕</button></div></td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  });
+  g('ulist').innerHTML=html||`<div class="banner b-info">No units. Add them in the Units tab.</div>`;
+}
+
+function toggleU(id){
+  const b=g('ub-'+id),c=g('chev-'+id);
+  const h=b.style.display==='none';b.style.display=h?'':'none';c.classList.toggle('open',h);
+}
+
+function renderUMng(){
+  g('umng').innerHTML=state.units.map(u=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-light)">
+      <span style="flex:1;font-weight:500">${u.name}</span>
+      <span style="font-size:11px;color:var(--muted)">Floor ${u.floor||'?'}</span>
+      <span style="font-size:11px;color:var(--muted)">${state.patients.filter(p=>p.unit===u.id).length} patients</span>
+      <button class="btn btn-danger btn-sm needs-connect" onclick="delUnit('${u.id}')">Delete</button>
+    </div>`).join('')||'<p style="color:var(--muted);font-size:13px">No units.</p>';
+}
+
+function renderDates(){
+  const sorted=[...state.billingDates].sort((a,b)=>a.sortKey-b.sortKey);
+  const el=g('dlist');if(!el)return;
+  if(sorted.length===0){
+    el.innerHTML=`<p style="color:var(--muted);font-size:13px;font-style:italic;margin-top:8px">No dates yet. Click a date on the calendar above to add it.</p>`;
+    return;
+  }
+  el.innerHTML=`
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-family:var(--mono);margin-top:4px">${sorted.length} / ${MAX_D} SLOTS USED</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${sorted.map(d=>`
+        <div class="dchip">
+          <div class="dchip-info">
+            <span class="dchip-date">${esc(d.label)}</span>
+            <span class="dchip-dow">${esc(d.dow||'')}</span>
+            ${d.seen?`<span class="dchip-seen">(${esc(d.seen)})</span>`:'<span class="dchip-seen" style="color:var(--muted);font-style:italic;font-family:var(--sans)">no count</span>'}
+          </div>
+          <button class="dchip-edit needs-connect" onclick="editSeen('${d.id}')" title="Edit patients seen">✏</button>
+          <button class="dchip-del needs-connect" onclick="removeDate('${d.id}')" title="Remove">×</button>
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm needs-connect" onclick="clearDates()">Clear All Dates</button>
+    </div>
+    ${sorted.length>=MAX_D?`<div class="banner b-warn" style="margin-top:12px">⚠ All ${MAX_D} slots filled.</div>`:''}`;
+}
+
+// ── BUILD TRIM LIST ──
+function buildTrimList(){
+  const total=state.patients.length;
+  const perPage=Math.ceil(total/2);
+  const fp=Math.max(5.5,Math.min(8,Math.floor(760/Math.max(perPage,1))));
+  const rp=Math.max(10,Math.min(16,Math.floor(960/Math.max(perPage,1))));
+  const nmW=Math.max(148,fp*19);
+
+  let html='';
+  LIST_PAGES.forEach(uids=>{
+    let rows='';
+    uids.forEach(uid=>{
+      const unit=state.units.find(u=>u.id===uid);if(!unit)return;
+      const pts=state.patients.filter(p=>p.unit===uid).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+      if(pts.length===0)return;
+      // Unit header with unit name + room indicator
+      rows+=`<div class="t-uhdr" style="font-size:${fp+0.5}px"><span>${unit.name}</span></div>`;
+      pts.forEach(p=>{
+        // Single line: LastName, FirstName  PHN  RoomNumber
+        const parts=[esc(p.name),p.phn?esc(p.phn):'',p.room?esc(p.room):''].filter(Boolean);
+        const nameLine=parts.join('  ');
+        rows+=`<div class="t-row" style="min-height:${rp}px;background:#fff !important">
+          <div class="t-nm" style="font-size:${fp}px;width:${nmW}px;flex:0 0 ${nmW}px">${nameLine}</div>
+          <div class="t-bill" style="font-size:${fp}px">
+            <span>114</span><span>115</span><span>127</span><span>200</span>
+            <span class="sep">13334</span><span class="sep">14077</span>
+            <span>x</span><span>1</span><span class="sep">2</span>
+            <span>start:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span>end:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+            <span>R:</span>
+          </div>
+          <div class="t-icd" style="font-size:${fp}px">${esc(p.codes||'')}</div>
+        </div>`;
+      });
+    });
+    html+=`<div class="tpage">
+      <div class="t-datehdr"><span>TRIM Date:</span><span class="t-dateline"></span></div>
+      ${rows}
+    </div>`;
+  });
+  g('print-trim').innerHTML=html||'<p>No patients.</p>';
+}
+
+// ── BUILD TRIM BILLING ──
+function computeBalancedBillingPages(){
+  // Target rows-per-page so units look full but don't overflow. Tuned for
+  // MIN_ROW/MAX_ROW readability — aim for the row count that lands near MAX_ROW.
+  const TARGET_ROWS=38; // tuned so current units balance into ~3 even pages
+  const unitsInOrder=state.units.filter(u=>state.patients.some(p=>p.unit===u.id));
+
+  const pages=[];
+  let current=[], currentRows=0;
+  unitsInOrder.forEach(u=>{
+    const count=state.patients.filter(p=>p.unit===u.id).length;
+    const rows=1+count; // header row + patient rows
+    if(current.length>0 && currentRows+rows>TARGET_ROWS){
+      pages.push(current);
+      current=[];currentRows=0;
+    }
+    current.push(u.id);
+    currentRows+=rows;
+  });
+  if(current.length>0) pages.push(current);
+  return pages.length>0?pages:[[]];
+}
+
+function buildTrimBilling(){
+  const sorted=[...state.billingDates].sort((a,b)=>a.sortKey-b.sortKey);
+  const cols=Array.from({length:MAX_D},(_,i)=>sorted[i]||null);
+  const pages=computeBalancedBillingPages();
+
+  // Usable page height ~9.7in at 96dpi = ~931px, minus header row (~36px)
+  const PAGE_USABLE_PX=895;
+  const MIN_ROW=16, MAX_ROW=34;
+
+  let html='';
+  pages.forEach(uids=>{
+    const hdr=cols.map(d=>{
+      if(!d)return`<th class="bdh empty"></th>`;
+      return`<th class="bdh">
+        <span class="bdh-date">${esc(d.label)}</span>
+        <span class="bdh-dow">${esc(d.dow||'')}</span>
+        ${d.seen?`<span class="bdh-seen">(${esc(d.seen)})</span>`:'<span class="bdh-seen">&nbsp;</span>'}
+      </th>`;
+    }).join('');
+
+    // Count rows on this page first (patient rows + unit header rows)
+    let rowCount=0;
+    uids.forEach(uid=>{
+      const pts=state.patients.filter(p=>p.unit===uid);
+      if(pts.length===0)return;
+      rowCount+=1+pts.length; // unit header row + patient rows
+    });
+    const rowPx=rowCount>0?Math.max(MIN_ROW,Math.min(MAX_ROW,Math.floor(PAGE_USABLE_PX/rowCount))):MIN_ROW;
+    const fontPx=Math.max(6.5,Math.min(10,Math.floor(rowPx*0.42)));
+
+    let body='';
+    uids.forEach(uid=>{
+      const unit=state.units.find(u=>u.id===uid);if(!unit)return;
+      const pts=state.patients.filter(p=>p.unit===uid).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+      if(pts.length===0)return;
+      body+=`<tr class="buh" style="height:${rowPx}px"><td colspan="${MAX_D+1}" style="font-size:${fontPx}px">${unit.name}</td></tr>`;
+      pts.forEach(p=>{
+        // Billing: name + room only (no PHN)
+        const lbl=p.room?`${esc(p.name)}  ${esc(p.room)}`:`${esc(p.name)}`;
+        body+=`<tr style="height:${rowPx}px"><td class="bpn" style="--bf:${fontPx}px">${lbl}</td>${cols.map(()=>`<td class="bc"></td>`).join('')}</tr>`;
+      });
+    });
+
+    html+=`<div class="bpage">
+      <table class="btbl">
+        <thead><tr><th class="bnh">Patient</th>${hdr}</tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>`;
+  });
+  g('print-billing').innerHTML=html||'<p>No patients.</p>';
+}
+
+// ── PRINT ──
+function todayStr(){
+  const d=new Date();
+  const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const yr=d.getFullYear();
+  const mon=months[d.getMonth()];
+  const day=String(d.getDate()).padStart(2,'0');
+  return`${yr}-${mon}-${day}`;
+}
+function printTrim(){
+  buildTrimList();
+  document.body.classList.remove('pb');
+  document.title=`TRIM List ${todayStr()}`;
+  setTimeout(()=>{window.print();setTimeout(()=>{document.title='TRIM Patient Manager'},1000)},120);
+}
+function printBilling(){
+  buildTrimBilling();
+  document.body.classList.add('pb');
+  document.title=`TRIM Billing ${todayStr()}`;
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{document.body.classList.remove('pb');document.title='TRIM Patient Manager'},600);
+  },120);
+}
+
+// ── UTILS ──
+function g(id){return document.getElementById(id)}
+function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+// ── INIT ──
+async function init(){
+  await loadLocal();
+  showPreAuthShell();
+  renderCal();
+  render();
+  setSS('Connect Google Drive to load the roster',false);
+}
+init();
+</script>
+</body>
+</html>
