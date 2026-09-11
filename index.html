@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lets get this done</title>
+<title>Let's get this done</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -17,6 +17,58 @@
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
 
 /* PRE-AUTH SHELL — expose only the app name and Drive sign-in control. */
+body:not(.drive-connected){overflow:hidden}
+body:not(.drive-connected) header{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100dvh;
+  padding:32px 24px;
+  flex-direction:column;
+  justify-content:center;
+  gap:26px;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 50% 43%,rgba(45,90,61,.09),transparent 34%),
+    var(--bg);
+  box-shadow:none;
+}
+body:not(.drive-connected) header h1{
+  font-family:var(--sans);
+  font-size:clamp(30px,5vw,44px);
+  font-weight:600;
+  line-height:1.1;
+  letter-spacing:-.035em;
+  text-transform:none;
+  text-align:center;
+}
+body:not(.drive-connected) .hdr-right{justify-content:center}
+body:not(.drive-connected) #btn-connect{
+  min-width:220px;
+  min-height:48px;
+  justify-content:center;
+  padding:12px 22px;
+  border:1px solid var(--accent);
+  border-radius:9px;
+  background:var(--accent);
+  color:#fff;
+  font-size:15px;
+  box-shadow:0 8px 20px rgba(30,63,43,.18);
+}
+body:not(.drive-connected) #btn-connect:hover{
+  background:var(--accent-hover);
+  border-color:var(--accent-hover);
+  box-shadow:0 10px 24px rgba(30,63,43,.24);
+  transform:translateY(-1px);
+}
+body:not(.drive-connected) #btn-connect:focus-visible{
+  outline:3px solid rgba(45,90,61,.28);
+  outline-offset:4px;
+}
+@media (max-width:480px){
+  body:not(.drive-connected) header{padding:24px 20px;gap:22px}
+  body:not(.drive-connected) #btn-connect{width:min(100%,280px)}
+}
 body:not(.drive-connected) .hdr-right > :not(#btn-connect),
 body:not(.drive-connected) .tabs-bar,
 body:not(.drive-connected) .panel,
@@ -248,7 +300,7 @@ body.pb #print-trim{display:none !important}
 <body>
 
 <header>
-  <h1 id="app-title">Lets get this done</h1>
+  <h1 id="app-title">Let's get this done</h1>
   <div class="hdr-right">
     <span class="save-status" id="ss">Loading…</span>
     <button class="btn btn-gw btn-sm" id="btn-connect" onclick="gConnect()">Connect Google Drive</button>
@@ -394,8 +446,8 @@ let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
 // ── GOOGLE DRIVE ──
 function showPreAuthShell(){
   document.body.classList.remove('drive-connected');
-  g('app-title').textContent='Lets get this done';
-  document.title='Lets get this done';
+  g('app-title').textContent="Let's get this done";
+  document.title="Let's get this done";
   g('btn-connect').textContent='Connect Google Drive';
   g('btn-sync').style.display='none';
 }
