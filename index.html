@@ -136,7 +136,14 @@ header h1{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:
 .ptbl td{padding:7px 10px;border-bottom:1px solid var(--border-light);font-size:13px;vertical-align:middle}
 .ptbl tr:last-child td{border-bottom:none}
 .ptbl tr:hover td{background:#faf9f7}
-.pnm{font-weight:500}.pnm a{color:var(--text);text-decoration:none;font-weight:500}.pnm a:hover{color:var(--accent);text-decoration:underline}
+.pnm{font-weight:500;display:flex;align-items:center;gap:5px}.pnm a{color:var(--text);text-decoration:none;font-weight:500}.pnm a:hover{color:var(--accent);text-decoration:underline}
+.pflag{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--accent);color:#fff;font-family:var(--mono);font-size:10px;font-weight:600;line-height:1;flex:0 0 17px}
+.p-toggle{height:35px;min-width:35px;border:1.5px solid var(--border);border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
+.p-toggle:hover{border-color:var(--accent);background:var(--accent-light)}
+.p-toggle input{position:absolute;opacity:0;pointer-events:none}
+.p-toggle span{display:flex;align-items:center;justify-content:center;width:19px;height:19px;border:1.5px solid var(--border);border-radius:50%;color:var(--muted);font-family:var(--mono);font-size:10px;font-weight:600}
+.p-toggle input:checked+span{background:var(--accent);border-color:var(--accent);color:#fff}
+.edit-name-wrap{display:flex;align-items:center;gap:5px}.edit-name-wrap .einp{flex:1}.edit-name-wrap .p-toggle{height:27px;min-width:27px;flex:0 0 27px}.edit-name-wrap .p-toggle span{width:17px;height:17px;font-size:9px}
 .pphn{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .prm{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);padding:2px 6px;border-radius:4px;display:inline-block}
 .pcd{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:500}
@@ -296,6 +303,7 @@ body.pb #print-trim{display:none !important}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   width:105px;max-width:105px;background:#fff !important;
 }
+.b-pflag{display:inline-flex;align-items:center;justify-content:center;width:1.35em;height:1.35em;border:.8px solid #000;border-radius:50%;font-size:.78em;font-weight:bold;line-height:1;margin-left:2px;vertical-align:middle;background:#fff !important}
 .bc{width:29px;background:#fff !important}
 </style>
 </head>
@@ -331,13 +339,14 @@ body.pb #print-trim{display:none !important}
   <div class="connect-hint">🔒 Editing is disabled until the live Drive roster is active.</div>
   <div class="card needs-connect">
     <h3>+ Add New Patient</h3>
-    <div style="display:grid;grid-template-columns:1.6fr 1fr 0.6fr 0.6fr 1fr 1fr auto;gap:8px;align-items:end">
+    <div style="display:grid;grid-template-columns:1.6fr 1fr 0.6fr 0.6fr 1fr 1fr auto auto;gap:8px;align-items:end">
       <div class="fgrp"><label class="flbl">Last, First Name</label><input class="inp" id="in-name" placeholder="e.g. Last, First"/></div>
       <div class="fgrp"><label class="flbl">PHN</label><input class="inp" id="in-phn" placeholder="e.g. 1234567890"/></div>
       <div class="fgrp"><label class="flbl">Unit</label><select class="sel" id="in-unit"></select></div>
       <div class="fgrp"><label class="flbl">Room #</label><input class="inp" id="in-room" placeholder="e.g. 1502"/></div>
       <div class="fgrp"><label class="flbl">ICD Codes</label><input class="inp" id="in-codes" placeholder="e.g. 290 401 V15"/></div>
       <div class="fgrp"><label class="flbl">AVA EMR #</label><input class="inp" id="in-ava" placeholder="e.g. 1234567"/></div>
+      <div class="fgrp"><label class="flbl" for="in-pflag">P</label><label class="p-toggle"><input id="in-pflag" type="checkbox"/><span>P</span></label></div>
       <button class="btn btn-green" onclick="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
     </div>
   </div>
@@ -696,10 +705,12 @@ function addPatient(){
   const room=g('in-room').value.trim();
   const codes=g('in-codes').value.trim();
   const ava=g('in-ava').value.trim();
+  const pFlag=g('in-pflag').checked;
   if(!name||!unit){alert('Please enter a name and unit.');return}
   if(state.patients.length>=MAX_P){alert('Patient limit reached.');return}
-  state.patients.push({id:Date.now().toString(),name,phn,unit,room,codes,ava});
+  state.patients.push({id:Date.now().toString(),name,phn,unit,room,codes,ava,pFlag});
   ['in-name','in-phn','in-room','in-codes','in-ava'].forEach(i=>g(i).value='');
+  g('in-pflag').checked=false;
   saveDrive();render();
 }
 function startEdit(id){editId=id;render()}
@@ -712,6 +723,7 @@ function saveEdit(id){
   p.room=g(`er-${id}`).value.trim();
   p.codes=g(`ec-${id}`).value.trim();
   p.ava=g(`ea-${id}`).value.trim();
+  p.pFlag=g(`epf-${id}`).checked;
   editId=null;saveDrive();render();
 }
 function promptDel(id){
@@ -877,7 +889,7 @@ function renderUList(){
             ${pts.map(p=>editId===p.id?`
               <tr>
                 <td><input class="einp" id="er-${p.id}" value="${esc(p.room)}" style="width:50px"/></td>
-                <td><input class="einp" id="en-${p.id}" value="${esc(p.name)}"/></td>
+                <td><div class="edit-name-wrap"><input class="einp" id="en-${p.id}" value="${esc(p.name)}"/><label class="p-toggle"><input id="epf-${p.id}" type="checkbox"${p.pFlag?' checked':''}/><span>P</span></label></div></td>
                 <td>
                   <input class="einp" id="ep-${p.id}" value="${esc(p.phn||'')}"/>
                   <select class="sel" id="eu-${p.id}" style="font-size:11px;padding:3px 5px;margin-top:3px">
@@ -891,7 +903,7 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${p.ava?`<a href="https://www.avaemr.ca/patients/${esc(p.ava)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:`${esc(p.name)}`}</div>
+                  <div class="pnm">${p.ava?`<a href="https://www.avaemr.ca/patients/${esc(p.ava)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
                   <div class="pphn">${esc(p.phn||'')}</div>
                 </td>
                 <td><span class="pphn">${esc(p.phn||'—')}</span></td>
@@ -1053,7 +1065,8 @@ function buildTrimBilling(){
       body+=`<tr class="buh" style="height:${rowPx}px"><td colspan="${MAX_D+1}" style="font-size:${fontPx}px">${unit.name}</td></tr>`;
       pts.forEach(p=>{
         // Billing: name + room only (no PHN)
-        const lbl=p.room?`${esc(p.name)}  ${esc(p.room)}`:`${esc(p.name)}`;
+        const nameWithFlag=`${esc(p.name)}${p.pFlag?'<span class="b-pflag">P</span>':''}`;
+        const lbl=p.room?`${nameWithFlag}  ${esc(p.room)}`:nameWithFlag;
         body+=`<tr style="height:${rowPx}px"><td class="bpn" style="--bf:${fontPx}px">${lbl}</td>${cols.map(()=>`<td class="bc"></td>`).join('')}</tr>`;
       });
     });
