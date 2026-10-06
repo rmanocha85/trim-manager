@@ -1,0 +1,6 @@
+node_modules/
+work/
+*.tmp
+trim-patients*.json
+trim-billing-data*.json
+

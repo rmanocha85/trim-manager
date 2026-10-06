@@ -17,6 +17,10 @@
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+#removed-list{overflow-x:auto;margin-top:16px}
+#removed-list table{width:100%;border-collapse:collapse;text-align:left}
+#removed-list th,#removed-list td{padding:10px 14px;border-bottom:1px solid var(--border-light)}
+#removed-list th{color:var(--muted);font-size:12px}
 
 /* PRE-AUTH SHELL — expose only the app name and Drive sign-in control. */
 body:not(.drive-connected){overflow:hidden}
@@ -325,6 +329,7 @@ body.pb #print-trim{display:none !important}
   <button class="tab-btn" onclick="showTab('billing-dates',this)">Billing Dates</button>
   <button class="tab-btn" onclick="showTab('units',this)">Units</button>
   <button class="tab-btn" onclick="showTab('history',this)">📅 Past Lists</button>
+  <button class="tab-btn" onclick="showTab('removed',this)">Removed Patients</button>
 </div>
 
 <div id="history-banner" style="display:none;background:#7a5a1e;color:white;padding:8px 24px;font-size:13px;font-weight:500;display:none;align-items:center;justify-content:space-between">
@@ -399,6 +404,15 @@ body.pb #print-trim{display:none !important}
   </div>
 </div>
 
+<div id="tab-removed" class="panel">
+  <div class="card">
+    <h3>Removed Patients</h3>
+    <p>Former patients retained for billing reconciliation only. They are excluded from active lists and counts. Records expire three calendar months after removal, checked when the live roster loads or saves. Existing billing and past daily lists are preserved.</p>
+    <p>For a returning patient, use Add New Patient with the same PHN and Ava number to restore their retained identity.</p>
+    <div id="removed-list"></div>
+  </div>
+</div>
+
 <!-- DELETE MODAL -->
 <div class="modal-ov" id="delmv">
   <div class="modal">
@@ -430,10 +444,12 @@ body.pb #print-trim{display:none !important}
 <div id="print-trim"></div>
 <div id="print-billing"></div>
 
+<script src="roster-core.js?v=20261005-retention1"></script>
 <script>
 const MAX_P=110,MAX_D=17;
 const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
 const FILE_NAME='trim-patients-data.json';
+const ROSTER_FILE_ID='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 const SCOPE='https://www.googleapis.com/auth/drive.file';
 const OAUTH_CLIENT_ID='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -442,6 +458,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 let state={
   patients:[],
+  removedPatients:[],
   units:[
     {id:'cedar',name:'CEDAR',floor:1},{id:'cherry',name:'CHERRY',floor:1},
     {id:'hatzic',name:'HATZIC',floor:1},{id:'fern',name:'FERN',floor:2},
@@ -453,6 +470,33 @@ let state={
 };
 let delId=null,editId=null,pendingDateKey=null;
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
+let rosterDocument=null,driveEtag=null,saveQueue=Promise.resolve(),writeBlocked=false,pendingSaves=0;
+function currentRoster(){
+  return {...rosterDocument,patients:state.patients,removedPatients:state.removedPatients,units:state.units,billingDates:state.billingDates};
+}
+function applyRoster(roster){
+  rosterDocument=TrimRoster.normalize(roster);
+  for(const key of ['patients','removedPatients','units','billingDates'])state[key]=rosterDocument[key];
+}
+function canEdit(){
+  if(inHistoryView||writeBlocked||!state.googleConnected||!driveEtag){alert('Connect or sync the live roster before editing.');return false;}
+  return true;
+}
+async function driveRequest(url,options={}){
+  const response=await fetch(url,{...options,cache:'no-store',headers:{Authorization:'Bearer '+state.googleToken,...options.headers}});
+  if(!response.ok)throw new Error(response.status===412?'The roster changed elsewhere. Sync from Drive and repeat your edit.':`Drive request failed (${response.status}).`);
+  return response.json();
+}
+async function readDriveRevision(){
+  const url=`https://www.googleapis.com/drive/v2/files/${ROSTER_FILE_ID}`;
+  for(let attempt=0;attempt<2;attempt++){
+    const before=await driveRequest(url+'?fields=id,etag');
+    const roster=TrimRoster.normalize(await driveRequest(url+'?alt=media'));
+    const after=await driveRequest(url+'?fields=id,etag');
+    if(before.etag&&before.etag===after.etag)return {roster,etag:after.etag};
+  }
+  throw new Error('The roster is changing elsewhere. Try syncing again.');
+}
 
 // ── GOOGLE DRIVE ──
 function showPreAuthShell(){
@@ -470,6 +514,8 @@ function showAuthenticatedShell(){
   g('btn-sync').style.display='inline-flex';
 }
 async function gConnect(){
+  if(pendingSaves){alert('Wait for the current save to finish.');return;}
+  if(inHistoryView)exitHistoryView();
   if(!window.google?.accounts){
     await new Promise((r,j)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;s.onerror=j;document.head.appendChild(s)});
   }
@@ -489,13 +535,13 @@ async function gConnect(){
 }
 
 async function forceSyncFromDrive(){
+  if(pendingSaves){alert('Wait for the current save to finish.');return;}
+  if(inHistoryView)exitHistoryView();
   if(!state.googleConnected||!state.googleToken){
     alert('Please connect Google Drive first.');return;
   }
   setSS('Force syncing from Drive…',false);
-  // Clear local state completely first
-  state.patients=[];
-  state.billingDates=[];
+  showPreAuthShell();
   const loaded=await loadDrive();
   if(!loaded){
     state.googleConnected=false;state.googleToken=null;
@@ -503,67 +549,40 @@ async function forceSyncFromDrive(){
     alert('The roster could not be refreshed. The app has been locked until you reconnect.');
   }
 }
-async function saveDrive(){
-  const body=JSON.stringify({patients:state.patients,units:state.units,billingDates:state.billingDates,driveFileId:state.driveFileId});
-  saveLocal();
-  if(!state.googleConnected||!state.googleToken){setSS('Not connected to Drive',false);return false}
-  setSS('Saving to Drive…',false);
-  try{
-    let fileId=state.driveFileId;
-    if(fileId){
-      const patchRes=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
-      if(!patchRes.ok){
-        const err=await patchRes.json();
-        console.error('Patch failed:',err);
-        // File may have been deleted — try creating new
-        fileId=null;
-        state.driveFileId=null;
-      }
+function saveDrive(){
+  if(!canEdit())return Promise.resolve(false);
+  let snapshot;
+  try{applyRoster(TrimRoster.expire(currentRoster()));snapshot=structuredClone(currentRoster());}
+  catch(e){alert(e.message);return Promise.resolve(false);}
+  pendingSaves++;
+  saveQueue=saveQueue.then(async()=>{
+    if(writeBlocked)return false;
+    setSS('Saving to Drive…',false);
+    try{
+      await driveRequest(`https://www.googleapis.com/upload/drive/v2/files/${ROSTER_FILE_ID}?uploadType=media`,{
+        method:'PUT',headers:{'Content-Type':'application/json','If-Match':driveEtag},body:JSON.stringify(snapshot)
+      });
+      const verified=await readDriveRevision();
+      if(JSON.stringify(verified.roster)!==JSON.stringify(snapshot))throw new Error('Saved roster readback differs. Sync and review before editing.');
+      driveEtag=verified.etag;saveLocal();setSS('Saved to Drive ✓',true);return true;
+    }catch(e){
+      writeBlocked=true;setSS('NOT SAVED — '+e.message,false);
+      alert('The edit could not be verified as saved. '+e.message+' Editing is locked until Sync from Drive.');return false;
     }
-    if(!fileId){
-      const metaRes=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,mimeType:'application/json'})});
-      if(!metaRes.ok){const err=await metaRes.json();console.error('Create failed:',err);setSS('Save failed! Check console.',false);return false}
-      const m=await metaRes.json();
-      state.driveFileId=m.id;
-      console.log('Created new Drive file:',m.id);
-      const uploadRes=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${m.id}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
-      if(!uploadRes.ok){const err=await uploadRes.json();console.error('Upload failed:',err);setSS('Save failed! Check console.',false);return false}
-      saveLocal();
-    }
-    setSS('Saved to Drive ✓',true);
-    return true;
-  }catch(e){setSS('Save failed! '+e.message,false);console.error('saveDrive error:',e);return false}
+  }).finally(()=>{pendingSaves--;});
+  return saveQueue;
 }
 async function loadDrive(){
   setSS('Loading…',false);
   try{
-    const listRes=await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${FILE_NAME}' and trashed=false&fields=files(id,name)`,{headers:{'Authorization':'Bearer '+state.googleToken}});
-    if(!listRes.ok)throw new Error(`Drive file lookup failed (${listRes.status})`);
-    const list=await listRes.json();
-    if(list.files?.length>0){
-      const loadedFileId=list.files[0].id;
-      const contentRes=await fetch(`https://www.googleapis.com/drive/v3/files/${loadedFileId}?alt=media`,{headers:{'Authorization':'Bearer '+state.googleToken}});
-      if(!contentRes.ok)throw new Error(`Drive roster load failed (${contentRes.status})`);
-      const c=await contentRes.json();
-      if(!Array.isArray(c.patients)||!Array.isArray(c.units)||!Array.isArray(c.billingDates)){
-        throw new Error('Drive roster has an invalid structure');
-      }
-      // Drive ALWAYS wins — completely replace local state with Drive data
-      state.patients=c.patients;
-      state.units=c.units;
-      state.billingDates=c.billingDates;
-      state.driveFileId=loadedFileId;
-      saveLocal();setSS('Loaded from Drive ✓',true);render();
-      await maybeSaveDailySnapshot();
-    }else{
-      state.patients=[];
-      state.billingDates=[];
-      state.driveFileId=null;
-      setSS('Connected — saving patients to Drive…',true);
-      const saved=await saveDrive();
-      if(!saved)throw new Error('Could not create the Drive roster');
-      render();
-    }
+    const loaded=await readDriveRevision();
+    applyRoster(loaded.roster);driveEtag=loaded.etag;writeBlocked=false;
+    state.driveFileId=ROSTER_FILE_ID;
+    const before=state.removedPatients.length;
+    applyRoster(TrimRoster.expire(currentRoster()));
+    if(before!==state.removedPatients.length&&!await saveDrive())return false;
+    saveLocal();setSS('Loaded from Drive ✓',true);render();showAuthenticatedShell();
+    await maybeSaveDailySnapshot();
     return true;
   }catch(e){setSS('Load failed',false);console.error(e);return false}
 }
@@ -634,6 +653,14 @@ function showTab(name,btn){
   if(name==='units')renderUMng();
   if(name==='billing-dates'){renderCal();renderDates();}
   if(name==='history')renderSnapshotList();
+  if(name==='removed')renderRemoved();
+}
+function renderRemoved(){
+  const el=g('removed-list');
+  if(!state.googleConnected||!driveEtag){el.textContent='Connect Google Drive to see retained records.';return;}
+  if(inHistoryView){el.textContent='Return to Today (Live) to see retained records.';return;}
+  const records=TrimRoster.expire(currentRoster()).removedPatients;
+  el.innerHTML=records.length?`<table><thead><tr><th>Name</th><th>Unit / room</th><th>Removed</th><th>Expires</th></tr></thead><tbody>${records.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.unit)} / ${esc(p.room)}</td><td>${esc(p.removedDate)}</td><td>${TrimRoster.expiresOn(p.removedDate)}</td></tr>`).join('')}</tbody></table>`:'No retained removed patients.';
 }
 
 async function renderSnapshotList(){
@@ -666,11 +693,12 @@ let inHistoryView=false;
 let liveStateBackup=null;
 
 async function viewSnapshot(fileId,label){
+  if(pendingSaves){alert('Wait for the current save to finish.');return;}
   if(!state.googleConnected||!state.googleToken){alert('Please connect Google Drive first.');return}
   try{
     const data=await loadSnapshot(fileId);
     // Back up the live state so we can restore it exactly
-    liveStateBackup={patients:state.patients,units:state.units,billingDates:state.billingDates};
+    if(!inHistoryView)liveStateBackup={patients:state.patients,units:state.units,billingDates:state.billingDates};
     if(data.patients) state.patients=data.patients;
     if(data.units && data.units.length>0) state.units=data.units;
     if(data.billingDates) state.billingDates=data.billingDates;
@@ -699,6 +727,7 @@ function exitHistoryView(){
 
 // ── PATIENTS ──
 function addPatient(){
+  if(!canEdit())return;
   const name=g('in-name').value.trim();
   const phn=g('in-phn').value.trim();
   const unit=g('in-unit').value;
@@ -708,7 +737,8 @@ function addPatient(){
   const pFlag=g('in-pflag').checked;
   if(!name||!unit){alert('Please enter a name and unit.');return}
   if(state.patients.length>=MAX_P){alert('Patient limit reached.');return}
-  state.patients.push({id:Date.now().toString(),name,phn,unit,room,codes,ava,pFlag});
+  try{applyRoster(TrimRoster.add(currentRoster(),{name,phn,unit,room,codes,ava,pFlag}));}
+  catch(e){alert(e.message);return;}
   ['in-name','in-phn','in-room','in-codes','in-ava'].forEach(i=>g(i).value='');
   g('in-pflag').checked=false;
   saveDrive();render();
@@ -716,26 +746,30 @@ function addPatient(){
 function startEdit(id){editId=id;render()}
 function cancelEdit(){editId=null;render()}
 function saveEdit(id){
+  if(!canEdit())return;
   const p=state.patients.find(x=>x.id===id);if(!p)return;
-  p.name=g(`en-${id}`).value.trim()||p.name;
-  p.phn=g(`ep-${id}`).value.trim();
-  p.unit=g(`eu-${id}`).value;
-  p.room=g(`er-${id}`).value.trim();
-  p.codes=g(`ec-${id}`).value.trim();
-  p.ava=g(`ea-${id}`).value.trim();
-  p.pFlag=g(`epf-${id}`).checked;
+  try{applyRoster(TrimRoster.edit(currentRoster(),id,{
+    name:g(`en-${id}`).value.trim()||p.name,phn:g(`ep-${id}`).value.trim(),unit:g(`eu-${id}`).value,
+    room:g(`er-${id}`).value.trim(),codes:g(`ec-${id}`).value.trim(),ava:g(`ea-${id}`).value.trim(),pFlag:g(`epf-${id}`).checked
+  }));}catch(e){alert(e.message);return;}
   editId=null;saveDrive();render();
 }
 function promptDel(id){
+  if(!canEdit())return;
   delId=id;const p=state.patients.find(x=>x.id===id);
-  g('delmsg').textContent=`Remove "${p?.name}"?`;
+  g('delmsg').textContent=`Remove "${p?.name}" from the active list today (${TrimRoster.today()})? Their roster record will be retained until ${TrimRoster.expiresOn(TrimRoster.today())} for billing reconciliation. Existing billing is preserved.`;
   g('delmv').classList.add('open');
 }
 function closeModal(id){g(id).classList.remove('open')}
-function confirmDel(){state.patients=state.patients.filter(p=>p.id!==delId);closeModal('delmv');delId=null;saveDrive();render()}
+function confirmDel(){
+  if(!canEdit()||!delId)return;
+  try{applyRoster(TrimRoster.remove(currentRoster(),delId));}catch(e){alert(e.message);return;}
+  closeModal('delmv');delId=null;saveDrive();render();
+}
 
 // ── UNITS ──
 function addUnit(){
+  if(!canEdit())return;
   const name=g('in-un').value.trim().toUpperCase();
   const floor=parseInt(g('in-uf').value)||0;
   if(!name)return;
@@ -744,6 +778,7 @@ function addUnit(){
   saveDrive();renderUMng();populateUSel();
 }
 function delUnit(id){
+  if(!canEdit())return;
   if(state.patients.some(p=>p.unit===id)){alert('Cannot delete a unit with patients.');return}
   state.units=state.units.filter(u=>u.id!==id);saveDrive();renderUMng();populateUSel();
 }
@@ -793,6 +828,7 @@ function calSelectDay(day){
 }
 
 function confirmSeen(){
+  if(!canEdit())return;
   if(pendingDateKey && pendingDateKey.editId){
     // Edit mode — update existing
     const d=state.billingDates.find(x=>x.id===pendingDateKey.editId);
@@ -832,8 +868,8 @@ function cancelSeen(){
   closeModal('seenmv');
 }
 
-function removeDate(id){state.billingDates=state.billingDates.filter(d=>d.id!==id);saveDrive();renderDates();renderCal()}
-function clearDates(){if(!confirm('Clear all dates?'))return;state.billingDates=[];saveDrive();renderDates();renderCal()}
+function removeDate(id){if(!canEdit())return;state.billingDates=state.billingDates.filter(d=>d.id!==id);saveDrive();renderDates();renderCal()}
+function clearDates(){if(!canEdit()||!confirm('Clear all dates?'))return;state.billingDates=[];saveDrive();renderDates();renderCal()}
 
 // ESC key closes any open modal
 document.addEventListener('keydown',function(e){
@@ -844,7 +880,7 @@ document.addEventListener('keydown',function(e){
 });
 
 // ── RENDER ──
-function render(){renderStats();renderUList();populateUSel();renderDates()}
+function render(){renderStats();renderUList();populateUSel();renderDates();renderRemoved()}
 
 function renderStats(){
   const t=state.patients.length,pct=Math.round(t/MAX_P*100);
@@ -1091,12 +1127,14 @@ function todayStr(){
   return`${yr}-${mon}-${day}`;
 }
 function printTrim(){
+  if(writeBlocked||pendingSaves){alert('Wait for saving or sync the roster before printing.');return;}
   buildTrimList();
   document.body.classList.remove('pb');
   document.title=`TRIM List ${todayStr()}`;
   setTimeout(()=>{window.print();setTimeout(()=>{document.title='TRIM Patient Manager'},1000)},120);
 }
 function printBilling(){
+  if(writeBlocked||pendingSaves){alert('Wait for saving or sync the roster before printing.');return;}
   buildTrimBilling();
   document.body.classList.add('pb');
   document.title=`TRIM Billing ${todayStr()}`;
