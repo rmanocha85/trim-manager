@@ -1,8 +1,13 @@
-import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,defaultConferenceEnd,normalizeManualTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261006-session1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261006-session1';
+import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,defaultConferenceEnd,normalizeManualTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261006-modes1';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261006-modes1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
-import {renderReport} from './reports.mjs?v=20261006-session1';
+import {renderReport} from './reports.mjs?v=20261006-modes1';
+import {sessionChanges,coveragePatient,extractDemographics} from './workspace.mjs?v=20261006-modes1';
 const $=id=>document.getElementById(id);
+let savedBase=null,billingMode='concern',lastChecked=null,driveReachable=false,localRecoveryFailed=false,ocrBusy=false,ocrRun=0,ocrAbort=null,imageURL=null;
+const localChanges=()=>dirty&&ledger&&savedBase?sessionChanges(savedBase,ledger):[];
+function checkedDrive(){driveReachable=true;lastChecked=new Date();}
+function connectionError(e){driveReachable=e?.status===409;if(driveReachable)lastChecked=new Date();}
 let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,timer,releaseLock,printedSignature=null,recoveryQueue=Promise.resolve(),recoveryPending=0;
 let setupCandidate,connecting=false;
 let stagedImport=null,importing=false,importRead=0;
@@ -16,14 +21,14 @@ function safe(fn){return async(...args)=>{try{await fn(...args);}catch(e){notice
 const writeUnavailable=()=>!connectionVerified||syncFailed||blocked||checking||!navigator.onLine;
 function guardWrite(){if(writeUnavailable())throw new Error('Billing is locked until the Google Drive connection and saved revision are verified. Use Save to Drive / retry.');if(saving)throw new Error('Wait for the current save to finish.');}
 function updateWriteLock(){
-  $('sync').disabled=saving||checking;$('sync').textContent=saving?'Saving…':blocked||syncFailed||!connectionVerified?'Reconnect / retry':'Save to Drive';
+  renderSaveControls();
   if(!ledger)return;const unavailable=writeUnavailable(),busy=saving||checking;
   const e=selected?currentEntry():null,historical=selected&&(ledger.historicalBillings||[]).some(h=>h.patientKey===selected&&h.date===date());
   $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset],[data-time-open]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON');});
   refreshTimePicker();
   $('roster').querySelectorAll('[data-patient]').forEach(el=>el.disabled=busy);
   $('calendar').querySelectorAll('button').forEach(el=>el.disabled=busy||el.dataset.future==='true');
-  for(const id of ['add-other','baseline-save','portal-confirm','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='finalize'&&ledger.settings.parallel);
+  for(const id of ['confirm-patient','add-other','baseline-save','portal-confirm','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='confirm-patient'&&(ocrBusy||!$('identity-reviewed').checked))||(id==='finalize'&&ledger.settings.parallel);
   $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Billing locked — resolve the saved-data conflict in Settings. Your draft is retained.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Save to Drive / retry to verify Google Drive before making changes.';
 }
 function renderCalendar(){
@@ -42,12 +47,13 @@ async function recover(){
     validateLedger(saved.ledger);
     if(sameBillingContent(saved.ledger,ledger)){dirty=false;blocked=false;await persistRecovery();notice('Your previous changes are already saved to Google Drive. Recovery status repaired.');return;}
     ledger=saved.ledger;dirty=true;
+    if(saved.baseLedger?.datasetId===ledger.datasetId){validateLedger(saved.baseLedger);savedBase=saved.baseLedger;}
     if(saved.etag!==etag){blocked=true;notice('Recovered an unsynced draft, but saved billing has changed. Your draft is retained. Download it in Settings, then reload saved data and reconcile before saving.');}
     else notice('Recovered your unfinished session on this device. Choose Save to Drive when ready.');
   }
 }
-function persistRecovery(){const snapshot={ledger:clone(ledger),etag,dirty,savedAt:new Date().toISOString()};recoveryPending++;
-  recoveryQueue=recoveryQueue.catch(()=>{}).then(()=>saveRecovery(snapshot.ledger.datasetId,snapshot)).then(()=>{recoveryPending--;}).catch(e=>{recoveryPending--;blocked=true;status('Recovery save failed — keep this tab open',true);notice(`Device recovery failed: ${e.message}. Download a private backup before closing.`);throw e;});return recoveryQueue;
+function persistRecovery(){const snapshot={ledger:clone(ledger),baseLedger:clone(savedBase),etag,dirty,savedAt:new Date().toISOString()};recoveryPending++;
+  recoveryQueue=recoveryQueue.catch(()=>{}).then(()=>saveRecovery(snapshot.ledger.datasetId,snapshot)).then(()=>{recoveryPending--;localRecoveryFailed=false;}).catch(e=>{recoveryPending--;localRecoveryFailed=true;blocked=true;status('Recovery save failed — keep this tab open',true);notice(`Device recovery failed: ${e.message}. Download a private backup before closing.`);throw e;});return recoveryQueue;
 }
 async function connect(mode,create=false){
   if(connecting)return;connecting=true;
@@ -63,11 +69,11 @@ async function connect(mode,create=false){
     catch(e){if(e.code==='MISSING_BILLING'){setupCandidate=candidate;$('create-cloud').hidden=false;$('setup-import').hidden=false;}throw e;}
     if(releaseLock){releaseLock();releaseLock=null;}
     await takeTabLock(s.ledger.datasetId);
-    adapter=candidate;roster=r;ledger=s.ledger;etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;
+    adapter=candidate;roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;
     await recover();
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();document.title='TRIM Billing · Parallel review';
     $('storage-note').textContent=mode==='local'?'Local preview · saves to this laptop’s Drive folder. Cloud sync is not verified. Original roster: read-only.':'Google Drive connected · original roster: read-only.';
-    renderAll();document.querySelector('.version').textContent=ledger.settings.parallel?'PAPER COMPARISON':'BILLING';status(blocked?'Draft conflict — action needed':dirty?'Saved on this device — not yet in Drive':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
+    renderAll();setBillingMode(billingMode);document.querySelector('.version').textContent=ledger.settings.parallel?'PAPER COMPARISON':'BILLING';status(blocked?'Draft conflict — action needed':dirty?'Saved on this device — not yet in Drive':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
     return true;
   }catch(e){if(releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;}
   finally{connecting=false;}
@@ -79,23 +85,23 @@ async function flush(){
   saveFocus=document.activeElement?.matches('#editor input,#editor textarea')?{el:document.activeElement,start:document.activeElement.selectionStart,end:document.activeElement.selectionEnd}:null;
   saving=true;updateWriteLock();const currentSeq=seq;const snapshot=clone(ledger);
   try{
-    await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;
+    await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;savedBase=clone(saved.ledger);checkedDrive();
     if(seq===currentSeq){ledger=saved.ledger;dirty=false;}else{ledger.revision=saved.ledger.revision;ledger.updatedAt=saved.ledger.updatedAt;ledger.localWriter=saved.ledger.localWriter;}
     syncFailed=false;connectionVerified=true;await persistRecovery();status(dirty?'More changes waiting to save':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);
-  }catch(e){syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice(e.message+' Your encrypted draft is retained. Use Settings to download it before reloading.');}else{notice(e.message+' Your draft remains on this device. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
+  }catch(e){connectionError(e);syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice(e.message+' Your encrypted draft is retained. Use Settings to download it before reloading.');}else{notice(e.message+' Your draft remains on this device. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
   finally{saving=false;updateWriteLock();if(!dirty&&!writeUnavailable()){renderCalendar();if(saveFocus?.el.isConnected&&!saveFocus.el.disabled&&document.activeElement===document.body){saveFocus.el.focus();if(saveFocus.start!==null)saveFocus.el.setSelectionRange(saveFocus.start,saveFocus.end);}}saveFocus=null;}
 }
 function renderAll(){
   $('unit-filter').innerHTML='<option value="">All units</option>'+roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
-  $('other-unit').innerHTML=roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
+  $('other-unit').innerHTML='<option value="">Not entered</option>'+roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   renderStats();renderRoster();renderEditor();renderReports();renderHistory();renderSettings();renderCalendar();updateWriteLock();
 }
 function renderStats(){const pts=people(),own=pts.filter(p=>p.panel),day=ledger.entries.filter(e=>e.date===date());const missing=day.filter(e=>entryIssues(e,ledger,person(e.patientKey)).length);$('stats').innerHTML=[['My panel',own.length,'No patient limit'],['Selected this date',day.length,'Patients with billing'],['Needs information',missing.length,'Saved, incomplete'],['Due for review',own.filter(p=>dueState(ledger,p,date()).kind==='due').length,`${own.filter(p=>dueState(ledger,p,date()).kind==='unknown').length} with unknown history`]].map(([label,n,sub])=>`<div class="stat"><span>${label}</span><b>${n}</b><small>${sub}</small></div>`).join('');$('day-summary').textContent=`${date()} · ${day.length} patients billed${missing.length?` · ${missing.length} need information`:''}`;}
 function renderRoster(){
   const q=$('search').value.toLowerCase().trim(),unit=$('unit-filter').value,panel=$('panel-filter').value,dueOnly=$('due-filter').checked;
-  const pts=people().filter(p=>(panel==='all'||(panel==='mine'?p.panel:!p.panel))&&(!unit||p.unit===unit)&&(!q||`${p.name} ${p.room} ${p.phn}`.toLowerCase().includes(q))&&(!dueOnly||dueState(ledger,p,date()).kind==='due'));
+  const pts=people().filter(p=>(billingMode!=='routine'||p.panel)&&(panel==='all'||(panel==='mine'?p.panel:!p.panel))&&(!unit||p.unit===unit)&&(!q||`${p.name} ${p.room} ${p.phn}`.toLowerCase().includes(q))&&(!dueOnly||dueState(ledger,p,date()).kind==='due'||(billingMode==='routine'&&ledger.entries.some(e=>e.patientKey===p.key&&e.date===date()))));
   const units=[...roster.units];for(const p of pts)if(!units.some(u=>u.id===p.unit))units.push({id:p.unit,name:p.unit||'OTHER',floor:''});
-  $('roster').innerHTML=units.map(u=>{const group=pts.filter(p=>p.unit===u.id).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})||a.name.localeCompare(b.name));if(!group.length)return '';return `<section class="unit"><div class="unit-heading"><span>${esc(u.name)}${u.floor?` · FLOOR ${esc(u.floor)}`:''}</span><span>${group.length}</span></div>${group.map(p=>{const e=ledger.entries.find(e=>e.patientKey===p.key&&e.date===date());const d=dueState(ledger,p,date());return `<button class="patient ${selected===p.key?'selected':''}" data-patient="${esc(p.key)}"><span class="room">${esc(p.room||'—')}</span><span><span class="patient-name">${esc(p.name)}${p.pFlag?'<span class="pflag">P</span>':''}</span><span class="patient-detail">${d.last?`Billing basis ${d.last}`:p.panel?'Starting history not supplied':'Reason required for coverage billing'}</span></span><span class="patient-right">${e?`<span class="pill">${e.items.map(i=>esc(i.code.replace(/^0+/,''))).join(' · ')}</span><span class="patient-detail">${e.batchId?'Handed over':entryIssues(e,ledger,p).length?'Needs information':'Selected'}</span>`:`<span class="pill ${d.kind==='unknown'?'warn':''}">${esc(d.label)}</span>`}</span></button>`;}).join('')}</section>`;}).join('')||'<div class="empty">No patients match these filters.</div>';
+  $('roster').innerHTML=units.map(u=>{const group=pts.filter(p=>p.unit===u.id).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})||a.name.localeCompare(b.name));if(!group.length)return '';return `<section class="unit"><div class="unit-heading"><span>${esc(u.name)}${u.floor?` · FLOOR ${esc(u.floor)}`:''}</span><span>${group.length}</span></div>${group.map(p=>{const e=ledger.entries.find(e=>e.patientKey===p.key&&e.date===date());const d=dueState(ledger,p,date());return `<button class="patient ${selected===p.key?'selected':''}" data-patient="${esc(p.key)}"><span class="room">${esc(p.room||'—')}</span><span><span class="patient-name">${esc(p.name)}${p.pFlag?'<span class="pflag">P</span>':''}</span><span class="patient-detail">${d.last?`Last billing ${d.last}${billingMode==='routine'?` · ${Math.round((Date.parse(date())-Date.parse(d.last))/86400000)} days ago`:''}`:p.panel?'Starting history not supplied':'Reason required for coverage billing'}</span></span><span class="patient-right">${e?`<span class="pill">${e.items.map(i=>esc(i.code.replace(/^0+/,''))).join(' · ')}</span><span class="patient-detail">${e.batchId?'Handed over':entryIssues(e,ledger,p).length?'Needs information':'Selected'}</span>`:`<span class="pill ${d.kind==='unknown'?'warn':''}">${esc(d.label)}</span>`}</span></button>`;}).join('')}</section>`;}).join('')||'<div class="empty">No patients match these filters.</div>';
   $('roster').querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(saving||checking)return;selected=b.dataset.patient;editingId=null;renderRoster();renderEditor();});updateWriteLock();
 }
 function currentEntry(){return editingId?ledger.entries.find(e=>e.id===editingId):ledger.entries.find(e=>e.patientKey===selected&&e.date===date());}
@@ -108,9 +114,9 @@ function applyItems(items,comment=currentEntry()?.comment||''){
 function renderEditor(){
   if(!selected){$('editor').innerHTML='<div class="empty-editor"><h2>Choose a patient</h2><p>Select a name to choose billing codes.</p><small>No charge is added until you select a code.</small></div>';return;}const p=person(selected);if(!p)return;const e=currentEntry(),items=e?.items||[],locked=Boolean(e?.batchId);
   const historical=(ledger.historicalBillings||[]).filter(h=>h.patientKey===p.key).sort((a,b)=>b.date.localeCompare(a.date));
-  $('editor').innerHTML=`<div class="editor-head"><div><h2>${esc(p.name)}</h2><p>${esc(roster.units.find(u=>u.id===p.unit)?.name||p.unit||'Location not recorded')} · Room ${esc(p.room||'—')} · ${p.panel?'My patient':'Coverage / former patient'}</p></div><span class="editor-date">${esc(date())}</span></div>${locked?'<div class="issue-box">Given to Suzy. This entry is read-only.</div>':''}<div class="codes-grid" aria-label="Common billing codes">${COMMON_CODES.map(code=>{const c=codeInfo(code);return `<button class="code-chip ${items.some(i=>i.code===code)?'on':''}" data-code="${code}" aria-pressed="${items.some(i=>i.code===code)}" ${locked?'disabled':''}>${code.replace(/^0+/,'')}<small>${esc({'00114':'Routine','00127':'Palliative','14077':'Provider','13121':'Family'}[code]||c.label)}</small></button>`;}).join('')}</div><details class="other-codes"><summary>Other billing codes</summary><label>Additional code<select id="other-code" ${locked?'disabled':''}><option value="">Choose a code…</option>${CODES.filter(c=>!COMMON_CODES.includes(c.code)).map(c=>`<option value="${c.code}">${c.code} · ${esc(c.label)}</option>`).join('')}</select></label><div class="fields"><label>Custom five-digit code<input id="custom-code" maxlength="5" inputmode="numeric"></label><button id="add-code" ${locked?'disabled':''}>Add</button></div></details>${items.some(i=>i.code==='13334')?`<div class="bonus-banner">✓ 13334 · First-visit bonus${items.find(i=>i.code==='13334').autoAdded?' · Auto':''}</div>`:''}<div id="item-details">${items.map((i,index)=>i.code==='13334'?'':itemHTML(i,index,locked)).join('')}</div><div id="editor-issues"></div>${e?.comment||items.some(i=>i.code!=='00114'&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code))?`<section class="comment-details"><label>Additional billing comment<textarea id="entry-comment" maxlength="3000" ${locked?'disabled':''} placeholder="Only information needed for billing">${esc(e?.comment||'')}</textarea></label></section>`:''}${e&&!locked?'<button id="remove-entry" class="text-button danger">Remove this billing date</button>':''}<details class="billing-history"><summary>Previous billing dates & patient details</summary><p class="hint">PHN ${esc(p.phn||'—')} · Usual ICD ${esc(p.codes||'—')}</p>${ledger.entries.filter(x=>x.patientKey===p.key).sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="history-row"><span>${esc(x.date)}<small> · ${x.items.map(i=>i.code).join(', ')}${x.batchId?' · Given to Suzy':''}</small></span><button data-edit="${x.id}">View</button></div>`).join('')||'<p class="hint">No billing recorded yet.</p>'}${ledger.baselines[p.key]?`<p class="hint">Starting qualifying billing: ${esc(ledger.baselines[p.key].date)}</p>`:''}${historical.length?`<h3>Already billed · imported</h3>${historical.map(h=>`<div class="history-row"><span>${esc(h.date)} · ${h.codes.map(esc).join(', ')}<small>${esc(h.reason||'')} · ${sourceLabel(h.sources)}</small></span></div>`).join('')}`:''}</details>`;
+  $('editor').innerHTML=`<div class="editor-head"><div><h2>${esc(p.name)}</h2><p>${esc(roster.units.find(u=>u.id===p.unit)?.name||p.unit||'Location not recorded')} · Room ${esc(p.room||'—')} · ${p.panel?'My patient':'Coverage / former patient'}</p></div><span class="editor-date">${esc(date())}</span></div>${locked?'<div class="issue-box">Given to Suzy. This entry is read-only.</div>':''}<div class="codes-grid" aria-label="Common billing codes">${(billingMode==='routine'?['00114',...COMMON_CODES.filter(c=>c!=='00114')]:COMMON_CODES).map(code=>{const c=codeInfo(code);return `<button class="code-chip ${billingMode==='routine'&&code==='00114'?'routine-primary ':''}${items.some(i=>i.code===code)?'on':''}" data-code="${code}" aria-pressed="${items.some(i=>i.code===code)}" ${locked?'disabled':''}>${code.replace(/^0+/,'')}<small>${esc({'00114':billingMode==='routine'?'Routine':'Visit','00127':'Palliative','14077':'Provider','13121':'Family'}[code]||c.label)}</small></button>`;}).join('')}</div><details class="other-codes"><summary>Other billing codes</summary><label>Additional code<select id="other-code" ${locked?'disabled':''}><option value="">Choose a code…</option>${CODES.filter(c=>!COMMON_CODES.includes(c.code)).map(c=>`<option value="${c.code}">${c.code} · ${esc(c.label)}</option>`).join('')}</select></label><div class="fields"><label>Custom five-digit code<input id="custom-code" maxlength="5" inputmode="numeric"></label><button id="add-code" ${locked?'disabled':''}>Add</button></div></details>${items.some(i=>i.code==='13334')?`<div class="bonus-banner">✓ 13334 · First-visit bonus${items.find(i=>i.code==='13334').autoAdded?' · Auto':''}</div>`:''}<div id="item-details">${items.map((i,index)=>i.code==='13334'?'':itemHTML(i,index,locked)).join('')}</div><div id="editor-issues"></div>${e?.comment||items.some(i=>i.code!=='00114'&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code))?`<section class="comment-details"><label>Additional billing comment<textarea id="entry-comment" maxlength="3000" ${locked?'disabled':''} placeholder="Only information needed for billing">${esc(e?.comment||'')}</textarea></label></section>`:''}${e&&!locked?'<button id="remove-entry" class="text-button danger">Remove this billing date</button>':''}<details class="billing-history"><summary>Previous billing dates & patient details</summary><p class="hint">PHN ${esc(p.phn||'—')} · Usual ICD ${esc(p.codes||'—')}</p>${ledger.entries.filter(x=>x.patientKey===p.key).sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="history-row"><span>${esc(x.date)}<small> · ${x.items.map(i=>i.code).join(', ')}${x.batchId?' · Given to Suzy':''}</small></span><button data-edit="${x.id}">View</button></div>`).join('')||'<p class="hint">No billing recorded yet.</p>'}${ledger.baselines[p.key]?`<p class="hint">Starting qualifying billing: ${esc(ledger.baselines[p.key].date)}</p>`:''}${historical.length?`<h3>Already billed · imported</h3>${historical.map(h=>`<div class="history-row"><span>${esc(h.date)} · ${h.codes.map(esc).join(', ')}<small>${esc(h.reason||'')} · ${sourceLabel(h.sources)}</small></span></div>`).join('')}`:''}</details>`;
   if(historical.some(h=>h.date===date())){$('editor').insertAdjacentHTML('afterbegin','<div class="issue-box">Already billed on this date. No new charge can be added.</div>');$('editor').querySelectorAll('button,input,textarea').forEach(x=>x.disabled=true);}
-  const newItem=code=>({code,units:1,...(code==='00114'?{diagnosisMode:'per-charge'}:{})});
+  const newItem=code=>({code,units:1,...(code==='00114'?{diagnosisMode:'per-charge',...(billingMode==='concern'?{concernBilling:true}:{})}:{})});
   $('editor').querySelectorAll('[data-code]').forEach(b=>b.onclick=safe(()=>{const current=currentEntry()?.items||[];applyItems(current.some(i=>i.code===b.dataset.code)?current.filter(i=>i.code!==b.dataset.code):[...current,newItem(b.dataset.code)]);renderEditor();}));
   const addCode=code=>{if(!/^\d{5}$/.test(code))throw new Error('Enter the full five-digit fee code.');if(currentEntry()?.items.some(i=>i.code===code))throw new Error('That code is already selected.');applyItems([...(currentEntry()?.items||[]),newItem(code)]);renderEditor();};
   $('add-code').onclick=safe(()=>addCode($('custom-code').value.trim()));$('other-code').onchange=safe(()=>{if($('other-code').value)addCode($('other-code').value);});
@@ -222,7 +228,8 @@ $('import-apply').onclick=async()=>{
   }catch(e){$('import-error').textContent=e.message;}
   finally{importing=false;$('workspace').inert=false;$('import-file').disabled=false;$('import-close').disabled=false;$('import-apply').disabled=!stagedImport;}
 };
-function switchTab(name){tab=name;document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==name);document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));if(name==='reports')renderReports();if(name==='history')renderHistory();if(name==='settings')renderSettings();}
+function switchTab(name){if(name==='routine'){setBillingMode('routine');name='billing';}else if(name==='billing'){setBillingMode('concern');}tab=name;document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==name);document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',name==='billing'?b.dataset.tab===(billingMode==='routine'?'routine':'billing'):b.dataset.tab===name));if(name==='reports')renderReports();if(name==='history')renderHistory();if(name==='settings')renderSettings();}
+function setBillingMode(mode){billingMode=mode;$('panel-filter').value=mode==='routine'?'mine':'all';$('panel-filter').disabled=mode==='routine';$('due-filter').checked=mode==='routine';$('add-other').hidden=mode==='routine';$('mode-title').textContent=mode==='routine'?'Routine Billing':'Concern Billing';$('mode-help').textContent=mode==='routine'?'Your panel · due for 14-day billing review. Select each patient and code; nothing is added automatically. Uncheck Due for review to include patients with unknown history.':'Search any patient · record the concern, billing code and relevant details.';if(mode==='routine'&&selected&&!person(selected)?.panel){selected=null;editingId=null;}renderRoster();renderEditor();}
 $('connect').onclick=()=>{$('connection-error').textContent='';$('connection-dialog').showModal();};
 $('local-option').hidden=!['127.0.0.1','localhost'].includes(location.hostname);
 $('local-connect').onclick=()=>connect('local');$('cloud-connect').onclick=()=>connect('cloud');
@@ -239,36 +246,38 @@ for(const id of ['batch-from','batch-to','report-layout'])$(id).onchange=()=>{pr
 async function verifyConnection(){
   if(!adapter||!ledger||checking||saving||blocked||document.hidden)return;
   checking=true;updateWriteLock();
-  try{if(!navigator.onLine)throw new Error('No internet connection.');await adapter.verify(etag);connectionVerified=true;syncFailed=false;status(dirty?'Saved on this device — not yet in Drive':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);}
-  catch(e){connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);notice(e.message);}
+  try{if(!navigator.onLine)throw new Error('No internet connection.');await adapter.verify(etag);checkedDrive();connectionVerified=true;syncFailed=false;status(dirty?'Saved on this device — not yet in Drive':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);}
+  catch(e){connectionError(e);connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);notice(e.message);}
   finally{checking=false;updateWriteLock();}
 }
-$('sync').onclick=safe(async()=>{
+async function syncSession(save=true){
   if(saving||checking)return;checking=true;updateWriteLock();
   try{
     if(!connectionVerified||syncFailed||blocked)await adapter.connect();
     if(blocked||syncFailed){
       const current=await adapter.load();
       if(!sameBillingContent(ledger,current.ledger)&&(blocked||current.etag!==etag))throw Object.assign(new Error('The browser draft and Google Drive contain different billing information. Both versions are retained; download your draft in Settings for review before reloading.'),{status:409});
-      if(sameBillingContent(ledger,current.ledger)){ledger=current.ledger;etag=current.etag;dirty=false;blocked=false;connectionVerified=true;syncFailed=false;printedSignature=null;await persistRecovery();notice('Your billing already matches Google Drive. The stale conflict has been cleared.');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');return;}
+      if(sameBillingContent(ledger,current.ledger)){ledger=current.ledger;savedBase=clone(current.ledger);checkedDrive();etag=current.etag;dirty=false;blocked=false;connectionVerified=true;syncFailed=false;printedSignature=null;await persistRecovery();notice('Your billing already matches Google Drive. The stale conflict has been cleared.');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');return;}
       blocked=false;syncFailed=false;connectionVerified=true;
     }
-    await adapter.verify(etag);connectionVerified=true;syncFailed=false;checking=false;
-    if(dirty){await flush();if(!dirty)notice('');return;}
-    const [r,s]=await Promise.all([adapter.roster(),adapter.load()]);roster=r;ledger=s.ledger;etag=s.etag;printedSignature=null;await persistRecovery();notice('');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
-  }catch(e){connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);throw e;}
+    await adapter.verify(etag);checkedDrive();connectionVerified=true;syncFailed=false;checking=false;
+    if(dirty){if(save)await flush();else status('Saved on this device — not yet in Drive',true);if(!dirty)notice('');return;}
+    const [r,s]=await Promise.all([adapter.roster(),adapter.load()]);roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;printedSignature=null;await persistRecovery();notice('');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
+  }catch(e){connectionError(e);connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);throw e;}
   finally{checking=false;updateWriteLock();}
-});
+}
+$('sync').onclick=safe(()=>syncSession(true));
+$('drive-connection').onclick=safe(()=>syncSession(false));
 $('lock').onclick=safe(async()=>{await persistRecovery();if(dirty&&!confirm('Changes remain on this device. Lock anyway? Reconnect on this browser to recover them.'))return;releaseLock?.();releaseLock=null;location.reload();});
-$('add-other').onclick=()=>{$('other-error').textContent='';$('other-dialog').showModal();};
-$('other-form').onsubmit=async ev=>{ev.preventDefault();try{const f=new FormData(ev.target);const p={id:crypto.randomUUID(),name:String(f.get('name')).trim(),phn:String(f.get('phn')),unit:String(f.get('unit')),room:String(f.get('room')).trim(),codes:String(f.get('codes')).trim(),ava:'',panel:false};p.key=patientKey(p);if(people().some(x=>x.key===p.key))throw new Error('This patient already exists. Select the existing record.');const next=clone(ledger);next.nonPanel.push(p);next.patients[p.key]=p;commit(next);$('other-dialog').close();ev.target.reset();$('panel-filter').value='other';selected=p.key;editingId=null;renderRoster();renderEditor();}catch(e){$('other-error').textContent=e.message;}};
+$('add-other').onclick=()=>{resetPatientForm();$('other-dialog').showModal();};
+$('other-form').onsubmit=async ev=>{ev.preventDefault();try{guardWrite();if(ocrBusy||!$('identity-reviewed').checked)throw new Error('Review the name and all 10 PHN digits before confirming.');const p=coveragePatient(Object.fromEntries(new FormData(ev.target)),people(),crypto.randomUUID());const next=clone(ledger);next.nonPanel.push(p);next.patients[p.key]=p;commit(next);$('other-dialog').close();$('search').value='';$('unit-filter').value='';$('panel-filter').value='other';$('due-filter').checked=false;selected=p.key;editingId=null;renderRoster();renderEditor();}catch(e){$('other-error').textContent=e.message;}};
 $('parallel').onchange=safe(()=>{const off=!$('parallel').checked;if(off&&!confirm('End paper-comparison mode? Only do this when you are ready to use digital reports as the single MOA billing source.')){$('parallel').checked=true;return;}const n=clone(ledger);n.settings.parallel=!off;commit(n);document.querySelector('.version').textContent=off?'BILLING WORKSPACE':'PAPER COMPARISON';});
 $('portal-confirm').onclick=safe(()=>{const year=$('portal-year').value;if(!/^20\d{2}$/.test(year))throw new Error('Choose a valid year.');if(!confirm(`Confirm you meet the eligible portal requirements for ${year}?`))return;const n=clone(ledger);n.settings.portalYears=[...new Set([...n.settings.portalYears,year])];commit(n);renderSettings();});
 $('portal-year').onchange=renderSettings;
 $('baseline-save').onclick=safe(()=>{const key=$('baseline-patient').value,value=$('baseline-date').value;if(!validDate(value)||value>today())throw new Error('Choose a valid past or current starting billing date.');const n=clone(ledger);n.baselines[key]={date:value,enteredAt:new Date().toISOString()};n.patients[key]=clone(person(key));commit(n);renderSettings();});
 $('baseline-patient').onchange=()=>{$('baseline-date').value=ledger.baselines[$('baseline-patient').value]?.date||'';};
 $('export-data').onclick=()=>download(`PRIVATE_TRIM_Billing_${today()}.json`,ledger);
-$('reload-data').onclick=safe(async()=>{if(saving||checking)throw new Error('Wait for the current save to finish.');if(!confirm('Discard this browser’s unsynced draft and reload the saved file? Download a private backup first if you need to reconcile changes.'))return;clearTimeout(timer);if(dirty)download(`PRIVATE_TRIM_Recovery_Before_Reload_${today()}.json`,ledger);const s=await adapter.load();ledger=s.ledger;etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;seq++;await persistRecovery();notice('');renderAll();status('Reloaded saved billing');});
+$('reload-data').onclick=safe(async()=>{if(saving||checking)throw new Error('Wait for the current save to finish.');if(!confirm('Discard this browser’s unsynced draft and reload the saved file? Download a private backup first if you need to reconcile changes.'))return;clearTimeout(timer);if(dirty)download(`PRIVATE_TRIM_Recovery_Before_Reload_${today()}.json`,ledger);const s=await adapter.load();ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;seq++;await persistRecovery();notice('');renderAll();status('Reloaded saved billing');});
 $('generate').onclick=safe(async()=>{
   guardWrite();
   await flush();if(dirty||blocked||saving)throw new Error('Save all changes successfully before creating the batch.');
@@ -277,8 +286,65 @@ $('generate').onclick=safe(async()=>{
 });
 $('print-report').onclick=()=>{printedSignature=signature();$('report-frame').contentWindow.focus();$('report-frame').contentWindow.print();};
 $('finalize').onclick=safe(async()=>{guardWrite();await flush();if(dirty||blocked||saving)throw new Error('Save changes before handoff.');if(printedSignature!==signature())throw new Error('Generate and print/save the current batch first.');if(issuesFor(chosen()).length)throw new Error('Resolve the flagged billing information first.');if(!confirm('Confirm this exact batch was successfully saved/printed, reviewed, and actually given to Suzy. It will leave the next print batch, but its billing history stays saved.'))return;commit(finalizeBatch(ledger,chosen(),{from:$('batch-from').value,to:$('batch-to').value,layout:$('report-layout').value,reviewed:$('rules-reviewed').checked,delivered:true}));await flush();renderReports();renderHistory();updateWriteLock();});
-window.addEventListener('offline',()=>{connectionVerified=false;syncFailed=true;status('Offline — billing locked',true);});
+window.addEventListener('offline',()=>{driveReachable=false;connectionVerified=false;syncFailed=true;status('Offline — billing locked',true);});
 window.addEventListener('online',()=>verifyConnection());
 window.addEventListener('beforeunload',e=>{if(dirty||recoveryPending){e.preventDefault();e.returnValue='';}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)verifyConnection();});
 setInterval(verifyConnection,45000);
+
+function renderSaveControls(){
+  if(!$('drive-connection'))return;
+  const offline=!navigator.onLine,connected=driveReachable&&!offline;
+  $('drive-connection').dataset.state=checking?'busy':connected?'ok':'error';
+  $('drive-connection').textContent=checking?'◌ Checking Drive…':connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):'● Reconnect Drive';
+  $('drive-connection').title=lastChecked?'Last checked '+lastChecked.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):'Check your connection without saving billing';
+  $('drive-connection').disabled=saving||checking||!adapter;
+  const changes=localChanges(),count=new Set(changes.filter(r=>r.patientKey).map(r=>r.patientKey)).size;
+  $('local-changes').dataset.state=blocked||localRecoveryFailed?'error':dirty?'pending':'ok';
+  $('local-changes').textContent=localRecoveryFailed?'! Local save needs attention':recoveryPending?'◌ Saving locally…':dirty?(count?'● Local changes · '+count+' patient'+(count===1?'':'s'):'● Local changes'):'✓ No local changes';
+  $('local-changes').title=dirty?'Saved on this device, not in Drive. Click to review changes.':'Everything matches your last Drive save.';
+  $('local-changes').disabled=!ledger;
+  $('sync').textContent=saving?'◌ Saving session…':'Save session to Drive';
+  $('sync').dataset.state=saving?'busy':dirty?'pending':'quiet';
+  $('sync').disabled=!dirty||saving||checking||blocked||!connectionVerified||syncFailed||offline;
+  $('saved-time').textContent=dirty?'Not yet saved to Drive':savedBase?.updatedAt?'Last saved '+new Date(savedBase.updatedAt).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'No changes to save';
+  if($('changes-save'))$('changes-save').disabled=$('sync').disabled;
+  if($('changes-dialog').open)renderChanges();
+}
+function billingSummary(entry){
+  if(!entry)return 'None';
+  return entry.items.map(i=>[i.code.replace(/^0+/,''),i.start&&i.end?i.start+'–'+i.end:'',i.reason||'',i.diagnosis?'ICD '+i.diagnosis:'',i.units>1?i.units+' units':''].filter(Boolean).join(' · ')).join('; ')+(entry.comment?' · '+entry.comment:'');
+}
+function renderChanges(){
+  const changes=localChanges();
+  $('changes-summary').textContent=localRecoveryFailed?'Local recovery failed. Keep this tab open and download a private backup in Settings.':recoveryPending?'Saving the latest changes on this device…':dirty?'Saved on this device, not yet in Drive. Includes earlier sessions and backdated billing. Save before switching computers.':'No local changes waiting for Drive.';
+  $('changes-list').innerHTML=changes.map(r=>'<article class="change-row"><div><strong>'+esc(r.name)+'</strong><span>'+esc(r.date)+'</span></div><b>'+esc(r.kind)+'</b>'+(r.before?'<p><small>Before</small> '+esc(billingSummary(r.before))+'</p>':'')+(r.after?'<p><small>After</small> '+esc(billingSummary(r.after))+'</p>':'')+(r.detail?'<p>'+esc(r.detail)+'</p>':'')+'</article>').join('')||(dirty?'<p>A recovered session is waiting to save. No patient changes compared with the saved snapshot.</p>':'<p>✓ All changes saved.</p>');
+  $('changes-conflict').hidden=!blocked;$('changes-conflict').textContent='The saved file changed elsewhere. Nothing will be overwritten. Your local version is retained; use Settings to download it for reconciliation.';
+}
+$('local-changes').onclick=()=>{renderChanges();$('changes-dialog').showModal();renderSaveControls();};
+$('changes-save').onclick=safe(()=>syncSession(true));
+function clearScreenshot(){ocrRun++;ocrAbort?.abort();ocrAbort=null;ocrBusy=false;if(imageURL)URL.revokeObjectURL(imageURL);imageURL=null;$('patient-preview').removeAttribute('src');$('patient-preview').hidden=true;}
+function resetPatientForm(){clearScreenshot();$('other-form').reset();$('ocr-status').textContent='Paste only the demographics area for the clearest result. The image stays on this device.';$('other-error').textContent='';setPatientBusy(false);updateWriteLock();}
+function setPatientBusy(busy){ocrBusy=busy;for(const el of $('other-form').querySelectorAll('input,select'))el.disabled=busy;updateWriteLock();}
+$('other-dialog').addEventListener('close',resetPatientForm);
+$('identity-reviewed').onchange=updateWriteLock;
+for(const input of $('other-form').querySelectorAll('[name="name"],[name="phn"]'))input.addEventListener('input',()=>{$('identity-reviewed').checked=false;updateWriteLock();});
+$('clear-screenshot').onclick=resetPatientForm;
+$('paste-patient').addEventListener('paste',async event=>{
+  const images=[...(event.clipboardData?.items||[])].filter(i=>i.kind==='file'&&i.type.startsWith('image/'));
+  if(!images.length){$('ocr-status').textContent='Copy a screenshot first, then click here and press Ctrl+V. Or enter the details below.';return;}
+  event.preventDefault();if(images.length!==1){$('ocr-status').textContent='Paste one patient screenshot at a time.';return;}
+  if(ocrBusy)return;
+  const blob=images[0].getAsFile();if(!blob)return;
+  clearScreenshot();const run=ocrRun;ocrAbort=new AbortController();
+  $('other-form').elements.name.value='';$('other-form').elements.phn.value='';$('identity-reviewed').checked=false;
+  imageURL=URL.createObjectURL(blob);$('patient-preview').src=imageURL;$('patient-preview').hidden=false;setPatientBusy(true);
+  try{
+    const {readScreenshot}=await import('./ocr.mjs?v=20261006-modes1');
+    const text=await readScreenshot(blob,msg=>{if(run===ocrRun)$('ocr-status').textContent=msg;},ocrAbort.signal);
+    if(run!==ocrRun)return;
+    const result=extractDemographics(text);$('other-form').elements.name.value=result.name;$('other-form').elements.phn.value=result.phn;
+    $('ocr-status').textContent='Review the name and every PHN digit against the screenshot. '+result.warnings.join(' ');
+  }catch(e){if(run===ocrRun)$('ocr-status').textContent='Could not read the screenshot reliably. Enter the details manually. '+(e.message.includes('smaller')||e.message.includes('too large')?e.message:'');}
+  finally{if(run===ocrRun)setPatientBusy(false);}
+});

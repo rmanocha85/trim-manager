@@ -175,7 +175,7 @@ export function entryIssues(entry,ledger,patient) {
   for(const i of entry.items) {
     const info=codeInfo(i.code); const prefix=`${i.code}: `;
     if(!info) {required(i.customVerified===true&&Boolean(i.customLabel?.trim()),prefix+'custom code needs a description and physician rule confirmation.');if(i.customTimed){required(minutes(i.start)!==null&&minutes(i.end)!==null&&minutes(i.end)>minutes(i.start),prefix+'custom timed code needs valid start/end times.');}}
-    if(info?.reason||((entry.panelAtBilling??patient?.panel)===false&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code))) required(Boolean(i.reason?.trim()),prefix+'reason required.');
+    if(info?.reason||i.concernBilling===true||((entry.panelAtBilling??patient?.panel)===false&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code))) required(Boolean(i.reason?.trim()),prefix+'reason required.');
     if(i.diagnosis?.trim())required(validDiagnosis(i.diagnosis),prefix+'enter a valid ICD-9 diagnosis code.');
     if(i.code==='00114'&&i.diagnosisMode==='per-charge'&&i.reason?.trim())required(Boolean(i.diagnosis?.trim()),prefix+'enter the ICD-9 for this billing reason.');
     if(info?.participants) required(Boolean(i.participants?.trim()),prefix+'participants / roles required.');
