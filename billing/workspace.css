@@ -4,8 +4,13 @@ header{height:60px;min-height:60px}.sidebar{top:60px;height:calc(100dvh - 60px)}
 @media(max-width:1100px){.brand strong{display:none}.mode-heading{display:block}.mode-heading span{display:block;margin-top:3px}.header-actions{gap:5px}.header-actions .save-control{font-size:11px;padding:7px 8px}}
 @media(max-width:760px){header{height:auto;min-height:60px}.header-actions{flex:1;flex-wrap:wrap;justify-content:flex-end}.header-actions .save-control{font-size:11px}.brand{align-self:start}.sidebar{height:auto;top:auto}.mode-heading{display:block}.change-row>div{flex-wrap:wrap}.session-save{align-items:stretch}#saved-time{text-align:center}}
 
-/* The save button + timestamp occupy exactly the same height as either status button. */
-.header-actions .save-control,.header-actions #lock{box-sizing:border-box;height:40px;min-height:40px;line-height:16px}
-.header-actions .session-save{display:grid;grid-template-rows:26px 12px;gap:2px;height:40px;align-items:stretch}
-.header-actions #sync{height:26px;min-height:26px;padding:4px 10px;font-size:11px;line-height:16px;border-radius:6px}
-.header-actions #saved-time{height:12px;min-height:0;line-height:12px;font-size:10px;white-space:nowrap;text-align:center}
+/* Three equal buttons share a top edge; only Save has a timestamp below it. */
+header{height:64px;min-height:64px}
+.sidebar{top:64px;height:calc(100dvh - 64px)}
+.header-actions{align-items:flex-start}
+.header-actions .save-control{box-sizing:border-box;width:184px;min-width:184px;height:36px;min-height:36px;padding:3px 8px;font-size:12px;line-height:14px;white-space:normal;border-radius:7px;display:flex;align-items:center;justify-content:center}
+.header-actions #lock{box-sizing:border-box;height:36px;min-height:36px;line-height:16px}
+.header-actions .session-save{display:grid;grid-template-rows:36px 14px;gap:2px;width:184px;flex:0 0 184px;align-items:stretch}
+.header-actions #saved-time{height:14px;min-height:0;line-height:14px;font-size:11px;white-space:nowrap;text-align:center}
+@media(pointer:coarse){header{height:72px;min-height:72px}.sidebar{top:72px;height:calc(100dvh - 72px)}.header-actions .save-control,.header-actions #lock{height:44px;min-height:44px}.header-actions .session-save{grid-template-rows:44px 14px}}
+@media(max-width:760px){header{height:auto}.sidebar{height:auto;top:auto}.header-actions{flex-basis:100%}}
