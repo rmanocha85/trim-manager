@@ -1,12 +1,12 @@
-import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,defaultConferenceEnd,calendarDays,codeInfo,clone,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261005-reasons1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261005-reasons1';
+import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,defaultConferenceEnd,normalizeManualTime,calendarDays,codeInfo,clone,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261005-timepicker1';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261005-timepicker1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
-import {renderReport} from './reports.mjs?v=20261005-reasons1';
+import {renderReport} from './reports.mjs?v=20261005-timepicker1';
 const $=id=>document.getElementById(id);
 let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,timer,releaseLock,printedSignature=null,recoveryQueue=Promise.resolve(),recoveryPending=0;
 let setupCandidate,connecting=false;
 let stagedImport=null,importing=false,importRead=0;
-let connectionVerified=false,syncFailed=false,checking=false,calendarMonth=today().slice(0,7),saveFocus=null;
+let connectionVerified=false,syncFailed=false,checking=false,calendarMonth=today().slice(0,7),saveFocus=null,timeTarget=null;
 const date=()=>$('service-date').value||today();
 const people=()=>rosterView(roster,ledger);
 const person=k=>people().find(p=>p.key===k);
@@ -18,7 +18,8 @@ function guardWrite(){if(writeUnavailable())throw new Error('Billing is locked u
 function updateWriteLock(){
   if(!ledger)return;const unavailable=writeUnavailable(),busy=dirty||saving||checking;
   const e=selected?currentEntry():null,historical=selected&&(ledger.historicalBillings||[]).some(h=>h.patientKey===selected&&h.date===date());
-  $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON');});
+  $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset],[data-time-open]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON');});
+  refreshTimePicker();
   $('roster').querySelectorAll('[data-patient]').forEach(el=>el.disabled=busy);
   $('calendar').querySelectorAll('button').forEach(el=>el.disabled=busy||el.dataset.future==='true');
   for(const id of ['add-other','baseline-save','portal-confirm','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='finalize'&&ledger.settings.parallel);
@@ -112,15 +113,57 @@ function renderEditor(){
   $('add-code').onclick=safe(()=>addCode($('custom-code').value.trim()));$('other-code').onchange=safe(()=>{if($('other-code').value)addCode($('other-code').value);});
   $('editor').querySelectorAll('[data-remove-code]').forEach(b=>b.onclick=safe(()=>{applyItems(currentEntry().items.filter(i=>i.code!==b.dataset.removeCode));renderEditor();}));
   $('editor').querySelectorAll('[data-field]').forEach(input=>input.addEventListener('input',safe(()=>{const list=clone(currentEntry().items),item=list[Number(input.dataset.index)];item[input.dataset.field]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;if(input.dataset.field==='start'&&CONFERENCE_CODES.includes(item.code)){const end=defaultConferenceEnd(item);if(end&&!item.end){item.end=end;$('editor').querySelector(`[data-index="${input.dataset.index}"][data-field="end"]`).value=end;}}if(item.code==='00114'&&['reason','diagnosis'].includes(input.dataset.field))item.diagnosisMode='per-charge';applyItems(list);renderEditorIssues();})));
+  $('editor').querySelectorAll('[data-time-open]').forEach(button=>button.onclick=safe(()=>openTimePicker(Number(button.dataset.index),button.dataset.timeOpen)));
   $('editor').querySelectorAll('[data-reason-preset]').forEach(button=>button.onclick=safe(()=>{guardWrite();const list=clone(currentEntry().items),item=list[Number(button.dataset.index)],preset=REASON_PRESETS[Number(button.dataset.reasonPreset)];if(!preset||item?.code!=='00114')return;if((item.reason?.trim()||item.diagnosis?.trim())&&!REASON_PRESETS.some(p=>p.reason===item.reason&&p.diagnosis===item.diagnosis)&&!confirm('Replace the current billing reason and diagnosis with this preset?'))return;Object.assign(item,preset,{diagnosisMode:'per-charge'});applyItems(list);renderEditor();}));
   if($('entry-comment'))$('entry-comment').oninput=safe(()=>{if(!currentEntry())return;applyItems(clone(currentEntry().items),$('entry-comment').value);renderEditorIssues();});
   if($('remove-entry'))$('remove-entry').onclick=safe(()=>applyItems([]));
   $('editor').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEntry(b.dataset.edit));renderEditorIssues();updateWriteLock();
 }
 function itemHTML(i,index,locked){
-  const c=codeInfo(i.code);const field=(name,label,type='text',extra='')=>`<label>${label}<input type="${type}" data-index="${index}" data-field="${name}" ${type==='checkbox'?(i[name]?'checked':''):`value="${esc(i[name]??'')}"`} ${locked?'disabled':''} ${extra}></label>`;
+  const c=codeInfo(i.code);const field=(name,label,type='text',extra='')=>type==='time'&&CONFERENCE_CODES.includes(i.code)?`<label>${label}<button type="button" class="time-choice" data-time-open="${name}" data-index="${index}" aria-label="${label} time: ${esc(i[name]||'choose time')}" ${locked?'disabled':''}>${esc(i[name]||'Choose time')} <span aria-hidden="true">▾</span></button><input type="hidden" data-index="${index}" data-field="${name}" value="${esc(i[name]||'')}"></label>`:`<label>${label}<input type="${type}" data-index="${index}" data-field="${name}" ${type==='checkbox'?(i[name]?'checked':''):`value="${esc(i[name]??'')}"`} ${locked?'disabled':''} ${extra}></label>`;
   return `<div class="code-details"><h3>${esc(i.code.replace(/^0+/,''))} · ${esc(c?.label||'Other code')}${!COMMON_CODES.includes(i.code)?`<button class="text-button" data-remove-code="${i.code}" ${locked?'disabled':''}>Remove</button>`:''}</h3>${!c?field('customLabel','Description')+field('customVerified','I checked this code’s service-date rules','checkbox')+field('customTimed','This code requires start/end times','checkbox'):''}${c?.timed||!c?`<div class="fields">${field('start','Start','time')}${field('end','End','time')}${field('units','Units','number',`min="1" max="${c?2:99}"`)}</div>`:c?.attendance?field('start','Attendance time','time'):''}${c?.request?field('requestAt','Request date and time','datetime-local')+field('requester','Requesting person / role'):''}${c?.participants?field('participants','Participants / roles'):''}${i.code==='00114'?reasonPresetHTML(i,index,locked,field):`<div class="reason-diagnosis">${CONFERENCE_CODES.includes(i.code)?'':field('reason',c?.reason||!person(selected)?.panel?'Reason / claim note (required)':'Reason / claim note','text','maxlength="2000"')}${field('diagnosis','ICD-9 for this billing','text','maxlength="8" placeholder="Usual if blank"')}</div>`}${c?.admission||c?.callout?field('attested',c.admission?'I confirm admission criteria and required documentation':'I confirm special call, travel and first patient on this call','checkbox'):''}<details class="code-guidance"><summary>Code guidance</summary><p>${esc(c?.note||'Rules for this code must be verified before finalizing.')}</p></details></div>`;
 }
+
+function timeCandidate(){
+  if($('time-manual-mode').checked)return normalizeManualTime($('time-manual').value);
+  return $('time-hour').value!==''&&$('time-minute').value!==''?normalizeManualTime($('time-hour').value+':'+$('time-minute').value):null;
+}
+function refreshTimePicker(){
+  if(!$('time-dialog').open)return;
+  const manual=$('time-manual-mode').checked,value=timeCandidate(),disabled=writeUnavailable()||dirty||saving||checking;
+  $('time-wheels').hidden=manual;$('time-manual-label').hidden=!manual;
+  for(const id of ['time-hour','time-minute','time-manual-mode','time-manual'])$(id).disabled=disabled;
+  $('time-use').disabled=disabled||!value;$('time-use').textContent=value?'Use '+value:'Choose a time';
+  $('time-feedback').textContent=disabled?'Billing is locked — reconnect or finish the current save.':value?'24-hour time · changes save only when you choose Use time.':manual?'Enter an exact time, e.g. 1837 or 18:37.':'Choose an hour and a ten-minute slot.';
+}
+function openTimePicker(index,field){
+  guardWrite();if(dirty)throw new Error('Wait for the current save to finish.');
+  const entry=currentEntry(),item=entry?.items[index];
+  if(!item||entry.batchId||!CONFERENCE_CODES.includes(item.code)||!['start','end'].includes(field))return;
+  timeTarget={entryId:entry.id,patientKey:selected,date:date(),index,field,code:item.code};
+  const current=normalizeManualTime(item[field]),exact=current&&Number(current.slice(3))%10!==0;
+  $('time-title').textContent=(field==='start'?'Start':'End')+' time · '+item.code;
+  $('time-hour').value=current?current.slice(0,2):'';
+  $('time-minute').value=current&&!exact?current.slice(3):'';
+  $('time-manual').value=current||'';$('time-manual-mode').checked=Boolean(exact);
+  $('time-dialog').showModal();refreshTimePicker();
+}
+$('time-hour').innerHTML='<option value="" disabled>Hour</option>'+Array.from({length:24},(_,h)=>`<option value="${String(h).padStart(2,'0')}">${String(h).padStart(2,'0')}</option>`).join('');
+$('time-minute').innerHTML='<option value="" disabled>Minute</option>'+['00','10','20','30','40','50'].map(m=>`<option value="${m}">${m}</option>`).join('');
+for(const id of ['time-hour','time-minute','time-manual'])$(id).addEventListener('input',refreshTimePicker);
+$('time-manual-mode').onchange=()=>{if($('time-manual-mode').checked){const value=$('time-hour').value!==''&&$('time-minute').value!==''?$('time-hour').value+':'+$('time-minute').value:null;if(value)$('time-manual').value=value;}refreshTimePicker();};
+$('time-cancel').onclick=()=>$('time-dialog').close();
+$('time-dialog').addEventListener('close',()=>timeTarget=null);
+$('time-use').onclick=safe(()=>{
+  guardWrite();if(dirty)throw new Error('Wait for the current save to finish.');
+  const entry=currentEntry(),target=timeTarget,value=timeCandidate();
+  if(!value||!target||entry?.id!==target.entryId||entry.batchId||selected!==target.patientKey||date()!==target.date||entry.items[target.index]?.code!==target.code)throw new Error('This billing selection changed. Close the time picker and reopen it.');
+  const items=clone(entry.items),item=items[target.index];item[target.field]=value;
+  if(target.field==='start'&&!item.end){const end=defaultConferenceEnd(item);if(end)item.end=end;}
+  applyItems(items);$('time-dialog').close();renderEditor();
+});
+$('time-manual').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();if(!$('time-use').disabled)$('time-use').click();}};
+
 function reasonPresetHTML(item,index,locked,field){
   return `<div class="reason-workspace"><div class="reason-presets" aria-label="Common billing reasons">${REASON_PRESETS.map((p,n)=>`<button type="button" data-reason-preset="${n}" data-index="${index}" aria-pressed="${item.reason===p.reason&&item.diagnosis===p.diagnosis}" ${locked?'disabled':''}><span>${esc(p.reason)}</span><small>${esc(p.diagnosis)}</small></button>`).join('')}</div><div class="reason-diagnosis"><label>Billing reason / comment<textarea data-index="${index}" data-field="reason" maxlength="2000" ${locked?'disabled':''} placeholder="Type a reason, or choose one above…">${esc(item.reason||'')}</textarea></label>${field('diagnosis','ICD-9 for this billing','text','maxlength="8" placeholder="Usual if blank"')}</div></div>`;
 }

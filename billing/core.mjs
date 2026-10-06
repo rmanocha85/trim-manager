@@ -43,6 +43,13 @@ export function validDate(s) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return fal
 export function addDays(s,n) {if(!validDate(s)) return null; const d=new Date(`${s}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 export function daysBetween(a,b) {return (Date.parse(`${b}T12:00:00Z`)-Date.parse(`${a}T12:00:00Z`))/86400000;}
 export function minutes(s) {return /^([01]\d|2[0-3]):[0-5]\d$/.test(s||'')?Number(s.slice(0,2))*60+Number(s.slice(3)):null;}
+export function normalizeManualTime(value){
+  const text=String(value||'').trim();
+  const match=text.match(/^(\d{1,2}):(\d{2})$/)||text.match(/^(\d{1,2})(\d{2})$/);
+  if(!match)return null;
+  const result=`${match[1].padStart(2,'0')}:${match[2]}`;
+  return minutes(result)===null?null:result;
+}
 export const escapeHTML = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function blankLedger(id=crypto.randomUUID()) {return {app:APP,schema:SCHEMA,datasetId:id,revision:0,updatedAt:null,entries:[],baselines:{},nonPanel:[],patients:{},units:[],batches:[],settings:{parallel:true,portalYears:[]}};}
 export function patientKey(p) {const phn=String(p.phn||'').replace(/\D/g,'');return phn?`phn:${phn}`:`roster:${String(p.id)}`;}
