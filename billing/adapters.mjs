@@ -1,4 +1,4 @@
-import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261005-review2';
+import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261005-balanced1';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 export class LocalAdapter {
@@ -7,6 +7,7 @@ export class LocalAdapter {
   async request(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,'X-Trim-Session':this.csrf}});const j=await r.json();if(!r.ok){const e=new Error(j.error);e.status=r.status;throw e;}return j;}
   roster(){return this.request('/api/roster');}
   load(){return this.request('/api/billing');}
+  async verify(etag){const current=await this.load();if(current.etag!==etag){const e=new Error('Billing changed elsewhere. Reload and reconcile your saved draft.');e.status=409;throw e;}}
   save(ledger,etag){return this.request('/api/billing',{method:'PUT',headers:{'Content-Type':'application/json','If-Match':etag},body:JSON.stringify(ledger)});}
 }
 export class DriveAdapter {
@@ -52,6 +53,7 @@ export class DriveAdapter {
     }
     throw new Error('Could not obtain a stable Drive revision. Saving is disabled.');
   }
+  async verify(etag){if(!this.fileId||!etag)throw new Error('Connect a billing file first.');const meta=await this.request(`https://www.googleapis.com/drive/v2/files/${this.fileId}?fields=id,etag`);if(!meta.etag||meta.etag!==etag){const e=new Error('Billing changed elsewhere. Reload and reconcile your saved draft.');e.status=409;throw e;}}
   async save(ledger,etag){
     if(!this.fileId||this.fileId===ROSTER||!etag||etag==='new')throw new Error('A separate billing file with a valid Drive revision is required.');
     validateLedger(ledger);assertImmutable(this.current,ledger);

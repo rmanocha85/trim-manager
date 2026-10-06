@@ -16,6 +16,7 @@ export const CODES = [
   {code:'01202', label:'Weekend / holiday call-out', request:true, attendance:true, reason:true, callout:true, note:'Special call and travel; first patient only. Check time-window and same-day restrictions.'}
 ];
 export const codeInfo = code => CODES.find(x => x.code === code);
+export const COMMON_CODES = ['00114','00127','14077','13121'];
 export const today = () => {const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 export const clone = value => structuredClone(value);
 export function validDate(s) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return false; const d=new Date(`${s}T12:00:00Z`); return !Number.isNaN(+d)&&d.toISOString().slice(0,10)===s; }
@@ -111,6 +112,26 @@ export function removeEntry(ledger,id) {
   const e=ledger.entries.find(e=>e.id===id);if(!e) throw new Error('Entry not found.');if(e.batchId) throw new Error('Handed-over entries cannot be removed.');
   const l=clone(ledger);l.entries=l.entries.filter(e=>e.id!==id);return l;
 }
+// Only interactive new qualifying selections receive an automatic bonus. Imports,
+// historical records and merely opening an existing day are never retrofitted.
+export function upsertInteractiveEntry(ledger,patient,date,items,comment='',id=null){
+  const existing=id?ledger.entries.find(e=>e.id===id):ledger.entries.find(e=>e.patientKey===patient.key&&e.date===date);
+  const qualifies=list=>list.some(i=>['00114','00127'].includes(i.code));
+  const cleaned=clone(items).filter(i=>!(i.code==='13334'&&i.autoAdded&&!qualifies(items)));
+  if(!cleaned.length)return existing?removeEntry(ledger,existing.id):clone(ledger);
+  const n=upsertEntry(ledger,patient,date,cleaned,comment,id);
+  const day=ledger.entries.filter(e=>e.date===date),history=(ledger.historicalBillings||[]).filter(e=>e.date===date);
+  if(qualifies(cleaned)&&!day.some(e=>qualifies(e.items)||e.items.some(i=>['13334','00115'].includes(i.code)))&&!history.some(h=>h.codes.some(c=>['00114','00127','13334','00115'].includes(c)))&&!cleaned.some(i=>['13334','00115'].includes(i.code))){
+    n.entries.find(e=>e.patientKey===patient.key&&e.date===date).items.push({code:'13334',units:1,autoAdded:true});
+  }
+  return n;
+}
+export function calendarDays(month){
+  if(!/^\d{4}-\d{2}$/.test(month)||!validDate(month+'-01'))throw new Error('Invalid calendar month.');
+  const first=new Date(month+'-01T12:00:00Z'),offset=(first.getUTCDay()+6)%7,last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+  return [...Array(offset).fill(null),...Array.from({length:last},(_,i)=>`${month}-${String(i+1).padStart(2,'0')}`)];
+}
+export function validDiagnosis(value){return /^(?:\d{3}(?:\.\d{1,2})?|\d{4,5}|V\d{2}(?:\.\d{1,2})?|V\d{3,4}|E\d{3}(?:\.\d)?|E\d{4})$/i.test(String(value||'').trim());}
 export function batchEntries(ledger,from,to) {return ledger.entries.filter(e=>!e.batchId&&e.date>=from&&e.date<=to).sort((a,b)=>a.date.localeCompare(b.date)||a.patientKey.localeCompare(b.patientKey));}
 export function entryIssues(entry,ledger,patient) {
   const errors=[]; const required=(ok,msg)=>{if(!ok)errors.push(msg);};
@@ -120,7 +141,9 @@ export function entryIssues(entry,ledger,patient) {
   for(const i of entry.items) {
     const info=codeInfo(i.code); const prefix=`${i.code}: `;
     if(!info) {required(i.customVerified===true&&Boolean(i.customLabel?.trim()),prefix+'custom code needs a description and physician rule confirmation.');if(i.customTimed){required(minutes(i.start)!==null&&minutes(i.end)!==null&&minutes(i.end)>minutes(i.start),prefix+'custom timed code needs valid start/end times.');}}
-    if(info?.reason||(entry.panelAtBilling??patient?.panel)===false) required(Boolean(i.reason?.trim()),prefix+'reason required.');
+    if(info?.reason||((entry.panelAtBilling??patient?.panel)===false&&i.code!=='13334')) required(Boolean(i.reason?.trim()),prefix+'reason required.');
+    if(i.diagnosis?.trim())required(validDiagnosis(i.diagnosis),prefix+'enter a valid ICD-9 diagnosis code.');
+    if(i.code==='00114'&&i.diagnosisMode==='per-charge'&&i.reason?.trim())required(Boolean(i.diagnosis?.trim()),prefix+'enter the ICD-9 for this billing reason.');
     if(info?.participants) required(Boolean(i.participants?.trim()),prefix+'participants / roles required.');
     if(info?.request) required(Boolean(i.requester?.trim())&&Boolean(i.requestAt)&&!Number.isNaN(Date.parse(i.requestAt)),prefix+'requesting person and request date/time required.');
     if(info?.attendance) required(minutes(i.start)!==null,prefix+'attendance time required.');
@@ -155,6 +178,7 @@ export function entryIssues(entry,ledger,patient) {
   if(codes.includes('13334')) {
     required(codes.some(c=>['00114','00127','13115'].includes(c)),'13334 requires a qualifying same-day visit on this entry.');
     required(!all.some(e=>e.date===entry.date&&e.id!==entry.id&&e.items.some(i=>i.code==='13334')),'13334 already recorded on this date.');
+    required(!(ledger.historicalBillings||[]).some(h=>h.date===entry.date&&h.codes.includes('13334')),'13334 already recorded in billed history for this date.');
     required(!all.some(e=>e.date===entry.date&&e.items.some(i=>i.code==='00115')),'13334 with an urgent assessment on this date requires review; blocked in this prototype.');
   }
   if(codes.includes('00115')&&codes.some(c=>['13334','01200','01201','01202'].includes(c))) errors.push('Urgent assessment cannot be combined with these bonus/call-out codes.');
