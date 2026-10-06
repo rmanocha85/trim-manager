@@ -7,8 +7,8 @@ export const CODES = [
   {code:'00127', label:'Palliative facility visit', reason:true, note:'Verify palliative criteria and any additional same-day claim requirements.'},
   {code:'13115', label:'LTC admission', reason:true, admission:true, note:'Initial in-person admission, once per patient per physician. Confirm reconciliation, care plan and MOST; not a return from hospital or physician transfer.'},
   {code:'13334', label:'First visit bonus', note:'Once per physician/day; requires qualifying visit. Not with urgent assessment.'},
-  {code:'14077', label:'Provider conference', timed:true, reason:true, portal:true, annual:18, note:'Two-way clinical conference, not routine-round communication. Start/end in claim and chart. Participant documentation stays in the clinical note, not this billing sheet. Annual units shown are recorded here only.'},
-  {code:'13121', label:'Family conference', timed:true, participants:true, reason:true, annual:100, physicianLimit:true, note:'Care planning/consent criteria, not routine updates. Separate time from other services.'},
+  {code:'14077', label:'Provider conference', timed:true, portal:true, annual:18, note:'Two-way clinical conference, not routine-round communication. Start/end in claim and chart. Reason and participant documentation stays in the clinical note. Annual units shown are recorded here only.'},
+  {code:'13121', label:'Family conference', timed:true, annual:100, physicianLimit:true, note:'Care planning/consent criteria, not routine updates. Separate time from other services. Reason and participant documentation stays in the clinical note.'},
   {code:'14067', label:'Brief provider conference', participants:true, reason:true, portal:true, annual:150, physicianLimit:true, note:'Clinical conferencing criteria; not an administrative or family conversation.'},
   {code:'13005', label:'Allied-worker advice', request:true, reason:true, note:'Document caller, request time and advice; same-day service restrictions apply.'},
   {code:'01200', label:'Evening call-out', request:true, attendance:true, reason:true, callout:true, note:'Special call and travel; first patient only. Check time-window and same-day restrictions.'},
@@ -17,6 +17,26 @@ export const CODES = [
 ];
 export const codeInfo = code => CODES.find(x => x.code === code);
 export const COMMON_CODES = ['00114','00127','14077','13121'];
+export const CONFERENCE_CODES = ['14077','13121'];
+export const REASON_PRESETS = [
+  {reason:'Fall and trauma',diagnosis:'959'},
+  {reason:'Sepsis/fever',diagnosis:'038.9'},
+  {reason:'Cough and shortness of breath',diagnosis:'786.2'},
+  {reason:'Abdominal pain',diagnosis:'789'},
+  {reason:'Cellulitis/wound infection',diagnosis:'682'},
+  {reason:'Worsening behavioral issues',diagnosis:'298'},
+  {reason:'Worsening chronic pain',diagnosis:'338'},
+  {reason:'Influenza',diagnosis:'487'},
+  {reason:'Cough and COVID',diagnosis:'C19'},
+  {reason:'Hyperglycemia and diabetes management',diagnosis:'250'}
+];
+// Only a deliberate start-time edit fills a missing end; imports and manual ends are untouched.
+export function defaultConferenceEnd(item){
+  if(!CONFERENCE_CODES.includes(item.code)||item.end)return item.end;
+  const start=minutes(item.start);
+  if(start===null||start+10>=1440)return item.end;
+  const end=start+10;return `${String(Math.floor(end/60)).padStart(2,'0')}:${String(end%60).padStart(2,'0')}`;
+}
 export const today = () => {const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 export const clone = value => structuredClone(value);
 export function validDate(s) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return false; const d=new Date(`${s}T12:00:00Z`); return !Number.isNaN(+d)&&d.toISOString().slice(0,10)===s; }
@@ -131,7 +151,7 @@ export function calendarDays(month){
   const first=new Date(month+'-01T12:00:00Z'),offset=(first.getUTCDay()+6)%7,last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
   return [...Array(offset).fill(null),...Array.from({length:last},(_,i)=>`${month}-${String(i+1).padStart(2,'0')}`)];
 }
-export function validDiagnosis(value){return /^(?:\d{3}(?:\.\d{1,2})?|\d{4,5}|V\d{2}(?:\.\d{1,2})?|V\d{3,4}|E\d{3}(?:\.\d)?|E\d{4})$/i.test(String(value||'').trim());}
+export function validDiagnosis(value){return /^(?:C19|\d{3}(?:\.\d{1,2})?|\d{4,5}|V\d{2}(?:\.\d{1,2})?|V\d{3,4}|E\d{3}(?:\.\d)?|E\d{4})$/i.test(String(value||'').trim());}
 export function batchEntries(ledger,from,to) {return ledger.entries.filter(e=>!e.batchId&&e.date>=from&&e.date<=to).sort((a,b)=>a.date.localeCompare(b.date)||a.patientKey.localeCompare(b.patientKey));}
 export function entryIssues(entry,ledger,patient) {
   const errors=[]; const required=(ok,msg)=>{if(!ok)errors.push(msg);};
@@ -141,7 +161,7 @@ export function entryIssues(entry,ledger,patient) {
   for(const i of entry.items) {
     const info=codeInfo(i.code); const prefix=`${i.code}: `;
     if(!info) {required(i.customVerified===true&&Boolean(i.customLabel?.trim()),prefix+'custom code needs a description and physician rule confirmation.');if(i.customTimed){required(minutes(i.start)!==null&&minutes(i.end)!==null&&minutes(i.end)>minutes(i.start),prefix+'custom timed code needs valid start/end times.');}}
-    if(info?.reason||((entry.panelAtBilling??patient?.panel)===false&&i.code!=='13334')) required(Boolean(i.reason?.trim()),prefix+'reason required.');
+    if(info?.reason||((entry.panelAtBilling??patient?.panel)===false&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code))) required(Boolean(i.reason?.trim()),prefix+'reason required.');
     if(i.diagnosis?.trim())required(validDiagnosis(i.diagnosis),prefix+'enter a valid ICD-9 diagnosis code.');
     if(i.code==='00114'&&i.diagnosisMode==='per-charge'&&i.reason?.trim())required(Boolean(i.diagnosis?.trim()),prefix+'enter the ICD-9 for this billing reason.');
     if(info?.participants) required(Boolean(i.participants?.trim()),prefix+'participants / roles required.');
