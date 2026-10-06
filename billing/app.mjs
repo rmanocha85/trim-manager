@@ -1,7 +1,7 @@
-import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,defaultConferenceEnd,normalizeManualTime,calendarDays,codeInfo,clone,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261005-timepicker1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261005-timepicker1';
+import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,defaultConferenceEnd,normalizeManualTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261006-session1';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261006-session1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
-import {renderReport} from './reports.mjs?v=20261005-timepicker1';
+import {renderReport} from './reports.mjs?v=20261006-session1';
 const $=id=>document.getElementById(id);
 let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,timer,releaseLock,printedSignature=null,recoveryQueue=Promise.resolve(),recoveryPending=0;
 let setupCandidate,connecting=false;
@@ -14,16 +14,17 @@ function notice(text){$('notice').textContent=text;$('notice').hidden=!text;}
 function status(text,warn=false){$('save-status').textContent=text;$('save-status').classList.toggle('dirty',warn);updateWriteLock();}
 function safe(fn){return async(...args)=>{try{await fn(...args);}catch(e){notice(e.message);}};}
 const writeUnavailable=()=>!connectionVerified||syncFailed||blocked||checking||!navigator.onLine;
-function guardWrite(){if(writeUnavailable())throw new Error('Billing is locked until the Google Drive connection and saved revision are verified. Use Sync / retry.');if(saving)throw new Error('Wait for the current save to finish.');}
+function guardWrite(){if(writeUnavailable())throw new Error('Billing is locked until the Google Drive connection and saved revision are verified. Use Save to Drive / retry.');if(saving)throw new Error('Wait for the current save to finish.');}
 function updateWriteLock(){
-  if(!ledger)return;const unavailable=writeUnavailable(),busy=dirty||saving||checking;
+  $('sync').disabled=saving||checking;$('sync').textContent=saving?'Saving…':blocked||syncFailed||!connectionVerified?'Reconnect / retry':'Save to Drive';
+  if(!ledger)return;const unavailable=writeUnavailable(),busy=saving||checking;
   const e=selected?currentEntry():null,historical=selected&&(ledger.historicalBillings||[]).some(h=>h.patientKey===selected&&h.date===date());
   $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset],[data-time-open]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON');});
   refreshTimePicker();
   $('roster').querySelectorAll('[data-patient]').forEach(el=>el.disabled=busy);
   $('calendar').querySelectorAll('button').forEach(el=>el.disabled=busy||el.dataset.future==='true');
   for(const id of ['add-other','baseline-save','portal-confirm','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='finalize'&&ledger.settings.parallel);
-  $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Billing locked — resolve the saved-data conflict in Settings. Your draft is retained.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Sync / retry to verify Google Drive before making changes.';
+  $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Billing locked — resolve the saved-data conflict in Settings. Your draft is retained.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Save to Drive / retry to verify Google Drive before making changes.';
 }
 function renderCalendar(){
   $('calendar-month').textContent=new Intl.DateTimeFormat('en-CA',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(calendarMonth+'-01T12:00:00Z'));
@@ -32,15 +33,17 @@ function renderCalendar(){
   $('selected-date-label').textContent=new Intl.DateTimeFormat('en-CA',{month:'short',day:'numeric',timeZone:'UTC'}).format(new Date(date()+'T12:00:00Z'));
   $('calendar-days').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>selectDate(b.dataset.day));updateWriteLock();
 }
-function selectDate(value){if(dirty||saving||checking)return notice('Wait for this save before changing the billing date.');if(!validDate(value)||value>today())return notice('Choose today or an earlier service date.');$('service-date').value=value;calendarMonth=value.slice(0,7);editingId=null;renderCalendar();renderStats();renderRoster();renderEditor();}
+function selectDate(value){if(saving||checking)return notice('Wait for this save before changing the billing date.');if(!validDate(value)||value>today())return notice('Choose today or an earlier service date.');$('service-date').value=value;calendarMonth=value.slice(0,7);editingId=null;renderCalendar();renderStats();renderRoster();renderEditor();}
 function download(name,value){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 async function takeTabLock(id){if(!navigator.locks)throw new Error('This browser cannot protect against competing tabs. Use an up-to-date Chrome browser.');return new Promise((resolve,reject)=>navigator.locks.request(`trim-billing:${id}`,{ifAvailable:true},async lock=>{if(!lock)return reject(new Error('This billing file is already open for editing in another tab. Close or lock that tab first.'));resolve();await new Promise(r=>releaseLock=r);}));}
 async function recover(){
   const saved=await loadRecovery(ledger.datasetId);
   if(saved?.dirty){
-    validateLedger(saved.ledger);ledger=saved.ledger;dirty=true;
+    validateLedger(saved.ledger);
+    if(sameBillingContent(saved.ledger,ledger)){dirty=false;blocked=false;await persistRecovery();notice('Your previous changes are already saved to Google Drive. Recovery status repaired.');return;}
+    ledger=saved.ledger;dirty=true;
     if(saved.etag!==etag){blocked=true;notice('Recovered an unsynced draft, but saved billing has changed. Your draft is retained. Download it in Settings, then reload saved data and reconcile before saving.');}
-    else notice('Recovered unfinished billing from this browser. It will save after reconnection.');
+    else notice('Recovered your unfinished session on this device. Choose Save to Drive when ready.');
   }
 }
 function persistRecovery(){const snapshot={ledger:clone(ledger),etag,dirty,savedAt:new Date().toISOString()};recoveryPending++;
@@ -64,12 +67,12 @@ async function connect(mode,create=false){
     await recover();
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();document.title='TRIM Billing · Parallel review';
     $('storage-note').textContent=mode==='local'?'Local preview · saves to this laptop’s Drive folder. Cloud sync is not verified. Original roster: read-only.':'Google Drive connected · original roster: read-only.';
-    renderAll();document.querySelector('.version').textContent=ledger.settings.parallel?'PAPER COMPARISON':'BILLING';if(dirty&&!blocked)await flush();else status(blocked?'Draft conflict — action needed':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked);
+    renderAll();document.querySelector('.version').textContent=ledger.settings.parallel?'PAPER COMPARISON':'BILLING';status(blocked?'Draft conflict — action needed':dirty?'Saved on this device — not yet in Drive':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
     return true;
   }catch(e){if(releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;}
   finally{connecting=false;}
 }
-function commit(next){guardWrite();ledger=next;ledger.units=clone(roster.units);seq++;dirty=true;printedSignature=null;status('Saving on this device…',true);persistRecovery().then(()=>{if(!blocked){status(adapter.mode==='local'?'Saved on device · syncing to folder…':'Saved on device · waiting to sync',true);clearTimeout(timer);timer=setTimeout(()=>flush(),450);}}).catch(()=>{});renderStats();renderRoster();updateWriteLock();}
+function commit(next){guardWrite();ledger=next;ledger.units=clone(roster.units);seq++;dirty=true;printedSignature=null;status('Saving on this device…',true);persistRecovery().then(()=>{if(!blocked&&!saving&&!writeUnavailable())status('Saved on this device — not yet in Drive',true);}).catch(()=>{});renderStats();renderRoster();updateWriteLock();}
 async function flush(){
   clearTimeout(timer);if(!dirty||saving||blocked||!adapter)return;
   if(!navigator.onLine){syncFailed=true;connectionVerified=false;status('Offline — changes retained on device',true);return;}
@@ -79,8 +82,8 @@ async function flush(){
     await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;
     if(seq===currentSeq){ledger=saved.ledger;dirty=false;}else{ledger.revision=saved.ledger.revision;ledger.updatedAt=saved.ledger.updatedAt;ledger.localWriter=saved.ledger.localWriter;}
     syncFailed=false;connectionVerified=true;await persistRecovery();status(dirty?'More changes waiting to save':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);
-  }catch(e){syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice(e.message+' Your encrypted draft is retained. Use Settings to download it before reloading.');}else{notice(e.message+' Your draft remains on this device. Use Sync / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
-  finally{saving=false;updateWriteLock();if(!dirty&&!writeUnavailable()){renderCalendar();if(saveFocus?.el.isConnected&&!saveFocus.el.disabled&&document.activeElement===document.body){saveFocus.el.focus();if(saveFocus.start!==null)saveFocus.el.setSelectionRange(saveFocus.start,saveFocus.end);}}saveFocus=null;if(dirty&&!blocked&&!syncFailed&&seq!==currentSeq)timer=setTimeout(flush,450);}
+  }catch(e){syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice(e.message+' Your encrypted draft is retained. Use Settings to download it before reloading.');}else{notice(e.message+' Your draft remains on this device. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
+  finally{saving=false;updateWriteLock();if(!dirty&&!writeUnavailable()){renderCalendar();if(saveFocus?.el.isConnected&&!saveFocus.el.disabled&&document.activeElement===document.body){saveFocus.el.focus();if(saveFocus.start!==null)saveFocus.el.setSelectionRange(saveFocus.start,saveFocus.end);}}saveFocus=null;}
 }
 function renderAll(){
   $('unit-filter').innerHTML='<option value="">All units</option>'+roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
@@ -93,7 +96,7 @@ function renderRoster(){
   const pts=people().filter(p=>(panel==='all'||(panel==='mine'?p.panel:!p.panel))&&(!unit||p.unit===unit)&&(!q||`${p.name} ${p.room} ${p.phn}`.toLowerCase().includes(q))&&(!dueOnly||dueState(ledger,p,date()).kind==='due'));
   const units=[...roster.units];for(const p of pts)if(!units.some(u=>u.id===p.unit))units.push({id:p.unit,name:p.unit||'OTHER',floor:''});
   $('roster').innerHTML=units.map(u=>{const group=pts.filter(p=>p.unit===u.id).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})||a.name.localeCompare(b.name));if(!group.length)return '';return `<section class="unit"><div class="unit-heading"><span>${esc(u.name)}${u.floor?` · FLOOR ${esc(u.floor)}`:''}</span><span>${group.length}</span></div>${group.map(p=>{const e=ledger.entries.find(e=>e.patientKey===p.key&&e.date===date());const d=dueState(ledger,p,date());return `<button class="patient ${selected===p.key?'selected':''}" data-patient="${esc(p.key)}"><span class="room">${esc(p.room||'—')}</span><span><span class="patient-name">${esc(p.name)}${p.pFlag?'<span class="pflag">P</span>':''}</span><span class="patient-detail">${d.last?`Billing basis ${d.last}`:p.panel?'Starting history not supplied':'Reason required for coverage billing'}</span></span><span class="patient-right">${e?`<span class="pill">${e.items.map(i=>esc(i.code.replace(/^0+/,''))).join(' · ')}</span><span class="patient-detail">${e.batchId?'Handed over':entryIssues(e,ledger,p).length?'Needs information':'Selected'}</span>`:`<span class="pill ${d.kind==='unknown'?'warn':''}">${esc(d.label)}</span>`}</span></button>`;}).join('')}</section>`;}).join('')||'<div class="empty">No patients match these filters.</div>';
-  $('roster').querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(dirty||saving)return;selected=b.dataset.patient;editingId=null;renderRoster();renderEditor();});updateWriteLock();
+  $('roster').querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(saving||checking)return;selected=b.dataset.patient;editingId=null;renderRoster();renderEditor();});updateWriteLock();
 }
 function currentEntry(){return editingId?ledger.entries.find(e=>e.id===editingId):ledger.entries.find(e=>e.patientKey===selected&&e.date===date());}
 function applyItems(items,comment=currentEntry()?.comment||''){
@@ -130,14 +133,14 @@ function timeCandidate(){
 }
 function refreshTimePicker(){
   if(!$('time-dialog').open)return;
-  const manual=$('time-manual-mode').checked,value=timeCandidate(),disabled=writeUnavailable()||dirty||saving||checking;
+  const manual=$('time-manual-mode').checked,value=timeCandidate(),disabled=writeUnavailable()||saving||checking;
   $('time-wheels').hidden=manual;$('time-manual-label').hidden=!manual;
   for(const id of ['time-hour','time-minute','time-manual-mode','time-manual'])$(id).disabled=disabled;
   $('time-use').disabled=disabled||!value;$('time-use').textContent=value?'Use '+value:'Choose a time';
   $('time-feedback').textContent=disabled?'Billing is locked — reconnect or finish the current save.':value?'24-hour time · changes save only when you choose Use time.':manual?'Enter an exact time, e.g. 1837 or 18:37.':'Choose an hour and a ten-minute slot.';
 }
 function openTimePicker(index,field){
-  guardWrite();if(dirty)throw new Error('Wait for the current save to finish.');
+  guardWrite();
   const entry=currentEntry(),item=entry?.items[index];
   if(!item||entry.batchId||!CONFERENCE_CODES.includes(item.code)||!['start','end'].includes(field))return;
   timeTarget={entryId:entry.id,patientKey:selected,date:date(),index,field,code:item.code};
@@ -155,7 +158,7 @@ $('time-manual-mode').onchange=()=>{if($('time-manual-mode').checked){const valu
 $('time-cancel').onclick=()=>$('time-dialog').close();
 $('time-dialog').addEventListener('close',()=>timeTarget=null);
 $('time-use').onclick=safe(()=>{
-  guardWrite();if(dirty)throw new Error('Wait for the current save to finish.');
+  guardWrite();
   const entry=currentEntry(),target=timeTarget,value=timeCandidate();
   if(!value||!target||entry?.id!==target.entryId||entry.batchId||selected!==target.patientKey||date()!==target.date||entry.items[target.index]?.code!==target.code)throw new Error('This billing selection changed. Close the time picker and reopen it.');
   const items=clone(entry.items),item=items[target.index];item[target.field]=value;
@@ -168,7 +171,7 @@ function reasonPresetHTML(item,index,locked,field){
   return `<div class="reason-workspace"><div class="reason-presets" aria-label="Common billing reasons">${REASON_PRESETS.map((p,n)=>`<button type="button" data-reason-preset="${n}" data-index="${index}" aria-pressed="${item.reason===p.reason&&item.diagnosis===p.diagnosis}" ${locked?'disabled':''}><span>${esc(p.reason)}</span><small>${esc(p.diagnosis)}</small></button>`).join('')}</div><div class="reason-diagnosis"><label>Billing reason / comment<textarea data-index="${index}" data-field="reason" maxlength="2000" ${locked?'disabled':''} placeholder="Type a reason, or choose one above…">${esc(item.reason||'')}</textarea></label>${field('diagnosis','ICD-9 for this billing','text','maxlength="8" placeholder="Usual if blank"')}</div></div>`;
 }
 function renderEditorIssues(){const e=currentEntry();$('editor').querySelectorAll('[data-reason-preset]').forEach(b=>{const i=e?.items[Number(b.dataset.index)],p=REASON_PRESETS[Number(b.dataset.reasonPreset)];b.setAttribute('aria-pressed',String(i?.reason===p.reason&&i?.diagnosis===p.diagnosis));});if(!$('editor-issues'))return;const issues=e?entryIssues(e,ledger,person(selected)):[];$('editor-issues').innerHTML=issues.length?`<div class="issue-box"><strong>Saved as a draft · needs information</strong><ul>${issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:e?'<p class="hint">Required fields complete. Physician eligibility review still required.</p>':'';}
-function openEntry(id){if(dirty||saving)return notice('Wait for the current save before opening another entry.');const e=ledger.entries.find(e=>e.id===id);if(!e)return;selected=e.patientKey;editingId=e.id;$('service-date').value=e.date;calendarMonth=e.date.slice(0,7);switchTab('billing');renderCalendar();renderStats();renderRoster();renderEditor();}
+function openEntry(id){if(saving||checking)return notice('Wait for the current save before opening another entry.');const e=ledger.entries.find(e=>e.id===id);if(!e)return;selected=e.patientKey;editingId=e.id;$('service-date').value=e.date;calendarMonth=e.date.slice(0,7);switchTab('billing');renderCalendar();renderStats();renderRoster();renderEditor();}
 function chosen(){return batchEntries(ledger,$('batch-from').value,$('batch-to').value);}
 function issuesFor(entries){return entries.flatMap(e=>entryIssues(e,ledger,person(e.patientKey)).map(issue=>({id:e.id,text:`${person(e.patientKey)?.name||'Patient'} · ${e.date} · ${issue}`})));}
 function signature(){return JSON.stringify({entries:chosen(),layout:$('report-layout').value,revision:ledger.revision,parallel:ledger.settings.parallel});}
@@ -214,7 +217,7 @@ $('import-apply').onclick=async()=>{
     await flush();if(dirty||saving||blocked)throw new Error('Resolve the save or recovery issue before importing.');
     const fresh=await adapter.load();if(fresh.etag!==etag)throw new Error('Billing changed elsewhere. Reload saved data, then choose the import again. Nothing was imported.');
     const result=mergeImport(ledger,stagedImport.p,stagedImport.sha256);
-    if(!result.duplicate){if(ledger.entries.length||ledger.historicalBillings?.length||Object.keys(ledger.baselines).length)download(`PRIVATE_TRIM_Before_Import_${today()}.json`,ledger);commit(result.ledger);await flush();if(dirty||blocked)throw new Error('Import is retained on this device but not verified in Drive. Use Sync / retry; do not re-import.');}
+    if(!result.duplicate){if(ledger.entries.length||ledger.historicalBillings?.length||Object.keys(ledger.baselines).length)download(`PRIVATE_TRIM_Before_Import_${today()}.json`,ledger);commit(result.ledger);await flush();if(dirty||blocked)throw new Error('Import is retained on this device but not verified in Drive. Use Save to Drive / retry; do not re-import.');}
     stagedImport=null;$('import-file').value='';$('import-dialog').close();renderAll();switchTab('history');notice(`Import saved and verified: ${result.summary.billed} already billed, ${result.summary.pending} in the current batch, ${result.summary.held} held for clarification.${result.summary.resolved?` ${result.summary.resolved} prior held items resolved.`:''} No billing was submitted.`);
   }catch(e){$('import-error').textContent=e.message;}
   finally{importing=false;$('workspace').inert=false;$('import-file').disabled=false;$('import-close').disabled=false;$('import-apply').disabled=!stagedImport;}
@@ -234,13 +237,28 @@ $('calendar-today').onclick=()=>selectDate(today());
 for(const id of ['search','unit-filter','panel-filter','due-filter'])$(id).addEventListener('input',()=>renderRoster());
 for(const id of ['batch-from','batch-to','report-layout'])$(id).onchange=()=>{printedSignature=null;renderReports();};
 async function verifyConnection(){
-  if(!adapter||!ledger||checking||saving||dirty||blocked||document.hidden)return;
+  if(!adapter||!ledger||checking||saving||blocked||document.hidden)return;
   checking=true;updateWriteLock();
-  try{if(!navigator.onLine)throw new Error('No internet connection.');await adapter.verify(etag);connectionVerified=true;syncFailed=false;status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');}
+  try{if(!navigator.onLine)throw new Error('No internet connection.');await adapter.verify(etag);connectionVerified=true;syncFailed=false;status(dirty?'Saved on this device — not yet in Drive':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);}
   catch(e){connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);notice(e.message);}
   finally{checking=false;updateWriteLock();}
 }
-$('sync').onclick=safe(async()=>{if(saving||checking)return;if(blocked)throw new Error('Resolve the conflict in Settings first.');checking=true;updateWriteLock();try{await adapter.connect();await adapter.verify(etag);connectionVerified=true;syncFailed=false;checking=false;if(dirty){await flush();if(!dirty)notice('');return;}const [r,s]=await Promise.all([adapter.roster(),adapter.load()]);roster=r;ledger=s.ledger;etag=s.etag;printedSignature=null;await persistRecovery();notice('');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');}catch(e){connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);throw e;}finally{checking=false;updateWriteLock();}});
+$('sync').onclick=safe(async()=>{
+  if(saving||checking)return;checking=true;updateWriteLock();
+  try{
+    if(!connectionVerified||syncFailed||blocked)await adapter.connect();
+    if(blocked||syncFailed){
+      const current=await adapter.load();
+      if(!sameBillingContent(ledger,current.ledger)&&(blocked||current.etag!==etag))throw Object.assign(new Error('The browser draft and Google Drive contain different billing information. Both versions are retained; download your draft in Settings for review before reloading.'),{status:409});
+      if(sameBillingContent(ledger,current.ledger)){ledger=current.ledger;etag=current.etag;dirty=false;blocked=false;connectionVerified=true;syncFailed=false;printedSignature=null;await persistRecovery();notice('Your billing already matches Google Drive. The stale conflict has been cleared.');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');return;}
+      blocked=false;syncFailed=false;connectionVerified=true;
+    }
+    await adapter.verify(etag);connectionVerified=true;syncFailed=false;checking=false;
+    if(dirty){await flush();if(!dirty)notice('');return;}
+    const [r,s]=await Promise.all([adapter.roster(),adapter.load()]);roster=r;ledger=s.ledger;etag=s.etag;printedSignature=null;await persistRecovery();notice('');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
+  }catch(e){connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);throw e;}
+  finally{checking=false;updateWriteLock();}
+});
 $('lock').onclick=safe(async()=>{await persistRecovery();if(dirty&&!confirm('Changes remain on this device. Lock anyway? Reconnect on this browser to recover them.'))return;releaseLock?.();releaseLock=null;location.reload();});
 $('add-other').onclick=()=>{$('other-error').textContent='';$('other-dialog').showModal();};
 $('other-form').onsubmit=async ev=>{ev.preventDefault();try{const f=new FormData(ev.target);const p={id:crypto.randomUUID(),name:String(f.get('name')).trim(),phn:String(f.get('phn')),unit:String(f.get('unit')),room:String(f.get('room')).trim(),codes:String(f.get('codes')).trim(),ava:'',panel:false};p.key=patientKey(p);if(people().some(x=>x.key===p.key))throw new Error('This patient already exists. Select the existing record.');const next=clone(ledger);next.nonPanel.push(p);next.patients[p.key]=p;commit(next);$('other-dialog').close();ev.target.reset();$('panel-filter').value='other';selected=p.key;editingId=null;renderRoster();renderEditor();}catch(e){$('other-error').textContent=e.message;}};
@@ -260,7 +278,7 @@ $('generate').onclick=safe(async()=>{
 $('print-report').onclick=()=>{printedSignature=signature();$('report-frame').contentWindow.focus();$('report-frame').contentWindow.print();};
 $('finalize').onclick=safe(async()=>{guardWrite();await flush();if(dirty||blocked||saving)throw new Error('Save changes before handoff.');if(printedSignature!==signature())throw new Error('Generate and print/save the current batch first.');if(issuesFor(chosen()).length)throw new Error('Resolve the flagged billing information first.');if(!confirm('Confirm this exact batch was successfully saved/printed, reviewed, and actually given to Suzy. It will leave the next print batch, but its billing history stays saved.'))return;commit(finalizeBatch(ledger,chosen(),{from:$('batch-from').value,to:$('batch-to').value,layout:$('report-layout').value,reviewed:$('rules-reviewed').checked,delivered:true}));await flush();renderReports();renderHistory();updateWriteLock();});
 window.addEventListener('offline',()=>{connectionVerified=false;syncFailed=true;status('Offline — billing locked',true);});
-window.addEventListener('online',()=>{if(dirty&&!blocked)flush();else verifyConnection();});
+window.addEventListener('online',()=>verifyConnection());
 window.addEventListener('beforeunload',e=>{if(dirty||recoveryPending){e.preventDefault();e.returnValue='';}});
-document.addEventListener('visibilitychange',()=>{if(document.hidden&&dirty)flush();else if(!document.hidden)verifyConnection();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)verifyConnection();});
 setInterval(verifyConnection,45000);

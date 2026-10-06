@@ -39,6 +39,13 @@ export function defaultConferenceEnd(item){
 }
 export const today = () => {const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
 export const clone = value => structuredClone(value);
+// A save may reach Drive before this browser records its acknowledgement.
+// Ignore ONLY server-owned root save metadata; every billing field must match.
+export function sameBillingContent(a,b){
+  const stable=value=>value&&typeof value==='object'?(Array.isArray(value)?value.map(stable):Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]))):value;
+  const content=value=>{const copy=clone(value);delete copy.revision;delete copy.updatedAt;return JSON.stringify(stable(copy));};
+  return Boolean(a&&b&&a.datasetId===b.datasetId)&&content(a)===content(b);
+}
 export function validDate(s) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return false; const d=new Date(`${s}T12:00:00Z`); return !Number.isNaN(+d)&&d.toISOString().slice(0,10)===s; }
 export function addDays(s,n) {if(!validDate(s)) return null; const d=new Date(`${s}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
 export function daysBetween(a,b) {return (Date.parse(`${b}T12:00:00Z`)-Date.parse(`${a}T12:00:00Z`))/86400000;}

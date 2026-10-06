@@ -1,4 +1,4 @@
-import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261005-timepicker1';
+import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261006-session1';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 export class LocalAdapter {
@@ -17,7 +17,7 @@ export class DriveAdapter {
     if(!globalThis.google?.accounts?.oauth2) await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(new Error('Google sign-in could not load.'));document.head.append(s);});
     return new Promise((resolve,reject)=>google.accounts.oauth2.initTokenClient({client_id:CLIENT,scope:'https://www.googleapis.com/auth/drive.file',callback:r=>{if(r.error)return reject(new Error(r.error));this.token=r.access_token;resolve();},error_callback:()=>reject(new Error('Google sign-in was cancelled or blocked. If this origin is not approved, configure it in Google Cloud before hosting.'))}).requestAccessToken());
   }
-  async request(url,options={}) {const r=await fetch(url,{...options,headers:{...options.headers,Authorization:`Bearer ${this.token}`}});if(!r.ok){const e=new Error(r.status===412?'Billing changed elsewhere. Reload and reconcile your saved draft.':r.status===401?'Google connection expired. Your draft stays on this device. Reconnect to save.':`Google Drive request failed (${r.status}).`);e.status=r.status===412?409:r.status;throw e;}return r.json();}
+  async request(url,options={}) {const r=await fetch(url,{...options,cache:'no-store',headers:{...options.headers,Authorization:`Bearer ${this.token}`}});if(!r.ok){const e=new Error(r.status===412?'Billing changed elsewhere. Reload and reconcile your saved draft.':r.status===401?'Google connection expired. Your draft stays on this device. Reconnect to save.':`Google Drive request failed (${r.status}).`);e.status=r.status===412?409:r.status;throw e;}return r.json();}
   async roster(){return normalizeRoster(await this.request(`https://www.googleapis.com/drive/v3/files/${ROSTER}?alt=media`));}
   async locate(){
     if(this.fileId)return;
