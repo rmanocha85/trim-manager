@@ -1,10 +1,11 @@
-import {CODES,codeInfo,clone,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger} from './core.mjs';
+import {CODES,codeInfo,clone,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs';
 import {LocalAdapter,DriveAdapter} from './adapters.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 import {renderReport} from './reports.mjs';
 const $=id=>document.getElementById(id);
 let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,timer,releaseLock,printedSignature=null,recoveryQueue=Promise.resolve(),recoveryPending=0;
 let setupCandidate,connecting=false;
+let stagedImport=null,importing=false,importRead=0;
 const date=()=>$('service-date').value||today();
 const people=()=>rosterView(roster,ledger);
 const person=k=>people().find(p=>p.key===k);
@@ -27,6 +28,7 @@ function persistRecovery(){const snapshot={ledger:clone(ledger),etag,dirty,saved
 async function connect(mode,create=false){
   if(connecting)return;connecting=true;
   $('create-cloud').hidden=true;
+  $('setup-import').hidden=true;setupCandidate=create?setupCandidate:null;
   $('connection-error').textContent='Connecting…';
   try{
     const candidate=create?setupCandidate:mode==='local'?new LocalAdapter():new DriveAdapter($('cloud-file-id').value);
@@ -34,7 +36,7 @@ async function connect(mode,create=false){
     if(!create)await candidate.connect();
     const r=await candidate.roster();let s;
     try{s=create?await candidate.createEmpty():await candidate.load();}
-    catch(e){if(e.code==='MISSING_BILLING'){setupCandidate=candidate;$('create-cloud').hidden=false;}throw e;}
+    catch(e){if(e.code==='MISSING_BILLING'){setupCandidate=candidate;$('create-cloud').hidden=false;$('setup-import').hidden=false;}throw e;}
     if(releaseLock){releaseLock();releaseLock=null;}
     await takeTabLock(s.ledger.datasetId);
     adapter=candidate;roster=r;ledger=s.ledger;etag=s.etag;dirty=false;blocked=false;selected=null;editingId=null;
@@ -42,6 +44,7 @@ async function connect(mode,create=false){
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();document.title='TRIM Billing · Parallel review';
     $('storage-note').textContent=mode==='local'?'Local preview · saves to this laptop’s Drive folder. Cloud sync is not verified. Original roster: read-only.':'Google Drive connected · original roster: read-only.';
     renderAll();document.querySelector('.version').textContent=ledger.settings.parallel?'NEW · PARALLEL REVIEW':'BILLING WORKSPACE';if(dirty&&!blocked)await flush();else status(blocked?'Draft conflict — action needed':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked);
+    return true;
   }catch(e){if(releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;}
   finally{connecting=false;}
 }
@@ -77,7 +80,10 @@ function applyItems(items,comment=currentEntry()?.comment||''){
 }
 function renderEditor(){
   if(!selected)return;const p=person(selected);if(!p)return;const e=currentEntry(),items=e?.items||[],locked=Boolean(e?.batchId);
+  const historical=(ledger.historicalBillings||[]).filter(h=>h.patientKey===p.key).sort((a,b)=>b.date.localeCompare(a.date));
   $('editor').innerHTML=`<div class="editor-head"><span class="eyebrow">${esc(date())} · ${p.panel?'MY PANEL':'COVERAGE'}</span><h2>${esc(p.name)}</h2><p>PHN ${esc(p.phn||'—')} · ${esc(p.unit)} · Room ${esc(p.room||'—')}</p><p>ICD ${esc(p.codes||'—')}</p></div>${locked?'<div class="issue-box">Handed over. This entry is read-only.</div>':''}<h3>Choose billing codes</h3><div class="codes-grid">${CODES.map(c=>`<button class="code-chip ${items.some(i=>i.code===c.code)?'on':''}" data-code="${c.code}" ${locked?'disabled':''}>${c.code}<small>${esc(c.label)}</small></button>`).join('')}</div><details><summary>Another code</summary><div class="fields"><label>Full five-digit code<input id="custom-code" maxlength="5" inputmode="numeric"></label><button id="add-code" ${locked?'disabled':''}>Add</button></div></details><div id="item-details">${items.map((i,index)=>itemHTML(i,index,locked)).join('')}</div><label>Billing comment<textarea id="entry-comment" maxlength="3000" ${locked?'disabled':''} placeholder="Only information needed for billing">${esc(e?.comment||'')}</textarea></label><div id="editor-issues"></div>${e&&!locked?'<button id="remove-entry" class="text-button danger">Remove this pending billing date</button>':''}<hr><h3>Billing dates</h3><div>${ledger.entries.filter(x=>x.patientKey===p.key).sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="history-row"><span>${esc(x.date)}<small> · ${x.items.map(i=>i.code).join(', ')}${x.batchId?' · Final':''}</small></span><button data-edit="${x.id}">View</button></div>`).join('')||'<p class="hint">No billing recorded yet.</p>'}</div>${ledger.baselines[p.key]?`<p class="hint">Starting qualifying billing: ${esc(ledger.baselines[p.key].date)}</p>`:''}`;
+  if(historical.length){$('editor').insertAdjacentHTML('beforeend',`<h3>Already billed · imported</h3>${historical.map(h=>`<div class="history-row"><span>${esc(h.date)} · ${h.codes.map(esc).join(', ')}<small>${esc(h.reason||'')} · ${sourceLabel(h.sources)}</small></span></div>`).join('')}`);}
+  if(historical.some(h=>h.date===date())){$('editor').insertAdjacentHTML('afterbegin','<div class="issue-box">Already billed on this date. No new charge can be added.</div>');$('editor').querySelectorAll('button,input,textarea').forEach(x=>x.disabled=true);}
   $('editor').querySelectorAll('[data-code]').forEach(b=>b.onclick=safe(()=>{const current=currentEntry()?.items||[];applyItems(current.some(i=>i.code===b.dataset.code)?current.filter(i=>i.code!==b.dataset.code):[...current,{code:b.dataset.code,units:1}]);renderEditor();}));
   $('add-code').onclick=safe(()=>{const code=$('custom-code').value.trim();if(!/^\d{5}$/.test(code))throw new Error('Enter the full five-digit fee code.');if(currentEntry()?.items.some(i=>i.code===code))throw new Error('That code is already selected.');applyItems([...(currentEntry()?.items||[]),{code,units:1}]);renderEditor();});
   $('editor').querySelectorAll('[data-field]').forEach(input=>input.addEventListener('input',safe(()=>{const list=clone(currentEntry().items);list[Number(input.dataset.index)][input.dataset.field]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;applyItems(list);renderEditorIssues();})));
@@ -95,7 +101,12 @@ function chosen(){return batchEntries(ledger,$('batch-from').value,$('batch-to')
 function issuesFor(entries){return entries.flatMap(e=>entryIssues(e,ledger,person(e.patientKey)).map(issue=>({id:e.id,text:`${person(e.patientKey)?.name||'Patient'} · ${e.date} · ${issue}`})));}
 function signature(){return JSON.stringify({entries:chosen(),layout:$('report-layout').value,revision:ledger.revision,parallel:ledger.settings.parallel});}
 function renderReports(){const entries=chosen(),issues=issuesFor(entries);$('batch-summary').innerHTML=`<p><strong>${entries.length}</strong> patient-date entries · <strong>${new Set(entries.map(e=>e.date)).size}</strong> dates · <strong>${new Set(entries.map(e=>e.patientKey)).size}</strong> patients</p>`;$('batch-issues').innerHTML=issues.length?`<div class="card"><h2>${issues.length} items need attention</h2>${issues.map(x=>`<div class="history-row"><span>${esc(x.text)}</span><button data-fix="${x.id}">Review</button></div>`).join('')}</div>`:'';$('batch-issues').querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>openEntry(b.dataset.fix));$('finalize').disabled=ledger.settings.parallel;}
-function renderHistory(){const entries=[...ledger.entries].sort((a,b)=>b.date.localeCompare(a.date));$('history-content').innerHTML=`<div class="card"><table class="history-table"><thead><tr><th>Date</th><th>Patient</th><th>Codes</th><th>Status</th><th></th></tr></thead><tbody>${entries.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(person(e.patientKey)?.name)}</td><td>${e.items.map(i=>esc(i.code)).join(' · ')}</td><td>${e.batchId?'Handed over':'Pending'}</td><td><button data-history="${e.id}">View</button></td></tr>`).join('')}</tbody></table>${entries.length?'':'<div class="empty">Your billing history will appear here.</div>'}</div>${ledger.batches.map(b=>`<div class="card"><h3>${esc(b.from)} → ${esc(b.to)}</h3><p>${b.entryIds.length} entries · handed over ${esc(b.handedOverAt.slice(0,10))}</p></div>`).join('')}`;$('history-content').querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>openEntry(b.dataset.history));}
+function sourceLabel(sources){return (sources||[]).map(s=>`${esc(s.file||'Source scan')} · page ${esc(s.page)}`).join('; ');}
+function renderHistory(){
+  const entries=[...ledger.entries].sort((a,b)=>b.date.localeCompare(a.date)),historical=[...(ledger.historicalBillings||[])].sort((a,b)=>b.date.localeCompare(a.date)),held=heldImports(ledger);
+  $('history-content').innerHTML=`<div class="card"><h2>Pending and handed-over billing</h2><table class="history-table"><thead><tr><th>Date</th><th>Patient</th><th>Codes</th><th>Status</th><th></th></tr></thead><tbody>${entries.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(person(e.patientKey)?.name)}</td><td>${e.items.map(i=>esc(i.code)).join(' · ')}</td><td>${e.batchId?'Handed over':'Pending'}</td><td><button data-history="${esc(e.id)}">View</button></td></tr>`).join('')}</tbody></table>${entries.length?'':'<div class="empty">No pending or handed-over entries.</div>'}</div><div class="card"><h2>Already billed · ${historical.length} imported records</h2><p>Read-only. These records are never included in a new billing batch. Historical timed-code units were not inferred.</p><table class="history-table"><thead><tr><th>Date</th><th>Patient</th><th>Codes / reason</th><th>Source</th></tr></thead><tbody>${historical.map(h=>`<tr><td>${esc(h.date)}</td><td>${esc(person(h.patientKey)?.name||h.name)}</td><td>${h.codes.map(esc).join(' · ')}<br>${esc(h.reason||'')}</td><td>${sourceLabel(h.sources)}</td></tr>`).join('')}</tbody></table></div><div class="card"><h2>Held for clarification · ${held.length}</h2><p>Not charges. Not included in reports or next-billing calculations.</p>${held.map(h=>`<div class="history-row"><span>${esc(h.date)} · ${esc(h.name)}<br>${esc(h.reason)}<br><small>${sourceLabel([h.source])}</small></span></div>`).join('')}</div>${ledger.batches.map(b=>`<div class="card"><h3>${esc(b.from)} → ${esc(b.to)}</h3><p>${b.entryIds.length} entries · handed over ${esc(b.handedOverAt.slice(0,10))}</p></div>`).join('')}`;
+  $('history-content').querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>openEntry(b.dataset.history));
+}
 function renderSettings(){
   const previousPatient=$('baseline-patient').value;
   $('parallel').checked=ledger.settings.parallel;$('baseline-patient').innerHTML=people().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join('');
@@ -105,7 +116,36 @@ function renderSettings(){
   $('baseline-list').innerHTML=Object.entries(ledger.baselines).map(([k,b])=>`<div class="history-row">${esc(person(k)?.name||'Retained patient')} <span>${esc(b.date)}</span></div>`).join('');
   const year=$('portal-year').value;const counts={};for(const e of ledger.entries.filter(e=>e.date.startsWith(year)))for(const i of e.items)counts[i.code]=(counts[i.code]||0)+Number(i.units);
   $('annual-counts').innerHTML=Object.entries(counts).map(([c,n])=>`<div class="history-row"><span>${c}</span><span>${n} units · ${year}</span></div>`).join('')||'<p class="hint">No recorded usage this year.</p>';
+  if(ledger.historicalBillings?.length)$('annual-counts').insertAdjacentHTML('beforeend','<p class="issue-box">Imported billed records also exist. Their units are unverified and are not included in these totals. Relevant annual-limit codes are flagged for reconciliation before handoff.</p>');
+  $('import-receipts').textContent=(ledger.imports||[]).map(i=>`Imported ${i.importedAt.slice(0,10)}: ${i.summary.billed} already billed, ${i.summary.pending} pending, ${i.summary.held} held.`).join(' ');
 }
+
+function openImport(){if(!adapter&&!setupCandidate)return;stagedImport=null;importRead++;$('import-file').value='';$('import-preview').textContent='';$('import-error').textContent='';$('import-apply').disabled=true;$('import-dialog').showModal();}
+const setupImport=document.createElement('button');setupImport.id='setup-import';setupImport.className='primary';setupImport.textContent='Import reviewed billing file';setupImport.hidden=true;$('create-cloud').after(setupImport);setupImport.onclick=openImport;
+const importCard=document.createElement('div');importCard.className='card';importCard.innerHTML='<h2>Import reviewed billing</h2><p>Add a reviewed JSON package with billed history, pending charges and held clarification items. Re-importing the same package will not duplicate charges.</p><button id="open-import">Choose reviewed billing file</button><p id="import-receipts" class="hint"></p>';$('settings').querySelector('.settings-grid').append(importCard);$('open-import').onclick=openImport;
+$('import-file').onchange=async()=>{
+  const read=++importRead;stagedImport=null;$('import-apply').disabled=true;$('import-error').textContent='';$('import-preview').textContent='';
+  try{const file=$('import-file').files[0];if(!file)return;if(file.size>8_000_000)throw new Error('Import is too large.');const text=await file.text(),p=parseImport(text),hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)),sha256=Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('');if(read!==importRead)return;
+    const result=mergeImport(ledger||blankLedger(),p,sha256);const s=result.summary;stagedImport={p,sha256};$('import-preview').textContent=`${s.billed} already billed · ${s.pending} pending · ${s.baselines} starting dates · ${s.held} held for clarification.${result.duplicate?' This package is already loaded.':''}`;$('import-apply').disabled=result.duplicate;
+  }catch(e){if(read===importRead)$('import-error').textContent=e.message;}
+};
+$('import-close').onclick=()=>{if(!importing){stagedImport=null;importRead++;$('import-dialog').close();}};
+$('import-dialog').addEventListener('cancel',e=>{if(importing)e.preventDefault();});
+$('import-apply').onclick=async()=>{
+  if(importing||!stagedImport)return;
+  importing=true;$('import-apply').disabled=true;$('import-file').disabled=true;$('import-close').disabled=true;$('workspace').inert=true;$('import-error').textContent='';
+  try{
+    // First setup creates an empty private file, then uses the same revision-
+    // checked save as an existing workspace. A failed import never replaces data.
+    if(!adapter&&!await connect('cloud',true))throw new Error($('connection-error').textContent);
+    await flush();if(dirty||saving||blocked)throw new Error('Resolve the save or recovery issue before importing.');
+    const fresh=await adapter.load();if(fresh.etag!==etag)throw new Error('Billing changed elsewhere. Reload saved data, then choose the import again. Nothing was imported.');
+    const result=mergeImport(ledger,stagedImport.p,stagedImport.sha256);
+    if(!result.duplicate){if(ledger.entries.length||ledger.historicalBillings?.length||Object.keys(ledger.baselines).length)download(`PRIVATE_TRIM_Before_Import_${today()}.json`,ledger);commit(result.ledger);await flush();if(dirty||blocked)throw new Error('Import is retained on this device but not verified in Drive. Use Sync / retry; do not re-import.');}
+    stagedImport=null;$('import-file').value='';$('import-dialog').close();renderAll();switchTab('history');notice(`Import saved and verified: ${result.summary.billed} already billed, ${result.summary.pending} pending, ${result.summary.held} held for clarification. No billing was submitted.`);
+  }catch(e){$('import-error').textContent=e.message;}
+  finally{importing=false;$('workspace').inert=false;$('import-file').disabled=false;$('import-close').disabled=false;$('import-apply').disabled=!stagedImport;}
+};
 function switchTab(name){tab=name;document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==name);document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));if(name==='reports')renderReports();if(name==='history')renderHistory();if(name==='settings')renderSettings();}
 $('connect').onclick=()=>{$('connection-error').textContent='';$('connection-dialog').showModal();};
 $('local-option').hidden=!['127.0.0.1','localhost'].includes(location.hostname);

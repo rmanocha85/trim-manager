@@ -56,6 +56,13 @@ export function validateLedger(l) {
   if(typeof l.settings.parallel!=='boolean'||!Array.isArray(l.settings.portalYears))throw new Error('Invalid billing settings.');
   const patientDates=new Set();
   for(const e of l.entries){const k=`${e.patientKey}|${e.date}`;if(patientDates.has(k))throw new Error('Duplicate patient/date billing.');patientDates.add(k);}
+  if(l.historicalBillings!==undefined&&!Array.isArray(l.historicalBillings))throw new Error('Invalid historical billing.');
+  for(const h of l.historicalBillings||[]) {
+    const key=`${h.patientKey}|${h.date}`;
+    if(!h.id||ids.has(h.id)||patientDates.has(key)||!l.patients[h.patientKey]||!validDate(h.date)||h.date>today()||h.status!=='already_billed'||!Array.isArray(h.codes)||!h.codes.length||h.codes.some(c=>!/^\d{5}$/.test(c)))throw new Error('Invalid or duplicate already-billed history.');
+    ids.add(h.id);patientDates.add(key);
+  }
+  if(l.imports!==undefined&&(!Array.isArray(l.imports)||l.imports.some(i=>!i.sourceDatasetId||!i.sha256||!Array.isArray(i.review?.held))))throw new Error('Invalid import receipt.');
   const batchIds=new Set();
   for(const b of l.batches) {
     if(!b.id||batchIds.has(b.id)||!Array.isArray(b.entryIds)||new Set(b.entryIds).size!==b.entryIds.length) throw new Error('Invalid batch.');
@@ -69,9 +76,12 @@ export function assertImmutable(previous,next) {
   if(previous.datasetId!==next.datasetId) throw new Error('Wrong billing dataset.');
   for(const b of previous.batches) if(JSON.stringify(b)!==JSON.stringify(next.batches.find(x=>x.id===b.id))) throw new Error('Handed-over batches cannot be altered.');
   for(const e of previous.entries.filter(e=>e.batchId)) if(JSON.stringify(e)!==JSON.stringify(next.entries.find(x=>x.id===e.id))) throw new Error('Handed-over billing cannot be altered.');
+  for(const h of previous.historicalBillings||[])if(JSON.stringify(h)!==JSON.stringify(next.historicalBillings?.find(x=>x.id===h.id)))throw new Error('Already-billed history cannot be altered.');
+  for(const i of previous.imports||[])if(JSON.stringify(i)!==JSON.stringify(next.imports?.find(x=>x.sourceDatasetId===i.sourceDatasetId)))throw new Error('Import receipts cannot be altered.');
 }
 export function lastBilling(ledger,key,asOf='9999-12-31',resetOnly=false,excludeId=null) {
   const dates=ledger.entries.filter(e=>e.patientKey===key&&e.date<=asOf&&e.id!==excludeId&&(!resetOnly||e.items.some(i=>RESET_CODES.includes(i.code)))).map(e=>e.date);
+  dates.push(...(ledger.historicalBillings||[]).filter(h=>h.patientKey===key&&h.date<=asOf&&(!resetOnly||h.codes.some(c=>RESET_CODES.includes(c)))).map(h=>h.date));
   const base=ledger.baselines[key];if(base?.date<=asOf) dates.push(base.date);
   return dates.sort().at(-1)||null;
 }
@@ -83,6 +93,7 @@ export function dueState(ledger,patient,date=today()) {
 export function upsertEntry(ledger,patient,date,items,comment='',id=null) {
   if(!validDate(date)||date>today()) throw new Error('Choose a valid service date, not a future date.');
   if(!items.length) throw new Error('Select at least one code.');
+  if(ledger.historicalBillings?.some(h=>h.patientKey===patient.key&&h.date===date))throw new Error('This patient/date is already billed in imported history. It cannot be added to pending billing.');
   const l=clone(ledger);const existing=id?l.entries.find(e=>e.id===id):l.entries.find(e=>e.patientKey===patient.key&&e.date===date);
   if(id&&!existing) throw new Error('Entry no longer exists. Reload before editing.');
   if(existing?.batchId) throw new Error('This entry has already been handed over.');
@@ -123,8 +134,10 @@ export function entryIssues(entry,ledger,patient) {
     if(info?.annual) {
       const total=all.filter(e=>e.date.slice(0,4)===entry.date.slice(0,4)&&(info.physicianLimit||e.patientKey===entry.patientKey)).flatMap(e=>e.items).filter(x=>x.code===i.code).reduce((sum,x)=>sum+Number(x.units),0);
       required(total<=info.annual,prefix+`recorded-here annual total ${total} exceeds reference limit ${info.annual}.`);
+      const imported=(ledger.historicalBillings||[]).filter(h=>h.date.slice(0,4)===entry.date.slice(0,4)&&(info.physicianLimit||h.patientKey===entry.patientKey)&&h.codes.includes(i.code));
+      required(!imported.length,prefix+'imported billed history contains this code without verified units; reconcile annual usage before handoff.');
     }
-    if(i.code==='13115') required(!all.some(e=>e.id!==entry.id&&e.patientKey===entry.patientKey&&e.items.some(x=>x.code==='13115')),prefix+'another admission charge is already recorded.');
+    if(i.code==='13115') required(!all.some(e=>e.id!==entry.id&&e.patientKey===entry.patientKey&&e.items.some(x=>x.code==='13115'))&&!(ledger.historicalBillings||[]).some(h=>h.patientKey===entry.patientKey&&h.codes.includes('13115')),prefix+'another admission charge is already recorded.');
     if(i.code==='00114') {
       const prior=lastBilling(ledger,entry.patientKey,entry.date,true,entry.id);
       if(prior&&daysBetween(prior,entry.date)<14) required(Boolean(i.reason?.trim()),prefix+'within 14 days of recorded billing; explanatory claim note required.');
@@ -154,3 +167,39 @@ export function finalizeBatch(ledger,entries,{from,to,layout,reviewed=false,deli
   const l=clone(ledger);const b={id:crypto.randomUUID(),from,to,layout,entryIds:entries.map(e=>e.id),handedOverAt:new Date().toISOString()};
   l.batches.push(b);for(const e of l.entries) if(b.entryIds.includes(e.id)) e.batchId=b.id;return l;
 }
+
+// Reviewed import packages are additive. Conflicts stop the whole import; no
+// patient/date, finalized charge, setting or existing identity is overwritten.
+export function parseImport(text) {
+  if(typeof text!=='string'||text.length>8_000_000)throw new Error('Import file exceeds the supported size.');
+  const p=JSON.parse(text,(key,value)=>{if(['__proto__','prototype','constructor'].includes(key))throw new Error('Unsafe import key.');return value;});
+  validateLedger(p);
+  if(!Array.isArray(p.historicalBillings)||!Array.isArray(p.importReview?.held)||p.batches.length||p.entries.some(e=>e.batchId)||p.nonPanel.length)throw new Error('Choose a reviewed billing import package, not a backup or roster.');
+  for(const [key,patient] of Object.entries(p.patients))if(!patient.name||patient.key!==key||patientKey(patient)!==key)throw new Error('Import patient identity mismatch.');
+  for(const [key] of Object.entries(p.baselines))if(!Object.hasOwn(p.patients,key))throw new Error('Starting date has no patient identity.');
+  for(const e of p.entries)if(e.date>today())throw new Error('Import contains a future pending date.');
+  for(const h of p.importReview.held)if(!h.name||!validDate(h.date)||!h.reason||h.status!=='held_not_imported')throw new Error('Invalid held review item.');
+  return p;
+}
+export function importSummary(p) {return {billed:p.historicalBillings.length,pending:p.entries.length,baselines:Object.keys(p.baselines).length,held:p.importReview.held.length};}
+export function mergeImport(current,source,sha256) {
+  validateLedger(current);const p=parseImport(JSON.stringify(source));
+  if(!/^[a-f0-9]{64}$/.test(sha256))throw new Error('Import fingerprint is missing.');
+  const receipt=current.imports?.find(i=>i.sourceDatasetId===p.datasetId);
+  if(receipt){if(receipt.sha256!==sha256)throw new Error('This import was changed after it was loaded. Review it separately.');return {ledger:clone(current),duplicate:true,summary:importSummary(p)};}
+  if(current.importReview)throw new Error('This workspace already contains a direct import. Review before combining packages.');
+  const n=clone(current);n.historicalBillings||=[];n.imports||=[];
+  const occupied=new Set([...n.entries,...n.historicalBillings].map(e=>`${e.patientKey}|${e.date}`));
+  const ids=new Set([...n.entries,...n.historicalBillings].map(e=>e.id));
+  for(const e of [...p.entries,...p.historicalBillings])if(occupied.has(`${e.patientKey}|${e.date}`)||ids.has(e.id))throw new Error('Import overlaps an existing patient/date or record ID. Nothing was changed; reconcile the overlap first.');
+  for(const [key,patient] of Object.entries(p.patients)){
+    if(Object.hasOwn(n.patients,key)){if(patientKey(n.patients[key])!==key)throw new Error('Existing patient identity mismatch.');}
+    else n.patients[key]=clone(patient);
+  }
+  n.entries.push(...clone(p.entries));n.historicalBillings.push(...clone(p.historicalBillings));
+  for(const [key,base] of Object.entries(p.baselines))if(!n.baselines[key]||n.baselines[key].date<base.date)n.baselines[key]=clone(base);
+  n.imports.push({sourceDatasetId:p.datasetId,sha256,importedAt:new Date().toISOString(),summary:importSummary(p),review:clone(p.importReview)});
+  validateLedger(n);assertImmutable(current,n);
+  return {ledger:n,duplicate:false,summary:importSummary(p)};
+}
+export function heldImports(l){return [...(l.importReview?.held||[]),...(l.imports||[]).flatMap(i=>i.review.held)];}
