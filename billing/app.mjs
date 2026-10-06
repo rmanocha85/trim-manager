@@ -1,5 +1,5 @@
-import {CODES,codeInfo,clone,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261005-import1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261005-import1';
+import {CODES,codeInfo,clone,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261005-review2';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261005-review2';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 import {renderReport} from './reports.mjs';
 const $=id=>document.getElementById(id);
@@ -117,7 +117,7 @@ function renderSettings(){
   const year=$('portal-year').value;const counts={};for(const e of ledger.entries.filter(e=>e.date.startsWith(year)))for(const i of e.items)counts[i.code]=(counts[i.code]||0)+Number(i.units);
   $('annual-counts').innerHTML=Object.entries(counts).map(([c,n])=>`<div class="history-row"><span>${c}</span><span>${n} units · ${year}</span></div>`).join('')||'<p class="hint">No recorded usage this year.</p>';
   if(ledger.historicalBillings?.length)$('annual-counts').insertAdjacentHTML('beforeend','<p class="issue-box">Imported billed records also exist. Their units are unverified and are not included in these totals. Relevant annual-limit codes are flagged for reconciliation before handoff.</p>');
-  $('import-receipts').textContent=(ledger.imports||[]).map(i=>`Imported ${i.importedAt.slice(0,10)}: ${i.summary.billed} already billed, ${i.summary.pending} pending, ${i.summary.held} held.`).join(' ');
+  $('import-receipts').textContent=(ledger.imports||[]).map(i=>`Imported ${i.importedAt.slice(0,10)}: ${i.summary.billed} already billed, ${i.summary.pending} pending, ${i.summary.held} held.${i.summary.resolved?` ${i.summary.resolved} prior held items resolved.`:''}`).join(' ');
 }
 
 function openImport(){if(!adapter&&!setupCandidate)return;stagedImport=null;importRead++;$('import-file').value='';$('import-preview').textContent='';$('import-error').textContent='';$('import-apply').disabled=true;$('import-dialog').showModal();}
@@ -126,7 +126,7 @@ const importCard=document.createElement('div');importCard.className='card';impor
 $('import-file').onchange=async()=>{
   const read=++importRead;stagedImport=null;$('import-apply').disabled=true;$('import-error').textContent='';$('import-preview').textContent='';
   try{const file=$('import-file').files[0];if(!file)return;if(file.size>8_000_000)throw new Error('Import is too large.');const text=await file.text(),p=parseImport(text),hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)),sha256=Array.from(new Uint8Array(hash),x=>x.toString(16).padStart(2,'0')).join('');if(read!==importRead)return;
-    const result=mergeImport(ledger||blankLedger(),p,sha256);const s=result.summary;stagedImport={p,sha256};$('import-preview').textContent=`${s.billed} already billed · ${s.pending} pending · ${s.baselines} starting dates · ${s.held} held for clarification.${result.duplicate?' This package is already loaded.':''}`;$('import-apply').disabled=result.duplicate;
+    const result=mergeImport(ledger||blankLedger(),p,sha256);const s=result.summary;stagedImport={p,sha256};$('import-preview').textContent=`${s.billed} already billed · ${s.pending} pending · ${s.baselines} starting dates · ${s.held} held for clarification.${s.resolved?` ${s.resolved} prior held items resolved.`:''}${result.duplicate?' This package is already loaded.':''}`;$('import-apply').disabled=result.duplicate;
   }catch(e){if(read===importRead)$('import-error').textContent=e.message;}
 };
 $('import-close').onclick=()=>{if(!importing){stagedImport=null;importRead++;$('import-dialog').close();}};
@@ -142,7 +142,7 @@ $('import-apply').onclick=async()=>{
     const fresh=await adapter.load();if(fresh.etag!==etag)throw new Error('Billing changed elsewhere. Reload saved data, then choose the import again. Nothing was imported.');
     const result=mergeImport(ledger,stagedImport.p,stagedImport.sha256);
     if(!result.duplicate){if(ledger.entries.length||ledger.historicalBillings?.length||Object.keys(ledger.baselines).length)download(`PRIVATE_TRIM_Before_Import_${today()}.json`,ledger);commit(result.ledger);await flush();if(dirty||blocked)throw new Error('Import is retained on this device but not verified in Drive. Use Sync / retry; do not re-import.');}
-    stagedImport=null;$('import-file').value='';$('import-dialog').close();renderAll();switchTab('history');notice(`Import saved and verified: ${result.summary.billed} already billed, ${result.summary.pending} pending, ${result.summary.held} held for clarification. No billing was submitted.`);
+    stagedImport=null;$('import-file').value='';$('import-dialog').close();renderAll();switchTab('history');notice(`Import saved and verified: ${result.summary.billed} already billed, ${result.summary.pending} pending, ${result.summary.held} held for clarification.${result.summary.resolved?` ${result.summary.resolved} prior held items resolved.`:''} No billing was submitted.`);
   }catch(e){$('import-error').textContent=e.message;}
   finally{importing=false;$('workspace').inert=false;$('import-file').disabled=false;$('import-close').disabled=false;$('import-apply').disabled=!stagedImport;}
 };

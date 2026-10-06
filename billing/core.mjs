@@ -7,7 +7,7 @@ export const CODES = [
   {code:'00127', label:'Palliative facility visit', reason:true, note:'Verify palliative criteria and any additional same-day claim requirements.'},
   {code:'13115', label:'LTC admission', reason:true, admission:true, note:'Initial in-person admission, once per patient per physician. Confirm reconciliation, care plan and MOST; not a return from hospital or physician transfer.'},
   {code:'13334', label:'First visit bonus', note:'Once per physician/day; requires qualifying visit. Not with urgent assessment.'},
-  {code:'14077', label:'Provider conference', timed:true, participants:true, reason:true, portal:true, annual:18, note:'Two-way clinical conference, not routine-round communication. Start/end in claim and chart. Annual units shown are recorded here only.'},
+  {code:'14077', label:'Provider conference', timed:true, reason:true, portal:true, annual:18, note:'Two-way clinical conference, not routine-round communication. Start/end in claim and chart. Participant documentation stays in the clinical note, not this billing sheet. Annual units shown are recorded here only.'},
   {code:'13121', label:'Family conference', timed:true, participants:true, reason:true, annual:100, physicianLimit:true, note:'Care planning/consent criteria, not routine updates. Separate time from other services.'},
   {code:'14067', label:'Brief provider conference', participants:true, reason:true, portal:true, annual:150, physicianLimit:true, note:'Clinical conferencing criteria; not an administrative or family conversation.'},
   {code:'13005', label:'Allied-worker advice', request:true, reason:true, note:'Document caller, request time and advice; same-day service restrictions apply.'},
@@ -63,6 +63,9 @@ export function validateLedger(l) {
     ids.add(h.id);patientDates.add(key);
   }
   if(l.imports!==undefined&&(!Array.isArray(l.imports)||l.imports.some(i=>!i.sourceDatasetId||!i.sha256||!Array.isArray(i.review?.held))))throw new Error('Invalid import receipt.');
+  if(l.reviewResolutions!==undefined&&!Array.isArray(l.reviewResolutions))throw new Error('Invalid review resolutions.');
+  const resolved=new Set(),held=allHeldImports(l);
+  for(const r of l.reviewResolutions||[]){if(!r.key||resolved.has(r.key)||!held.some(h=>heldKey(h)===r.key)||!['included','excluded'].includes(r.disposition)||!r.reason?.trim()||!r.resolvedAt||(r.disposition==='included'&&!r.entryId))throw new Error('Invalid or duplicate held-item resolution.');resolved.add(r.key);}
   const batchIds=new Set();
   for(const b of l.batches) {
     if(!b.id||batchIds.has(b.id)||!Array.isArray(b.entryIds)||new Set(b.entryIds).size!==b.entryIds.length) throw new Error('Invalid batch.');
@@ -78,6 +81,7 @@ export function assertImmutable(previous,next) {
   for(const e of previous.entries.filter(e=>e.batchId)) if(JSON.stringify(e)!==JSON.stringify(next.entries.find(x=>x.id===e.id))) throw new Error('Handed-over billing cannot be altered.');
   for(const h of previous.historicalBillings||[])if(JSON.stringify(h)!==JSON.stringify(next.historicalBillings?.find(x=>x.id===h.id)))throw new Error('Already-billed history cannot be altered.');
   for(const i of previous.imports||[])if(JSON.stringify(i)!==JSON.stringify(next.imports?.find(x=>x.sourceDatasetId===i.sourceDatasetId)))throw new Error('Import receipts cannot be altered.');
+  for(const r of previous.reviewResolutions||[])if(JSON.stringify(r)!==JSON.stringify(next.reviewResolutions?.find(x=>x.key===r.key)))throw new Error('Review resolutions cannot be altered.');
 }
 export function lastBilling(ledger,key,asOf='9999-12-31',resetOnly=false,excludeId=null) {
   const dates=ledger.entries.filter(e=>e.patientKey===key&&e.date<=asOf&&e.id!==excludeId&&(!resetOnly||e.items.some(i=>RESET_CODES.includes(i.code)))).map(e=>e.date);
@@ -179,9 +183,10 @@ export function parseImport(text) {
   for(const [key] of Object.entries(p.baselines))if(!Object.hasOwn(p.patients,key))throw new Error('Starting date has no patient identity.');
   for(const e of p.entries)if(e.date>today())throw new Error('Import contains a future pending date.');
   for(const h of p.importReview.held)if(!h.name||!validDate(h.date)||!h.reason||h.status!=='held_not_imported')throw new Error('Invalid held review item.');
+  if(p.importReview.resolutions!==undefined&&!Array.isArray(p.importReview.resolutions))throw new Error('Invalid clarification package.');
   return p;
 }
-export function importSummary(p) {return {billed:p.historicalBillings.length,pending:p.entries.length,baselines:Object.keys(p.baselines).length,held:p.importReview.held.length};}
+export function importSummary(p) {return {billed:p.historicalBillings.length,pending:p.entries.length,baselines:Object.keys(p.baselines).length,held:p.importReview.held.length,resolved:p.importReview.resolutions?.length||0};}
 export function mergeImport(current,source,sha256) {
   validateLedger(current);const p=parseImport(JSON.stringify(source));
   if(!/^[a-f0-9]{64}$/.test(sha256))throw new Error('Import fingerprint is missing.');
@@ -199,7 +204,19 @@ export function mergeImport(current,source,sha256) {
   n.entries.push(...clone(p.entries));n.historicalBillings.push(...clone(p.historicalBillings));
   for(const [key,base] of Object.entries(p.baselines))if(!n.baselines[key]||n.baselines[key].date<base.date)n.baselines[key]=clone(base);
   n.imports.push({sourceDatasetId:p.datasetId,sha256,importedAt:new Date().toISOString(),summary:importSummary(p),review:clone(p.importReview)});
+  n.reviewResolutions||=[];
+  for(const r of p.importReview.resolutions||[]){
+    const h=allHeldImports(current).find(h=>heldKey(h)===r.key);
+    if(!h||n.reviewResolutions.some(x=>x.key===r.key))throw new Error('Clarification does not match an unresolved source item.');
+    if(r.disposition==='included'){
+      const e=n.entries.find(e=>e.id===r.entryId);
+      if(!e||e.date!==h.date||n.patients[e.patientKey]?.name!==h.name)throw new Error('Clarified billing does not match the held patient/date.');
+    }
+    n.reviewResolutions.push({...clone(r),resolvedAt:new Date().toISOString(),sourceDatasetId:p.datasetId});
+  }
   validateLedger(n);assertImmutable(current,n);
   return {ledger:n,duplicate:false,summary:importSummary(p)};
 }
-export function heldImports(l){return [...(l.importReview?.held||[]),...(l.imports||[]).flatMap(i=>i.review.held)];}
+export function heldKey(h){return JSON.stringify([h.source?.driveFileId,h.source?.page,h.date,h.name]);}
+function allHeldImports(l){return [...(l.importReview?.held||[]),...(l.imports||[]).flatMap(i=>i.review.held)];}
+export function heldImports(l){const resolved=new Set((l.reviewResolutions||[]).map(r=>r.key));return allHeldImports(l).filter(h=>!resolved.has(heldKey(h)));}

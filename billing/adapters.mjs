@@ -1,4 +1,4 @@
-import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261005-import1';
+import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261005-review2';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 export class LocalAdapter {
