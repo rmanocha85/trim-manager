@@ -149,6 +149,12 @@ header h1{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:
 .p-toggle input:checked+span{background:var(--accent);border-color:var(--accent);color:#fff}
 .edit-name-wrap{display:flex;align-items:center;gap:5px}.edit-name-wrap .einp{flex:1}.edit-name-wrap .p-toggle{height:27px;min-width:27px;flex:0 0 27px}.edit-name-wrap .p-toggle span{width:17px;height:17px;font-size:9px}
 .pphn{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.phn-value{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;position:relative}
+.phn-copy{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:4px;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer;flex:none}
+.phn-copy:hover{color:var(--accent);background:var(--accent-light)}
+.phn-copy:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.phn-copy svg{width:15px;height:15px}
+.phn-copy-feedback:not(:empty){position:absolute;right:0;bottom:100%;margin-bottom:2px;padding:3px 6px;border-radius:4px;background:var(--accent);color:#fff;font-size:11px;z-index:1}
 .prm{font-family:var(--mono);font-size:11px;color:var(--muted);background:var(--bg);padding:2px 6px;border-radius:4px;display:inline-block}
 .pcd{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:500}
 .pact{display:flex;gap:5px}
@@ -915,7 +921,7 @@ function renderUList(){
           <thead><tr>
             <th style="width:38px">Room</th>
             <th>Name</th>
-            <th style="width:105px">PHN</th>
+            <th style="width:130px">PHN</th>
             <th style="width:80px">AVA #</th>
             <th style="width:120px">ICD Codes</th>
             <th style="width:110px">Actions</th>
@@ -940,9 +946,9 @@ function renderUList(){
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
                   <div class="pnm">${p.ava?`<a href="https://www.avaemr.ca/patients/${esc(p.ava)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
-                  <div class="pphn">${esc(p.phn||'')}</div>
+                  <div class="pphn">${phnWithCopy(p.phn,'')}</div>
                 </td>
-                <td><span class="pphn">${esc(p.phn||'—')}</span></td>
+                <td><span class="pphn">${phnWithCopy(p.phn)}</span></td>
                 <td><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(p.ava||'—')}</span></td>
                 <td><span class="pcd">${esc(p.codes)||'<span style="color:var(--muted);font-style:italic">—</span>'}</span></td>
                 <td><div class="pact"><button class="btn btn-outline btn-sm needs-connect" onclick="startEdit('${p.id}')">Edit</button><button class="btn btn-danger btn-sm needs-connect" onclick="promptDel('${p.id}')">✕</button></div></td>
@@ -1145,6 +1151,24 @@ function printBilling(){
 }
 
 // ── UTILS ──
+function phnWithCopy(phn,empty='—'){
+  const value=String(phn||'').replace(/\D/g,'');
+  if(!value)return esc(empty);
+  return `<span class="phn-value">${esc(phn)}<button type="button" class="phn-copy" data-phn="${value}" onclick="copyPhn(this)" title="Copy PHN" aria-label="Copy PHN"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button><span class="phn-copy-feedback" role="status"></span></span>`;
+}
+async function copyPhn(button){
+  const feedback=button.nextElementSibling;
+  clearTimeout(button.copyResetTimer);
+  button.disabled=true;
+  try{
+    await navigator.clipboard.writeText(button.dataset.phn);
+    feedback.textContent='Copied';
+    button.copyResetTimer=setTimeout(()=>{feedback.textContent='';},1500);
+  }catch(e){
+    feedback.textContent='';
+    alert('Your browser could not copy the PHN. Select the number and copy it manually.');
+  }finally{button.disabled=false;}
+}
 function g(id){return document.getElementById(id)}
 function esc(s){if(!s)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
