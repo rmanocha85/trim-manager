@@ -239,6 +239,12 @@ body.history-mode .connect-hint{display:flex}
 body.pb > *{display:none !important}
 body.pb #print-billing{display:block !important}
 body.pb #print-trim{display:none !important}
+/* Connection is independent of the adjacent save-status message. */
+body #btn-connect{border:1px solid;border-radius:7px;font-size:12px;font-weight:600;padding:8px 10px;white-space:nowrap}
+body #btn-connect[data-state=ok],body #btn-connect[data-state=ok]:hover{background:#e7f2e9;color:#214e35;border-color:#bdd9c5}
+body #btn-connect[data-state=error],body #btn-connect[data-state=error]:hover{background:#ffe5df;color:#922e24;border-color:#e5ada3}
+body #btn-connect[data-state=busy],body #btn-connect[data-state=busy]:hover{background:#e6f0ff;color:#22558b;border-color:#b7cdef}
+body #btn-connect:disabled{opacity:.7;cursor:wait}
 @media print{
   body.pb > *{display:none !important}
   body.pb #print-billing{display:block !important}
@@ -323,7 +329,7 @@ body.pb #print-trim{display:none !important}
   <h1 id="app-title">Let's get this done</h1>
   <div class="hdr-right">
     <span class="save-status" id="ss">Loading…</span>
-    <button class="btn btn-gw btn-sm" id="btn-connect" onclick="gConnect()">Connect Google Drive</button>
+    <button class="btn btn-sm" id="btn-connect" data-state="error" onclick="gConnect()" aria-live="polite" title="Check or reconnect Google Drive without saving">● Reconnect Drive</button>
     <button class="btn btn-gw btn-sm" onclick="forceSyncFromDrive()" id="btn-sync" style="display:none">🔄 Sync from Drive</button>
     <button class="btn btn-white btn-sm" onclick="printTrim()">🖨 TRIM List</button>
     <button class="btn btn-gw btn-sm" onclick="printBilling()">🖨 TRIM Billing</button>
@@ -403,7 +409,7 @@ body.pb #print-trim{display:none !important}
 <div id="tab-history" class="panel">
   <div class="card needs-connect">
     <h3>📅 Past Daily Lists</h3>
-    <p>A read-only copy of your patient list is automatically saved the first time you connect each day. Pick a past date below to view and print that day's list — you can't edit a past list, only today's live one.</p>
+    <p>A read-only daily copy is saved when you first save a roster edit after connecting, or use Sync from Drive. Connection checks do not write files. Pick a past date below to view and print that day's list — you can't edit a past list, only today's live one.</p>
     <div id="snapshot-list" style="margin-top:14px">
       <p style="color:var(--muted);font-size:13px;font-style:italic">Connect Google Drive to see past lists.</p>
     </div>
@@ -477,6 +483,36 @@ let state={
 let delId=null,editId=null,pendingDateKey=null;
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
 let rosterDocument=null,driveEtag=null,saveQueue=Promise.resolve(),writeBlocked=false,pendingSaves=0;
+let connectionChecking=false,lastDriveCheck=null,tokenExpiresAt=0,tokenExpiryTimer=null;
+let snapshotOnNextSave=null;
+function renderConnection(){
+  const button=g('btn-connect');
+  const connected=state.googleConnected&&!!state.googleToken&&navigator.onLine!==false;
+  const checking=connectionChecking&&navigator.onLine!==false;
+  button.dataset.state=checking?'busy':connected?'ok':'error';
+  button.textContent=checking?'◌ Checking Drive…':connected?'● Drive connected':'● Reconnect Drive';
+  button.disabled=connectionChecking||pendingSaves>0;
+  button.setAttribute('aria-busy',String(connectionChecking));
+  button.title='Check or reconnect Google Drive without saving.'+(lastDriveCheck?' Last verified '+lastDriveCheck.toLocaleString()+'.':'')+' Save status is shown separately.';
+}
+function checkedDrive(){
+  if(!state.googleToken||navigator.onLine===false||(tokenExpiresAt&&Date.now()>=tokenExpiresAt)){
+    disconnectDrive();return false;
+  }
+  state.googleConnected=true;lastDriveCheck=new Date();renderConnection();return true;
+}
+function disconnectDrive(clearToken=false){
+  state.googleConnected=false;
+  if(clearToken){state.googleToken=null;tokenExpiresAt=0;clearTimeout(tokenExpiryTimer);}
+  renderConnection();
+}
+function acceptDriveToken(response){
+  if(!response.access_token)throw new Error('Google did not return a Drive access token.');
+  state.googleToken=response.access_token;
+  tokenExpiresAt=Date.now()+(Number(response.expires_in)||3600)*1000;
+  clearTimeout(tokenExpiryTimer);
+  tokenExpiryTimer=setTimeout(()=>disconnectDrive(true),Math.max(0,tokenExpiresAt-Date.now()));
+}
 function currentRoster(){
   return {...rosterDocument,patients:state.patients,removedPatients:state.removedPatients,units:state.units,billingDates:state.billingDates};
 }
@@ -485,13 +521,20 @@ function applyRoster(roster){
   for(const key of ['patients','removedPatients','units','billingDates'])state[key]=rosterDocument[key];
 }
 function canEdit(){
-  if(inHistoryView||writeBlocked||!state.googleConnected||!driveEtag){alert('Connect or sync the live roster before editing.');return false;}
+  if(inHistoryView||writeBlocked||connectionChecking||navigator.onLine===false||!state.googleConnected||!driveEtag){alert('Connect or sync the live roster before editing.');return false;}
   return true;
 }
 async function driveRequest(url,options={}){
-  const response=await fetch(url,{...options,cache:'no-store',headers:{Authorization:'Bearer '+state.googleToken,...options.headers}});
-  if(!response.ok)throw new Error(response.status===412?'The roster changed elsewhere. Sync from Drive and repeat your edit.':`Drive request failed (${response.status}).`);
-  return response.json();
+  try{
+    if(navigator.onLine===false)throw new Error('No internet connection. Reconnect Drive when online.');
+    const response=await fetch(url,{...options,cache:'no-store',headers:{Authorization:'Bearer '+state.googleToken,...options.headers}});
+    if(!response.ok)throw Object.assign(new Error(response.status===412?'The roster changed elsewhere. Sync from Drive and repeat your edit.':`Drive request failed (${response.status}).`),{status:response.status});
+    return await response.json();
+  }catch(e){
+    if(e.status===412)checkedDrive(); // A revision conflict is separate from connectivity.
+    else disconnectDrive(e.status===401||e.status===403);
+    throw e;
+  }
 }
 async function readDriveRevision(){
   const url=`https://www.googleapis.com/drive/v2/files/${ROSTER_FILE_ID}`;
@@ -509,38 +552,60 @@ function showPreAuthShell(){
   document.body.classList.remove('drive-connected');
   g('app-title').textContent="Let's get this done";
   document.title="Let's get this done";
-  g('btn-connect').textContent='Connect Google Drive';
+  renderConnection();
   g('btn-sync').style.display='none';
 }
 function showAuthenticatedShell(){
   document.body.classList.add('drive-connected');
   g('app-title').textContent='⬛ TRIM Patient Manager';
   document.title='TRIM Patient Manager';
-  g('btn-connect').textContent='✓ Connected';
+  renderConnection();
   g('btn-sync').style.display='inline-flex';
 }
 async function gConnect(){
-  if(pendingSaves){alert('Wait for the current save to finish.');return;}
-  if(inHistoryView)exitHistoryView();
-  if(!window.google?.accounts){
-    await new Promise((r,j)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;s.onerror=j;document.head.appendChild(s)});
-  }
-  google.accounts.oauth2.initTokenClient({client_id:OAUTH_CLIENT_ID,scope:SCOPE,callback:async r=>{
-    if(r.error){alert('Auth failed: '+r.error);return}
-    state.googleToken=r.access_token;state.googleConnected=true;
-    setSS('Connected — loading from Drive…',true);
-    const loaded=await loadDrive();
-    if(!loaded){
-      state.googleConnected=false;state.googleToken=null;
-      showPreAuthShell();
-      alert('Google Drive connected, but the patient roster could not be loaded. No patient information has been displayed.');
-      return;
+  return checkDriveConnection(true);
+}
+async function checkDriveConnection(interactive=false){
+  if(connectionChecking||pendingSaves)return false;
+  connectionChecking=true;renderConnection();
+  try{
+    if(navigator.onLine===false)throw new Error('No internet connection. Reconnect Drive when online.');
+    if(tokenExpiresAt&&Date.now()>=tokenExpiresAt)disconnectDrive(true);
+    if(!state.googleToken){
+      if(!interactive){disconnectDrive();return false;}
+      if(!window.google?.accounts){
+        await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(new Error('Google sign-in could not load.'));document.head.appendChild(s);});
+      }
+      const token=await new Promise((resolve,reject)=>google.accounts.oauth2.initTokenClient({
+        client_id:OAUTH_CLIENT_ID,scope:SCOPE,
+        callback:r=>r.error?reject(new Error('Google sign-in failed: '+r.error)):resolve(r),
+        error_callback:()=>reject(new Error('Google sign-in was cancelled or blocked. Click Reconnect Drive to try again.'))
+      }).requestAccessToken());
+      acceptDriveToken(token);
+    }
+    const loaded=await readDriveRevision();
+    if(!checkedDrive())throw new Error('Drive access expired or the connection was lost. Reconnect Drive.');
+    if(!rosterDocument){
+      // First connection is also read-only: no snapshot creation or retention writes.
+      snapshotOnNextSave=structuredClone(loaded.roster);
+      applyRoster(TrimRoster.expire(loaded.roster));driveEtag=loaded.etag;state.driveFileId=ROSTER_FILE_ID;
+      saveLocal();setSS('Loaded from Drive ✓',true);render();showAuthenticatedShell();
+    }else if(loaded.etag!==driveEtag&&!writeBlocked){
+      writeBlocked=true;
+      setSS('Drive roster changed — sync before editing',false);
     }
     showAuthenticatedShell();
-  }}).requestAccessToken();
+    // Never replace a loaded roster, its ETag, or an unsaved/conflict status here.
+    return true;
+  }catch(e){
+    disconnectDrive();
+    if(interactive)alert(e.message);
+    return false;
+  }finally{connectionChecking=false;renderConnection();}
 }
 
 async function forceSyncFromDrive(){
+  if(connectionChecking)return;
   if(pendingSaves){alert('Wait for the current save to finish.');return;}
   if(inHistoryView)exitHistoryView();
   if(!state.googleConnected||!state.googleToken){
@@ -561,27 +626,32 @@ function saveDrive(){
   try{applyRoster(TrimRoster.expire(currentRoster()));snapshot=structuredClone(currentRoster());}
   catch(e){alert(e.message);return Promise.resolve(false);}
   pendingSaves++;
+  renderConnection();
   saveQueue=saveQueue.then(async()=>{
     if(writeBlocked)return false;
     setSS('Saving to Drive…',false);
     try{
+      if(snapshotOnNextSave){await maybeSaveDailySnapshot(snapshotOnNextSave);snapshotOnNextSave=null;}
       await driveRequest(`https://www.googleapis.com/upload/drive/v2/files/${ROSTER_FILE_ID}?uploadType=media`,{
         method:'PUT',headers:{'Content-Type':'application/json','If-Match':driveEtag},body:JSON.stringify(snapshot)
       });
       const verified=await readDriveRevision();
       if(JSON.stringify(verified.roster)!==JSON.stringify(snapshot))throw new Error('Saved roster readback differs. Sync and review before editing.');
-      driveEtag=verified.etag;saveLocal();setSS('Saved to Drive ✓',true);return true;
+      driveEtag=verified.etag;checkedDrive();saveLocal();setSS('Saved to Drive ✓',true);return true;
     }catch(e){
       writeBlocked=true;setSS('NOT SAVED — '+e.message,false);
       alert('The edit could not be verified as saved. '+e.message+' Editing is locked until Sync from Drive.');return false;
     }
-  }).finally(()=>{pendingSaves--;});
+  }).finally(()=>{pendingSaves--;renderConnection();});
   return saveQueue;
 }
 async function loadDrive(){
+  connectionChecking=true;renderConnection();
   setSS('Loading…',false);
   try{
     const loaded=await readDriveRevision();
+    if(!checkedDrive())throw new Error('Drive access expired or the connection was lost.');
+    connectionChecking=false;renderConnection();
     applyRoster(loaded.roster);driveEtag=loaded.etag;writeBlocked=false;
     state.driveFileId=ROSTER_FILE_ID;
     const before=state.removedPatients.length;
@@ -589,8 +659,10 @@ async function loadDrive(){
     if(before!==state.removedPatients.length&&!await saveDrive())return false;
     saveLocal();setSS('Loaded from Drive ✓',true);render();showAuthenticatedShell();
     await maybeSaveDailySnapshot();
+    snapshotOnNextSave=null;
     return true;
-  }catch(e){setSS('Load failed',false);console.error(e);return false}
+  }catch(e){disconnectDrive();setSS('Load failed',false);console.error(e);return false}
+  finally{connectionChecking=false;renderConnection();}
 }
 // ── DAILY SNAPSHOTS (read-only history for past-day printing) ──
 const SNAPSHOT_FOLDER='TRIM Snapshots';
@@ -612,17 +684,16 @@ function todaySnapshotName(){
   return `trim-patients-${d.getFullYear()}-${months[d.getMonth()]}-${String(d.getDate()).padStart(2,'0')}.json`;
 }
 
-// Called once per successful connect. Saves a read-only copy of whatever the
-// live list looked like the FIRST time we connect on a given day — i.e. it
-// captures yesterday's final state, before any of today's edits happen.
-async function maybeSaveDailySnapshot(){
+// Called on the first roster save after connect or on explicit Sync. A deferred
+// snapshot uses the roster first loaded, before local edits; checks never write.
+async function maybeSaveDailySnapshot(roster=currentRoster()){
   try{
     const name=todaySnapshotName();
     const folderId=await getOrCreateSnapshotFolder();
     const q=`name='${name}' and '${folderId}' in parents and trashed=false`;
     const existing=await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,{headers:{'Authorization':'Bearer '+state.googleToken}}).then(r=>r.json());
     if(existing.files?.length>0) return; // already snapshotted today, never overwrite
-    const body=JSON.stringify({patients:state.patients,units:state.units,billingDates:state.billingDates,snapshotDate:name});
+    const body=JSON.stringify({patients:roster.patients,units:roster.units,billingDates:roster.billingDates,snapshotDate:name});
     const meta=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/json',parents:[folderId]})}).then(r=>r.json());
     await fetch(`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`,{method:'PATCH',headers:{'Authorization':'Bearer '+state.googleToken,'Content-Type':'application/json'},body});
     console.log('Daily snapshot saved:',name);
@@ -679,7 +750,7 @@ async function renderSnapshotList(){
   try{
     const files=await listSnapshots();
     if(files.length===0){
-      el.innerHTML=`<p style="color:var(--muted);font-size:13px;font-style:italic">No past snapshots yet — one gets saved automatically the next time you connect on a new day.</p>`;
+      el.innerHTML=`<p style="color:var(--muted);font-size:13px;font-style:italic">No past snapshots yet — one gets saved with your first roster save after connecting, or when you use Sync from Drive.</p>`;
       return;
     }
     el.innerHTML=files.map(f=>{
@@ -1180,6 +1251,14 @@ async function init(){
   render();
   setSS('Connect Google Drive to load the roster',false);
 }
+window.addEventListener('offline',()=>disconnectDrive());
+window.addEventListener('online',()=>{if(state.googleToken)checkDriveConnection();else renderConnection();});
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&state.googleToken)checkDriveConnection();
+});
+setInterval(()=>{
+  if(!document.hidden&&state.googleToken)checkDriveConnection();
+},60000);
 init();
 </script>
 </body>

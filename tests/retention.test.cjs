@@ -103,9 +103,9 @@ test('expiry cannot rewrite independent saved billing identity or charges',async
 
 function appHarness(){
   const elements=new Map();
-  const element=id=>{if(!elements.has(id))elements.set(id,{value:'',checked:false,style:{},classList:{add(){},remove(){}},textContent:'',innerHTML:''});return elements.get(id);};
+  const element=id=>{if(!elements.has(id))elements.set(id,{value:'',checked:false,style:{},dataset:{},setAttribute(){},classList:{add(){},remove(){}},textContent:'',innerHTML:''});return elements.get(id);};
   const alerts=[];
-  const ctx=vm.createContext({TrimRoster:R,structuredClone,Date,console,crypto:require('node:crypto').webcrypto,setTimeout,alert:x=>alerts.push(x),localStorage:{removeItem(){}},document:{addEventListener(){},getElementById:element,body:{classList:{add(){},remove(){}}},querySelectorAll:()=>[],title:''}});
+  const ctx=vm.createContext({TrimRoster:R,structuredClone,Date,console,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,setInterval(){},navigator:{onLine:true},window:{addEventListener(){}},alert:x=>alerts.push(x),localStorage:{removeItem(){}},document:{addEventListener(){},getElementById:element,body:{classList:{add(){},remove(){}}},querySelectorAll:()=>[],title:''}});
   const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   const script=html.match(/<script>\s*([\s\S]*?)<\/script>/)[1].replace(/init\(\);\s*$/,'');
   vm.runInContext(script,ctx);
@@ -142,4 +142,76 @@ test('app load expires retained records with verified save; active counts and pr
   assert.equal(h.element('print-billing').innerHTML.includes(patient.name),false);
   assert.equal(h.element('removed-list').innerHTML.includes(patient.name),true);
   assert.match(h.element('stats').innerHTML,/>0</);
+});
+test('connection verification is read-only and preserves unsaved data, revision and save warning',async()=>{
+  const h=appHarness();let release;
+  const gate=new Promise(resolve=>{release=resolve;});
+  const requests=[];
+  h.ctx.fetch=async(url,opts)=>{
+    requests.push(opts.method||'GET');await gate;
+    return {ok:true,json:async()=>url.includes('alt=media')?fixture():{etag:'revision1'}};
+  };
+  h.run("state.patients[0].room='UNSAVED';writeBlocked=true;setSS('NOT SAVED — conflict',false);");
+  const promise=h.run('gConnect()');
+  assert.equal(h.element('btn-connect').textContent,'◌ Checking Drive…');
+  release();assert.equal(await promise,true);
+  assert.equal(h.element('btn-connect').textContent,'● Drive connected');
+  assert.equal(h.element('ss').textContent,'NOT SAVED — conflict');
+  assert.equal(h.run('state.patients[0].room'),'UNSAVED');assert.equal(h.run('writeBlocked'),true);
+  assert.equal(h.run('driveEtag'),'revision1');assert.deepEqual(requests,['GET','GET','GET']);
+});
+test('initial connect filters expired records without writing roster or snapshots',async()=>{
+  const h=appHarness();const disk=R.remove(fixture(),patient.id,'2020-01-31');let writes=0;
+  h.ctx.fetch=async(url,opts)=>{
+    if(opts.method&&opts.method!=='GET')writes++;
+    return {ok:true,json:async()=>url.includes('alt=media')?disk:{etag:'fresh'}};
+  };
+  h.run("rosterDocument=null;driveEtag=null;maybeSaveDailySnapshot=async()=>{throw new Error('Snapshot write on connect');};");
+  assert.equal(await h.run('gConnect()'),true);
+  assert.equal(h.run('state.removedPatients.length'),0);assert.equal(disk.removedPatients.length,1);
+  assert.equal(writes,0);assert.equal(h.run('driveEtag'),'fresh');
+});
+test('changed revision is connected but cannot replace current roster or clear write protection',async()=>{
+  const h=appHarness();
+  h.ctx.fetch=async(url)=>({ok:true,json:async()=>url.includes('alt=media')?fixture():{etag:'remote-new'}});
+  h.run("state.patients[0].room='UNSAVED';");
+  assert.equal(await h.run('gConnect()'),true);
+  assert.equal(h.element('btn-connect').dataset.state,'ok');
+  assert.equal(h.run('writeBlocked'),true);assert.equal(h.run('driveEtag'),'revision1');
+  assert.equal(h.run('state.patients[0].room'),'UNSAVED');
+});
+test('offline, authentication failure and network failure show reconnect without altering saved status',async()=>{
+  const h=appHarness();let calls=0;
+  h.run("setSS('Saved to Drive ✓',true);");h.ctx.navigator.onLine=false;
+  h.ctx.fetch=async()=>{calls++;return {ok:false,status:401};};
+  assert.equal(await h.run('gConnect()'),false);assert.equal(calls,0);
+  assert.equal(h.element('btn-connect').dataset.state,'error');
+  h.ctx.navigator.onLine=true;
+  assert.equal(await h.run('gConnect()'),false);assert.equal(h.run('state.googleToken'),null);
+  assert.equal(h.element('btn-connect').textContent,'● Reconnect Drive');
+  assert.equal(h.element('ss').textContent,'Saved to Drive ✓');
+  h.run("state.googleToken='synthetic';");h.ctx.fetch=async()=>{throw new Error('network failed');};
+  assert.equal(await h.run('gConnect()'),false);assert.equal(h.run('state.patients.length'),1);
+});
+test('connection checks wait for saves and do not leave checking state after cancelled login',async()=>{
+  const h=appHarness();h.run('pendingSaves=1;');
+  h.ctx.fetch=async()=>{throw new Error('must not fetch during save');};
+  assert.equal(await h.run('gConnect()'),false);
+  h.run('pendingSaves=0;state.googleToken=null;');
+  h.ctx.google=h.ctx.window.google={accounts:{oauth2:{initTokenClient:options=>({requestAccessToken:()=>options.error_callback()})}}};
+  assert.equal(await h.run('gConnect()'),false);assert.equal(h.run('connectionChecking'),false);
+  assert.equal(h.element('btn-connect').disabled,false);assert.equal(h.element('btn-connect').dataset.state,'error');
+});
+test('deferred daily snapshot keeps the pre-edit roster and runs only when an edit saves',async()=>{
+  const h=appHarness();let disk=fixture(),rev=1,captured=null;
+  h.ctx.fetch=async(url,opts)=>{
+    if(opts.method==='PUT'){disk=JSON.parse(opts.body);rev++;}
+    return {ok:true,json:async()=>url.includes('alt=media')?structuredClone(disk):{etag:'r'+rev}};
+  };
+  h.run('rosterDocument=null;driveEtag=null;');
+  h.ctx.capture=roster=>{captured=structuredClone(roster);};h.run('maybeSaveDailySnapshot=async roster=>capture(roster);');
+  assert.equal(await h.run('gConnect()'),true);assert.equal(captured,null);
+  h.run("applyRoster(TrimRoster.edit(currentRoster(),'synthetic-1',{room:'NEW'}));");
+  assert.equal(await h.run('saveDrive()'),true);
+  assert.equal(captured.patients[0].room,'1');assert.equal(disk.patients[0].room,'NEW');
 });
