@@ -37,6 +37,19 @@ header{height:64px;min-height:64px}
 @media(max-width:420px){#add-patient-section .patient-inputs{grid-template-columns:1fr}}
 
 /* Separate charges, with compact in-flow time controls (never a modal). */
+/* Unambiguous month names and weekdays, without changing stored ISO dates. */
+.named-date-control{display:block;min-width:0}
+.named-date-parts{display:grid;grid-template-columns:minmax(65px,1fr) minmax(54px,.75fr) minmax(70px,1fr);gap:5px}
+.named-date-parts select,.named-date-parts input{width:100%;min-width:0;padding:7px 5px;font-size:12px}
+.named-date-summary{display:block;margin:5px 0 0;font-size:11px;color:var(--green);line-height:1.35}
+.named-date-control>input{margin-top:6px;width:100%}
+.calendar-footer{flex-wrap:wrap;gap:5px}
+#selected-date-label{font-size:11px;line-height:1.35;text-align:right}
+.editor-head{flex-wrap:wrap;gap:8px}
+.editor-date{font-size:12px;white-space:nowrap;max-width:100%}
+.header-actions #saved-time{font-size:9px}
+.report-controls .fields>label{min-width:0}
+@media(max-width:760px){.report-controls .fields{flex-wrap:wrap}.report-controls .fields>label{flex-basis:100%}.change-row>div span{white-space:normal}}
 #item-details{display:grid;gap:16px;margin-top:12px}
 #editor .code-details{margin:0;padding:14px;border:1px solid #cdd8cb;border-left:4px solid #709779;border-radius:9px;background:#f8faf6}
 #editor .code-details>h3{color:var(--green);font-size:14px;margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid #dfe6da}
