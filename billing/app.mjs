@@ -2,7 +2,7 @@ import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,defaultConferenceEnd,
 import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261006-modes1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 import {renderReport} from './reports.mjs?v=20261006-modes1';
-import {sessionChanges,coveragePatient,extractDemographics} from './workspace.mjs?v=20261006-modes1';
+import {sessionChanges,coveragePatient,extractDemographics,matchesPatientSearch} from './workspace.mjs?v=20261006-concern2';
 const $=id=>document.getElementById(id);
 let savedBase=null,billingMode='concern',lastChecked=null,driveReachable=false,localRecoveryFailed=false,ocrBusy=false,ocrRun=0,ocrAbort=null,imageURL=null;
 const localChanges=()=>dirty&&ledger&&savedBase?sessionChanges(savedBase,ledger):[];
@@ -28,7 +28,8 @@ function updateWriteLock(){
   refreshTimePicker();
   $('roster').querySelectorAll('[data-patient]').forEach(el=>el.disabled=busy);
   $('calendar').querySelectorAll('button').forEach(el=>el.disabled=busy||el.dataset.future==='true');
-  for(const id of ['confirm-patient','add-other','baseline-save','portal-confirm','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='confirm-patient'&&(ocrBusy||!$('identity-reviewed').checked))||(id==='finalize'&&ledger.settings.parallel);
+  const identityReady=$('other-form').elements.name.value.trim()&&/^\d{10}$/.test($('other-form').elements.phn.value);
+  for(const id of ['confirm-patient','baseline-save','portal-confirm','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='confirm-patient'&&(ocrBusy||!identityReady))||(id==='finalize'&&ledger.settings.parallel);
   $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Billing locked — resolve the saved-data conflict in Settings. Your draft is retained.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Save to Drive / retry to verify Google Drive before making changes.';
 }
 function renderCalendar(){
@@ -93,13 +94,13 @@ async function flush(){
 }
 function renderAll(){
   $('unit-filter').innerHTML='<option value="">All units</option>'+roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
-  $('other-unit').innerHTML='<option value="">Not entered</option>'+roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   renderStats();renderRoster();renderEditor();renderReports();renderHistory();renderSettings();renderCalendar();updateWriteLock();
 }
 function renderStats(){const pts=people(),own=pts.filter(p=>p.panel),day=ledger.entries.filter(e=>e.date===date());const missing=day.filter(e=>entryIssues(e,ledger,person(e.patientKey)).length);$('stats').innerHTML=[['My panel',own.length,'No patient limit'],['Selected this date',day.length,'Patients with billing'],['Needs information',missing.length,'Saved, incomplete'],['Due for review',own.filter(p=>dueState(ledger,p,date()).kind==='due').length,`${own.filter(p=>dueState(ledger,p,date()).kind==='unknown').length} with unknown history`]].map(([label,n,sub])=>`<div class="stat"><span>${label}</span><b>${n}</b><small>${sub}</small></div>`).join('');$('day-summary').textContent=`${date()} · ${day.length} patients billed${missing.length?` · ${missing.length} need information`:''}`;}
 function renderRoster(){
-  const q=$('search').value.toLowerCase().trim(),unit=$('unit-filter').value,panel=$('panel-filter').value,dueOnly=$('due-filter').checked;
-  const pts=people().filter(p=>(billingMode!=='routine'||p.panel)&&(panel==='all'||(panel==='mine'?p.panel:!p.panel))&&(!unit||p.unit===unit)&&(!q||`${p.name} ${p.room} ${p.phn}`.toLowerCase().includes(q))&&(!dueOnly||dueState(ledger,p,date()).kind==='due'||(billingMode==='routine'&&ledger.entries.some(e=>e.patientKey===p.key&&e.date===date()))));
+  const q=$('search').value.trim(),unit=$('unit-filter').value,dueOnly=$('due-filter').checked;
+  // Concern search always spans the full roster, regardless of stale routine filters.
+  const pts=people().filter(p=>matchesPatientSearch(p,q)&&(billingMode==='concern'||(p.panel&&(!unit||p.unit===unit)&&(!dueOnly||dueState(ledger,p,date()).kind==='due'||ledger.entries.some(e=>e.patientKey===p.key&&e.date===date())))));
   const units=[...roster.units];for(const p of pts)if(!units.some(u=>u.id===p.unit))units.push({id:p.unit,name:p.unit||'OTHER',floor:''});
   $('roster').innerHTML=units.map(u=>{const group=pts.filter(p=>p.unit===u.id).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})||a.name.localeCompare(b.name));if(!group.length)return '';return `<section class="unit"><div class="unit-heading"><span>${esc(u.name)}${u.floor?` · FLOOR ${esc(u.floor)}`:''}</span><span>${group.length}</span></div>${group.map(p=>{const e=ledger.entries.find(e=>e.patientKey===p.key&&e.date===date());const d=dueState(ledger,p,date());return `<button class="patient ${selected===p.key?'selected':''}" data-patient="${esc(p.key)}"><span class="room">${esc(p.room||'—')}</span><span><span class="patient-name">${esc(p.name)}${p.pFlag?'<span class="pflag">P</span>':''}</span><span class="patient-detail">${d.last?`Last billing ${d.last}${billingMode==='routine'?` · ${Math.round((Date.parse(date())-Date.parse(d.last))/86400000)} days ago`:''}`:p.panel?'Starting history not supplied':'Reason required for coverage billing'}</span></span><span class="patient-right">${e?`<span class="pill">${e.items.map(i=>esc(i.code.replace(/^0+/,''))).join(' · ')}</span><span class="patient-detail">${e.batchId?'Handed over':entryIssues(e,ledger,p).length?'Needs information':'Selected'}</span>`:`<span class="pill ${d.kind==='unknown'?'warn':''}">${esc(d.label)}</span>`}</span></button>`;}).join('')}</section>`;}).join('')||'<div class="empty">No patients match these filters.</div>';
   $('roster').querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(saving||checking)return;selected=b.dataset.patient;editingId=null;renderRoster();renderEditor();});updateWriteLock();
@@ -229,7 +230,7 @@ $('import-apply').onclick=async()=>{
   finally{importing=false;$('workspace').inert=false;$('import-file').disabled=false;$('import-close').disabled=false;$('import-apply').disabled=!stagedImport;}
 };
 function switchTab(name){if(name==='routine'){setBillingMode('routine');name='billing';}else if(name==='billing'){setBillingMode('concern');}tab=name;document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==name);document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',name==='billing'?b.dataset.tab===(billingMode==='routine'?'routine':'billing'):b.dataset.tab===name));if(name==='reports')renderReports();if(name==='history')renderHistory();if(name==='settings')renderSettings();}
-function setBillingMode(mode){billingMode=mode;$('panel-filter').value=mode==='routine'?'mine':'all';$('panel-filter').disabled=mode==='routine';$('due-filter').checked=mode==='routine';$('add-other').hidden=mode==='routine';$('mode-title').textContent=mode==='routine'?'Routine Billing':'Concern Billing';$('mode-help').textContent=mode==='routine'?'Your panel · due for 14-day billing review. Select each patient and code; nothing is added automatically. Uncheck Due for review to include patients with unknown history.':'Search any patient · record the concern, billing code and relevant details.';if(mode==='routine'&&selected&&!person(selected)?.panel){selected=null;editingId=null;}renderRoster();renderEditor();}
+function setBillingMode(mode){billingMode=mode;$('billing').dataset.mode=mode;$('panel-filter').value=mode==='routine'?'mine':'all';$('panel-filter').hidden=true;$('unit-filter').hidden=mode==='concern';$('routine-filters').hidden=mode==='concern';$('search-scope').hidden=mode==='routine';$('due-filter').checked=mode==='routine';$('add-patient-section').hidden=mode==='routine';$('mode-title').textContent=mode==='routine'?'Routine Billing':'Concern Billing';$('mode-help').textContent=mode==='routine'?'Your panel · due for 14-day billing review. Select each patient and code; nothing is added automatically. Uncheck Due for review to include patients with unknown history.':'Search any patient · record the concern, billing code and relevant details.';if(mode==='routine'&&selected&&!person(selected)?.panel){selected=null;editingId=null;}renderRoster();renderEditor();}
 $('connect').onclick=()=>{$('connection-error').textContent='';$('connection-dialog').showModal();};
 $('local-option').hidden=!['127.0.0.1','localhost'].includes(location.hostname);
 $('local-connect').onclick=()=>connect('local');$('cloud-connect').onclick=()=>connect('cloud');
@@ -269,8 +270,7 @@ async function syncSession(save=true){
 $('sync').onclick=safe(()=>syncSession(true));
 $('drive-connection').onclick=safe(()=>syncSession(false));
 $('lock').onclick=safe(async()=>{await persistRecovery();if(dirty&&!confirm('Changes remain on this device. Lock anyway? Reconnect on this browser to recover them.'))return;releaseLock?.();releaseLock=null;location.reload();});
-$('add-other').onclick=()=>{resetPatientForm();$('other-dialog').showModal();};
-$('other-form').onsubmit=async ev=>{ev.preventDefault();try{guardWrite();if(ocrBusy||!$('identity-reviewed').checked)throw new Error('Review the name and all 10 PHN digits before confirming.');const p=coveragePatient(Object.fromEntries(new FormData(ev.target)),people(),crypto.randomUUID());const next=clone(ledger);next.nonPanel.push(p);next.patients[p.key]=p;commit(next);$('other-dialog').close();$('search').value='';$('unit-filter').value='';$('panel-filter').value='other';$('due-filter').checked=false;selected=p.key;editingId=null;renderRoster();renderEditor();}catch(e){$('other-error').textContent=e.message;}};
+$('other-form').onsubmit=async ev=>{ev.preventDefault();try{guardWrite();if(ocrBusy)throw new Error('Wait for screenshot reading to finish.');const p=coveragePatient(Object.fromEntries(new FormData(ev.target)),people(),crypto.randomUUID());const next=clone(ledger);next.nonPanel.push(p);next.patients[p.key]=p;commit(next);resetPatientForm();$('search').value='';$('unit-filter').value='';$('panel-filter').value='all';$('due-filter').checked=false;selected=p.key;editingId=null;renderRoster();renderEditor();}catch(e){$('other-error').textContent=e.message;}};
 $('parallel').onchange=safe(()=>{const off=!$('parallel').checked;if(off&&!confirm('End paper-comparison mode? Only do this when you are ready to use digital reports as the single MOA billing source.')){$('parallel').checked=true;return;}const n=clone(ledger);n.settings.parallel=!off;commit(n);document.querySelector('.version').textContent=off?'BILLING WORKSPACE':'PAPER COMPARISON';});
 $('portal-confirm').onclick=safe(()=>{const year=$('portal-year').value;if(!/^20\d{2}$/.test(year))throw new Error('Choose a valid year.');if(!confirm(`Confirm you meet the eligible portal requirements for ${year}?`))return;const n=clone(ledger);n.settings.portalYears=[...new Set([...n.settings.portalYears,year])];commit(n);renderSettings();});
 $('portal-year').onchange=renderSettings;
@@ -324,11 +324,9 @@ function renderChanges(){
 $('local-changes').onclick=()=>{renderChanges();$('changes-dialog').showModal();renderSaveControls();};
 $('changes-save').onclick=safe(()=>syncSession(true));
 function clearScreenshot(){ocrRun++;ocrAbort?.abort();ocrAbort=null;ocrBusy=false;if(imageURL)URL.revokeObjectURL(imageURL);imageURL=null;$('patient-preview').removeAttribute('src');$('patient-preview').hidden=true;}
-function resetPatientForm(){clearScreenshot();$('other-form').reset();$('ocr-status').textContent='Paste only the demographics area for the clearest result. The image stays on this device.';$('other-error').textContent='';setPatientBusy(false);updateWriteLock();}
+function resetPatientForm(){clearScreenshot();$('other-form').reset();$('ocr-status').textContent='Paste just the demographics area. The image stays on this device.';$('other-error').textContent='';setPatientBusy(false);updateWriteLock();}
 function setPatientBusy(busy){ocrBusy=busy;for(const el of $('other-form').querySelectorAll('input,select'))el.disabled=busy;updateWriteLock();}
-$('other-dialog').addEventListener('close',resetPatientForm);
-$('identity-reviewed').onchange=updateWriteLock;
-for(const input of $('other-form').querySelectorAll('[name="name"],[name="phn"]'))input.addEventListener('input',()=>{$('identity-reviewed').checked=false;updateWriteLock();});
+for(const input of $('other-form').querySelectorAll('[name="name"],[name="phn"]'))input.addEventListener('input',()=>updateWriteLock());
 $('clear-screenshot').onclick=resetPatientForm;
 $('paste-patient').addEventListener('paste',async event=>{
   const images=[...(event.clipboardData?.items||[])].filter(i=>i.kind==='file'&&i.type.startsWith('image/'));
@@ -337,7 +335,7 @@ $('paste-patient').addEventListener('paste',async event=>{
   if(ocrBusy)return;
   const blob=images[0].getAsFile();if(!blob)return;
   clearScreenshot();const run=ocrRun;ocrAbort=new AbortController();
-  $('other-form').elements.name.value='';$('other-form').elements.phn.value='';$('identity-reviewed').checked=false;
+  $('other-form').elements.name.value='';$('other-form').elements.phn.value='';
   imageURL=URL.createObjectURL(blob);$('patient-preview').src=imageURL;$('patient-preview').hidden=false;setPatientBusy(true);
   try{
     const {readScreenshot}=await import('./ocr.mjs?v=20261006-modes1');

@@ -18,11 +18,17 @@ export function sessionChanges(base,current){
   return rows.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name));
 }
 export function normalizePHN(value){return String(value||'').replace(/[\s-]/g,'');}
+export function matchesPatientSearch(patient,query){
+  const normalize=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  const words=normalize(query).split(/[\s,]+/).filter(Boolean);
+  const text=normalize(`${patient.name} ${patient.room||''} ${patient.phn||''}`);
+  return words.every(word=>text.includes(word));
+}
 export function coveragePatient(fields,existing,id){
   const name=String(fields.name||'').trim(),phn=normalizePHN(fields.phn);
   if(!name||name.length>120)throw new Error('Enter the patient name.');
   if(!/^\d{10}$/.test(phn))throw new Error('Check the PHN: enter exactly 10 digits. Letters are never converted to numbers.');
-  const key=`phn:${phn}`;if(existing.some(p=>p.key===key))throw new Error('This PHN is already on the list. Cancel and select the existing patient instead.');
+  const key=`phn:${phn}`;if(existing.some(p=>p.key===key))throw new Error('This PHN is already on the list. Search for and select the existing patient above.');
   return {id,key,name,phn,unit:String(fields.unit||''),room:String(fields.room||'').trim(),codes:String(fields.codes||'').trim(),ava:'',panel:false};
 }
 export function extractDemographics(text){

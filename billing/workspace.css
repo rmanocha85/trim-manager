@@ -14,3 +14,24 @@ header{height:64px;min-height:64px}
 .header-actions #saved-time{height:14px;min-height:0;line-height:14px;font-size:11px;white-space:nowrap;text-align:center}
 @media(pointer:coarse){header{height:72px;min-height:72px}.sidebar{top:72px;height:calc(100dvh - 72px)}.header-actions .save-control,.header-actions #lock{height:44px;min-height:44px}.header-actions .session-save{grid-template-rows:44px 14px}}
 @media(max-width:760px){header{height:auto}.sidebar{height:auto;top:auto}.header-actions{flex-basis:100%}}
+
+/* Concern Billing: full-roster search and an always-open, minimal identity form. */
+#billing [hidden]{display:none!important}
+#billing[data-mode=concern] .toolbar{display:block}
+#billing[data-mode=concern] #search{width:100%}
+#billing[data-mode=concern] #roster{max-height:clamp(140px,25vh,260px);overflow:auto}
+#search-scope{font-size:11px;margin:7px 0}
+#add-patient-section{margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+#add-patient-section h2{font-size:15px;margin:0 0 10px}
+#add-patient-section #paste-patient{padding:11px}
+#add-patient-section #paste-patient strong{font-size:13px}
+#add-patient-section #paste-patient span{font-size:11px;margin-top:4px}
+#add-patient-section .hint{font-size:11px;line-height:1.4;margin:6px 0}
+#add-patient-section .patient-inputs{display:grid;grid-template-columns:1.1fr 1fr;gap:10px;border:0;padding:0}
+#add-patient-section .patient-inputs label{margin:6px 0;font-size:12px;min-width:0}
+#add-patient-section .patient-inputs input{width:100%;padding:8px;font-size:13px}
+#add-patient-section .actions{margin:8px 0 0;gap:10px}
+#add-patient-section .actions button{padding:8px 12px;font-size:12px}
+#add-patient-section #other-error:empty{display:none}
+#add-patient-section #patient-preview{max-height:150px}
+@media(max-width:420px){#add-patient-section .patient-inputs{grid-template-columns:1fr}}
