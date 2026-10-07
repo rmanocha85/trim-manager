@@ -57,6 +57,30 @@ export function normalizeManualTime(value){
   const result=`${match[1].padStart(2,'0')}:${match[2]}`;
   return minutes(result)===null?null:result;
 }
+// Defaults apply only to newly selected services, never to imported/saved entries.
+export function roundedPacificTime(now=new Date()){
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Los_Angeles',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(now);
+  const part=k=>Number(parts.find(p=>p.type===k).value);
+  const rounded=(Math.round((part('hour')*60+part('minute')+part('second')/60)/10)*10)%1440;
+  return `${String(Math.floor(rounded/60)).padStart(2,'0')}:${String(rounded%60).padStart(2,'0')}`;
+}
+export function timeDefaults(code,now=new Date()){
+  const info=codeInfo(code);if(!info?.timed&&!info?.attendance)return {};
+  const start=roundedPacificTime(now);
+  return info.timed?{start,end:tenMinutesLater(start),endAuto:true}:{start};
+}
+export function tenMinutesLater(start){
+  const value=minutes(start);if(value===null||value+10>=1440)return '';
+  return `${String(Math.floor((value+10)/60)).padStart(2,'0')}:${String((value+10)%60).padStart(2,'0')}`;
+}
+export function editBillingTime(item,field,value){
+  const changed={...item,[field]:normalizeManualTime(value)||value.trim()};
+  if(field==='end')changed.endAuto=false;
+  if(field==='start'&&(codeInfo(item.code)?.timed||item.customTimed)&&(item.endAuto===true||!item.end)){
+    changed.end=tenMinutesLater(changed.start);changed.endAuto=true;
+  }
+  return changed;
+}
 export const escapeHTML = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function blankLedger(id=crypto.randomUUID()) {return {app:APP,schema:SCHEMA,datasetId:id,revision:0,updatedAt:null,entries:[],baselines:{},nonPanel:[],patients:{},units:[],batches:[],settings:{parallel:true,portalYears:[]}};}
 export function patientKey(p) {const phn=String(p.phn||'').replace(/\D/g,'');return phn?`phn:${phn}`:`roster:${String(p.id)}`;}
@@ -196,7 +220,9 @@ export function entryIssues(entry,ledger,patient) {
       const total=all.filter(e=>e.date.slice(0,4)===entry.date.slice(0,4)&&(info.physicianLimit||e.patientKey===entry.patientKey)).flatMap(e=>e.items).filter(x=>x.code===i.code).reduce((sum,x)=>sum+Number(x.units),0);
       required(total<=info.annual,prefix+`recorded-here annual total ${total} exceeds reference limit ${info.annual}.`);
       const imported=(ledger.historicalBillings||[]).filter(h=>h.date.slice(0,4)===entry.date.slice(0,4)&&(info.physicianLimit||h.patientKey===entry.patientKey)&&h.codes.includes(i.code));
-      required(!imported.length,prefix+'imported billed history contains this code without verified units; reconcile annual usage before handoff.');
+      // 13121 legacy unit reconciliation is intentionally not a handoff blocker.
+      // Keep the recorded-unit limit check and preserve all imported history.
+      if(i.code!=='13121')required(!imported.length,prefix+'imported billed history contains this code without verified units; reconcile annual usage before handoff.');
     }
     if(i.code==='13115') required(!all.some(e=>e.id!==entry.id&&e.patientKey===entry.patientKey&&e.items.some(x=>x.code==='13115'))&&!(ledger.historicalBillings||[]).some(h=>h.patientKey===entry.patientKey&&h.codes.includes('13115')),prefix+'another admission charge is already recorded.');
     if(i.code==='00114') {

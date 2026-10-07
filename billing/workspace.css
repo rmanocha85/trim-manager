@@ -35,3 +35,24 @@ header{height:64px;min-height:64px}
 #add-patient-section #other-error:empty{display:none}
 #add-patient-section #patient-preview{max-height:150px}
 @media(max-width:420px){#add-patient-section .patient-inputs{grid-template-columns:1fr}}
+
+/* Separate charges, with compact in-flow time controls (never a modal). */
+#item-details{display:grid;gap:16px;margin-top:12px}
+#editor .code-details{margin:0;padding:14px;border:1px solid #cdd8cb;border-left:4px solid #709779;border-radius:9px;background:#f8faf6}
+#editor .code-details>h3{color:var(--green);font-size:14px;margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid #dfe6da}
+#editor .code-details .fields{align-items:start}
+.inline-time{min-width:0;flex:1}
+.inline-time>label{margin-bottom:5px}
+.time-input-row{display:flex;gap:4px}
+.time-input-row input{width:100%;min-width:0;font-size:14px}
+.time-input-row .time-expand{flex:0 0 32px;padding:4px;font-size:15px}
+.time-hint{display:block;font-size:10px;margin-top:4px}
+.inline-time-picker{position:static;margin-top:7px;padding:8px;border:1px solid #cdd8cb;border-radius:7px;background:#edf3e9}
+.inline-time-wheels{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.inline-time-wheels label{min-width:0}
+.inline-time-wheels select{height:125px;width:100%;padding:0;overflow-y:auto;scrollbar-width:thin;font-size:14px}
+.inline-time-wheels option{padding:5px 7px;text-align:center}
+.inline-time-picker .time-done{width:100%;padding:4px 8px;margin-top:6px;font-size:11px}
+#editor .code-details .fields:has(.inline-time){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 54px;gap:10px}
+#editor .code-details .fields:has(.inline-time)>label input{width:100%}
+@media(max-width:480px){#editor .code-details{padding:10px}#editor .code-details .fields:has(.inline-time){grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}#editor .code-details .fields:has(.inline-time)>label{grid-column:1/-1;max-width:80px}.time-hint{font-size:9px}}
