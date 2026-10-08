@@ -69,3 +69,14 @@ header{height:64px;min-height:64px}
 #editor .code-details .fields:has(.inline-time){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 54px;gap:10px}
 #editor .code-details .fields:has(.inline-time)>label input{width:100%}
 @media(max-width:480px){#editor .code-details{padding:10px}#editor .code-details .fields:has(.inline-time){grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}#editor .code-details .fields:has(.inline-time)>label{grid-column:1/-1;max-width:80px}.time-hint{font-size:9px}}
+/* Per-code review and cancellation controls remain in each charge's own row. */
+.change-codes{list-style:none;padding:0;margin:6px 0 12px}
+.change-codes li{display:flex;align-items:start;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.change-codes li>div{min-width:0;display:grid;gap:4px}
+.change-codes li span{font-size:13px;overflow-wrap:anywhere}
+.change-codes button{white-space:nowrap;flex-shrink:0}
+.change-row h4{font-size:12px;color:var(--muted);margin:12px 0 4px}
+.code-details>h3{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.code-details>h3 button{font-size:12px;padding:4px 6px;white-space:nowrap}
+.removal-record{background:#fff9e9}.undo-removal{margin-top:12px}
+.inline-time-wheels select{height:96px}

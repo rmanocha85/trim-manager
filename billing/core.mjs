@@ -170,6 +170,33 @@ export function removeEntry(ledger,id) {
   const e=ledger.entries.find(e=>e.id===id);if(!e) throw new Error('Entry not found.');if(e.batchId) throw new Error('Handed-over entries cannot be removed.');
   const l=clone(ledger);l.entries=l.entries.filter(e=>e.id!==id);return l;
 }
+// Preserve a small reversible cancellation record; never alter handed-over history.
+export function cancelBillingCodes(ledger,id,code=null){
+  const before=ledger.entries.find(e=>e.id===id);
+  if(!before)throw new Error('Billing entry no longer exists.');
+  if(before.batchId)throw new Error('Handed-over billing is read-only.');
+  if(code&&!before.items.some(i=>i.code===code))throw new Error('Billing code no longer exists.');
+  let items=code?before.items.filter(i=>i.code!==code):[];
+  if(!items.some(i=>['00114','00127','13115'].includes(i.code)))items=items.filter(i=>i.code!=='13334');
+  const next=clone(ledger),after=items.length?{...clone(before),items:clone(items),updatedAt:new Date().toISOString()}:null;
+  next.entries=next.entries.filter(e=>e.id!==id);if(after)next.entries.push(after);
+  (next.cancellations??=[]).push({id:crypto.randomUUID(),cancelledAt:new Date().toISOString(),before:clone(before),after:clone(after)});
+  return next;
+}
+export function undoBillingCancellation(ledger,id){
+  const record=ledger.cancellations?.find(r=>r.id===id);
+  if(!record||record.undoneAt)throw new Error('This removal has already been undone.');
+  const current=ledger.entries.find(e=>e.id===record.before.id)||null;
+  if(JSON.stringify(current)!==JSON.stringify(record.after))throw new Error('This billing changed after removal. Review it before restoring.');
+  if(ledger.entries.some(e=>e.patientKey===record.before.patientKey&&e.date===record.before.date&&e.id!==record.before.id))throw new Error('Another entry now exists for this patient/date.');
+  const next=clone(ledger);next.entries=next.entries.filter(e=>e.id!==record.before.id);next.entries.push(clone(record.before));
+  next.cancellations.find(r=>r.id===id).undoneAt=new Date().toISOString();validateLedger(next);return next;
+}
+export function inheritConferenceDiagnoses(items,usual=''){
+  const primary=items.find(i=>i.code==='00114');
+  const usualPrimary=String(usual).trim().split(/[,;\s]+/)[0]||'';
+  return items.map(i=>CONFERENCE_CODES.includes(i.code)&&i.diagnosisSource==='primary114'?{...i,diagnosis:primary?primary.diagnosis||usualPrimary:i.diagnosis||usualPrimary}:i);
+}
 // Only interactive new qualifying selections receive an automatic bonus. Imports,
 // historical records and merely opening an existing day are never retrofitted.
 export function upsertInteractiveEntry(ledger,patient,date,items,comment='',id=null){
