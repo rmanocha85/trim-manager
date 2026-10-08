@@ -50,9 +50,17 @@ header{height:64px;min-height:64px}
 .header-actions #saved-time{font-size:9px}
 .report-controls .fields>label{min-width:0}
 @media(max-width:760px){.report-controls .fields{flex-wrap:wrap}.report-controls .fields>label{flex-basis:100%}.change-row>div span{white-space:normal}}
-#item-details{display:grid;gap:16px;margin-top:12px}
-#editor .code-details{margin:0;padding:14px;border:1px solid #cdd8cb;border-left:4px solid #709779;border-radius:9px;background:#f8faf6}
-#editor .code-details>h3{color:var(--green);font-size:14px;margin:0 0 12px;padding-bottom:9px;border-bottom:1px solid #dfe6da}
+#item-details{display:grid;gap:24px;margin-top:12px}
+#editor{background:#ededeb}
+#editor .code-details{margin:0;padding:14px;border:1px solid #bfc4c0;border-radius:9px;background:#f8f8f6;box-shadow:0 2px 4px #24242412;overflow:hidden}
+#editor .code-details>h3{color:#fff;background:var(--green);font-size:14px;margin:-14px -14px 12px;padding:9px 14px;border:0;min-height:42px}
+#editor .code-details>h3 .text-button{color:#fff;border:1px solid #ffffff55;border-radius:5px;background:transparent;padding:4px 7px}
+#editor .code-details>h3 .text-button:hover:not(:disabled){background:#ffffff18}
+#editor .bonus-card>h3{background:#e6e7e5;color:var(--ink)}
+#editor .bonus-card>h3 .text-button{color:var(--red);border-color:#bfc4c0}
+#editor .bonus-card>h3 .text-button:hover:not(:disabled){background:#fff}
+#editor .bonus-banner{display:none}
+#editor .code-details input,#editor .code-details textarea,#editor .code-details select{background:#fff;border-color:#bfc4c0}
 #editor .code-details .fields{align-items:start}
 .inline-time{min-width:0;flex:1}
 .inline-time>label{margin-bottom:5px}
@@ -60,7 +68,7 @@ header{height:64px;min-height:64px}
 .time-input-row input{width:100%;min-width:0;font-size:14px}
 .time-input-row .time-expand{flex:0 0 32px;padding:4px;font-size:15px}
 .time-hint{display:block;font-size:10px;margin-top:4px}
-.inline-time-picker{position:static;margin-top:7px;padding:8px;border:1px solid #cdd8cb;border-radius:7px;background:#edf3e9}
+.inline-time-picker{position:static;margin-top:7px;padding:8px;border:1px solid #d8dad7;border-radius:7px;background:#ededeb}
 .inline-time-wheels{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 .inline-time-wheels label{min-width:0}
 .inline-time-wheels select{height:125px;width:100%;padding:0;overflow-y:auto;scrollbar-width:thin;font-size:14px}
@@ -68,7 +76,7 @@ header{height:64px;min-height:64px}
 .inline-time-picker .time-done{width:100%;padding:4px 8px;margin-top:6px;font-size:11px}
 #editor .code-details .fields:has(.inline-time){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 54px;gap:10px}
 #editor .code-details .fields:has(.inline-time)>label input{width:100%}
-@media(max-width:480px){#editor .code-details{padding:10px}#editor .code-details .fields:has(.inline-time){grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}#editor .code-details .fields:has(.inline-time)>label{grid-column:1/-1;max-width:80px}.time-hint{font-size:9px}}
+@media(max-width:480px){#editor .code-details{padding:10px}#editor .code-details>h3{margin:-10px -10px 12px;padding:9px 10px;flex-wrap:wrap}#editor .code-details .fields:has(.inline-time){grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}#editor .code-details .fields:has(.inline-time)>label{grid-column:1/-1;max-width:80px}.time-hint{font-size:9px}}
 /* Per-code review and cancellation controls remain in each charge's own row. */
 .change-codes{list-style:none;padding:0;margin:6px 0 12px}
 .change-codes li{display:flex;align-items:start;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
