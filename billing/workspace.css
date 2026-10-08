@@ -80,3 +80,11 @@ header{height:64px;min-height:64px}
 .code-details>h3 button{font-size:12px;padding:4px 6px;white-space:nowrap}
 .removal-record{background:#fff9e9}.undo-removal{margin-top:12px}
 .inline-time-wheels select{height:96px}
+/* Direct History actions; current-batch charges stay independently editable. */
+.history-code{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 0;max-width:230px}
+.history-code+.history-code{border-top:1px solid var(--line)}
+.history-code .text-button,.history-actions .text-button{font-size:12px;padding:4px 6px;white-space:nowrap}
+.history-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.history-removals{border-left:3px solid #c29634}
+.history-removals .history-row small{display:block;margin-top:4px}
+#connection-error[data-state=connecting]{color:var(--green)}
