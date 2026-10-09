@@ -50,6 +50,7 @@ header{height:64px;min-height:64px}
 .header-actions #saved-time{font-size:9px}
 .report-controls .fields>label{min-width:0}
 @media(max-width:760px){.report-controls .fields{flex-wrap:wrap}.report-controls .fields>label{flex-basis:100%}.change-row>div span{white-space:normal}}
+.change-row>.merge-versions{display:grid;grid-template-columns:1fr 1fr;gap:18px}.merge-versions section{min-width:0}.merge-versions pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}#merge-list label{display:block;margin-top:10px}#merge-list input{width:auto}#conflict-actions{margin:0 0 12px}#conflict-actions[hidden]{display:none}@media(max-width:600px){.change-row>.merge-versions{grid-template-columns:1fr}}
 #item-details{display:grid;gap:24px;margin-top:12px}
 #editor{background:#ededeb}
 #editor .code-details{margin:0;padding:14px;border:1px solid #bfc4c0;border-radius:9px;background:#f8f8f6;box-shadow:0 2px 4px #24242412;overflow:hidden}

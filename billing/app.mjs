@@ -6,6 +6,7 @@ import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261006-modes1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 import {renderReport} from './reports.mjs?v=20261007-dates1';
 import {sessionChanges,coveragePatient,extractDemographics,matchesPatientSearch} from './workspace.mjs?v=20261007-cancel1';
+import {mergeSession} from './merge.mjs?v=20261008-merge1';
 const $=id=>document.getElementById(id);
 let savedBase=null,billingMode='concern',lastChecked=null,driveReachable=false,localRecoveryFailed=false,ocrBusy=false,ocrRun=0,ocrAbort=null,imageURL=null;
 const localChanges=()=>dirty&&ledger&&savedBase?sessionChanges(savedBase,ledger):[];
@@ -13,6 +14,7 @@ function checkedDrive(){driveReachable=true;lastChecked=new Date();}
 function connectionError(e){driveReachable=e?.status===409;if(driveReachable)lastChecked=new Date();}
 let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,timer,releaseLock,printedSignature=null,recoveryQueue=Promise.resolve(),recoveryPending=0;
 let setupCandidate,connecting=false;
+let mergeChoices={},mergeConflicts=[];
 let stagedImport=null,importing=false,importRead=0;
 let connectionVerified=false,syncFailed=false,checking=false,calendarMonth=today().slice(0,7),saveFocus=null;
 const date=()=>$('service-date').value||today();
@@ -33,7 +35,10 @@ function updateWriteLock(){
   $('calendar').querySelectorAll('button').forEach(el=>el.disabled=busy||el.dataset.future==='true');
   const identityReady=$('other-form').elements.name.value.trim()&&/^\d{10}$/.test($('other-form').elements.phn.value);
   for(const id of ['confirm-patient','baseline-save','portal-confirm','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='confirm-patient'&&(ocrBusy||!identityReady))||(id==='finalize'&&ledger.settings.parallel);
-  $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Billing locked — resolve the saved-data conflict in Settings. Your draft is retained.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Save to Drive / retry to verify Google Drive before making changes.';
+  $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Drive changed on another computer. Save my changes to Drive, or discard local changes below.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Save to Drive / retry to verify Google Drive before making changes.';
+  $('conflict-actions').hidden=!blocked;
+  for(const id of ['conflict-save','conflict-discard','changes-discard','reload-data'])$(id).disabled=busy||!navigator.onLine;
+  if($('merge-dialog').open){$('merge-save').disabled=busy||!navigator.onLine||!mergeConflicts.every(c=>mergeChoices[c.id]?.token===c.token);$('merge-list').querySelectorAll('input').forEach(el=>el.disabled=busy);}
 }
 function renderCalendar(){
   $('calendar-month').textContent=new Intl.DateTimeFormat('en-CA',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(calendarMonth+'-01T12:00:00Z'));
@@ -50,10 +55,11 @@ async function recover(){
   if(saved?.dirty){
     validateLedger(saved.ledger);
     if(sameBillingContent(saved.ledger,ledger)){dirty=false;blocked=false;await persistRecovery();notice('Your previous changes are already saved to Google Drive. Recovery status repaired.');return;}
-    ledger=saved.ledger;dirty=true;
-    if(saved.baseLedger?.datasetId===ledger.datasetId){validateLedger(saved.baseLedger);savedBase=saved.baseLedger;}
-    if(saved.etag!==etag){blocked=true;notice('Recovered an unsynced draft, but saved billing has changed. Your draft is retained. Download it in Settings, then reload saved data and reconcile before saving.');}
+    const loadedBase=clone(ledger);ledger=saved.ledger;dirty=true;
+    if(saved.baseLedger?.datasetId===ledger.datasetId){validateLedger(saved.baseLedger);savedBase=saved.baseLedger;}else savedBase=saved.etag===etag?loadedBase:null;
+    if(saved.etag!==etag){blocked=true;notice('Drive has newer billing. Click Save my changes to Drive to add your local work, or discard local changes.');}
     else notice('Recovered your unfinished session on this device. Choose Save to Drive when ready.');
+    etag=saved.etag; // Keep the revision belonging to this draft's starting copy.
   }
 }
 function persistRecovery(){const snapshot={ledger:clone(ledger),baseLedger:clone(savedBase),etag,dirty,savedAt:new Date().toISOString()};recoveryPending++;
@@ -92,7 +98,7 @@ async function flush(){
     await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;savedBase=clone(saved.ledger);checkedDrive();
     if(seq===currentSeq){ledger=saved.ledger;dirty=false;}else{ledger.revision=saved.ledger.revision;ledger.updatedAt=saved.ledger.updatedAt;ledger.localWriter=saved.ledger.localWriter;}
     syncFailed=false;connectionVerified=true;await persistRecovery();status(dirty?'More changes waiting to save':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);
-  }catch(e){connectionError(e);syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice(e.message+' Your encrypted draft is retained. Use Settings to download it before reloading.');}else{notice(e.message+' Your draft remains on this device. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
+  }catch(e){connectionError(e);syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice('Drive changed during saving. Your work is retained. Click Save my changes to Drive to try again.');}else{notice(e.message+' Your draft remains on this device. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
   finally{saving=false;updateWriteLock();if(!dirty&&!writeUnavailable()){renderCalendar();if(tab==='history')renderHistory();if(saveFocus?.el.isConnected&&!saveFocus.el.disabled&&document.activeElement===document.body){saveFocus.el.focus();if(saveFocus.start!==null)saveFocus.el.setSelectionRange(saveFocus.start,saveFocus.end);}}saveFocus=null;}
 }
 function renderAll(){
@@ -226,19 +232,72 @@ async function verifyConnection(){
 async function syncSession(save=true){
   if(saving||checking)return;checking=true;updateWriteLock();
   try{
-    if(!connectionVerified||syncFailed||blocked)await adapter.connect();
-    if(blocked||syncFailed){
-      const current=await adapter.load();
-      if(!sameBillingContent(ledger,current.ledger)&&(blocked||current.etag!==etag))throw Object.assign(new Error('The browser draft and Google Drive contain different billing information. Both versions are retained; download your draft in Settings for review before reloading.'),{status:409});
-      if(sameBillingContent(ledger,current.ledger)){ledger=current.ledger;savedBase=clone(current.ledger);checkedDrive();etag=current.etag;dirty=false;blocked=false;connectionVerified=true;syncFailed=false;printedSignature=null;await persistRecovery();notice('Your billing already matches Google Drive. The stale conflict has been cleared.');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');return;}
-      blocked=false;syncFailed=false;connectionVerified=true;
+    if(!navigator.onLine)throw new Error('Reconnect to the internet. Your local work is retained.');
+    if(!driveReachable)await adapter.connect();
+    await recoveryQueue;
+    const current=await adapter.load();checkedDrive();
+    if(!dirty||sameBillingContent(ledger,current.ledger)){roster=await adapter.roster();await adoptSaved(current);return;}
+    if(!save){
+      blocked=current.etag!==etag;connectionVerified=!blocked;syncFailed=false;
+      notice(blocked?'Drive has newer billing. Click Save my changes to Drive to add your local work.':'');
+      status(blocked?'Draft conflict — action needed':'Saved on this device — not yet in Drive',true);return;
     }
-    await adapter.verify(etag);checkedDrive();connectionVerified=true;syncFailed=false;checking=false;
-    if(dirty){if(save)await flush();else status('Saved on this device — not yet in Drive',true);if(!dirty)notice('');return;}
-    const [r,s]=await Promise.all([adapter.roster(),adapter.load()]);roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;printedSignature=null;await persistRecovery();notice('');renderAll();status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
+    const merged=mergeSession(savedBase,ledger,current.ledger,mergeChoices);
+    if(merged.conflicts.length){
+      blocked=true;mergeConflicts=merged.conflicts;renderMergeChoices();status('Conflict — save stopped',true);
+      notice('Choose which version to keep for the billing changed on both computers.');return;
+    }
+    // Rebase the local recovery before the one conditional upload. If the upload
+    // fails, retry uses the same changes against the newly loaded Drive version.
+    ledger=merged.ledger;savedBase=clone(current.ledger);etag=current.etag;seq++;
+    dirty=!sameBillingContent(ledger,current.ledger);blocked=false;syncFailed=false;connectionVerified=true;
+    printedSignature=null;mergeChoices={};mergeConflicts=[];await persistRecovery();
+    if($('merge-dialog').open)$('merge-dialog').close();
+    checking=false;
+    if(dirty)await flush();else await adoptSaved(current);
+    if(!dirty)notice('');
+    renderAll();
   }catch(e){connectionError(e);connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);throw e;}
   finally{checking=false;updateWriteLock();}
 }
+async function adoptSaved(s){
+  validateLedger(s.ledger);
+  ledger=s.ledger;savedBase=clone(s.ledger);etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;printedSignature=null;mergeChoices={};mergeConflicts=[];seq++;
+  checkedDrive();await persistRecovery();notice('');renderAll();
+  if($('merge-dialog').open)$('merge-dialog').close();
+  status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
+}
+async function discardLocal(){
+  if(saving||checking)return;
+  if(!confirm('Discard unsaved changes on this computer and load the latest Drive billing? Billing already saved in Drive will not be changed.'))return;
+  checking=true;updateWriteLock();
+  try{
+    if(!navigator.onLine)throw new Error('Reconnect first. Your local changes have not been discarded.');
+    if(!driveReachable)await adapter.connect();
+    await recoveryQueue;
+    const current=await adapter.load();validateLedger(current.ledger);
+    if(current.ledger.datasetId!==ledger.datasetId)throw new Error('Wrong billing file. Your draft has not been discarded.');
+    // Keep a private encrypted safety copy on this device, without downloads.
+    if(dirty)await saveRecovery(`${ledger.datasetId}:discarded`,{ledger:clone(ledger),baseLedger:clone(savedBase),etag,dirty:true,savedAt:new Date().toISOString()});
+    selected=null;editingId=null;await adoptSaved(current);
+    notice('Local changes discarded. Latest Drive billing loaded.');
+  }finally{checking=false;updateWriteLock();}
+}
+function renderMergeChoices(){
+  $('merge-list').innerHTML=mergeConflicts.map((c,n)=>`<article class="change-row"><strong>${esc(c.entry?c.label.replace((c.local||c.drive).date,formatDate((c.local||c.drive).date)):c.label)}</strong>${c.locked?'<p>Already handed over or imported in Drive. Keep the saved record.</p>':''}<div class="merge-versions"><section><h4>Drive version</h4>${mergeDetail(c,c.drive)}</section><section><h4>My local version</h4>${mergeDetail(c,c.local)}</section></div><label><input type="radio" name="merge-${n}" data-merge="${n}" value="drive"> Keep Drive version</label>${c.locked?'':`<label><input type="radio" name="merge-${n}" data-merge="${n}" value="local"> Use my local version</label>`}</article>`).join('');
+  $('merge-save').disabled=true;
+  $('merge-list').querySelectorAll('[data-merge]').forEach(el=>el.onchange=()=>{
+    const c=mergeConflicts[Number(el.dataset.merge)];mergeChoices[c.id]={token:c.token,side:el.value};
+    $('merge-save').disabled=!mergeConflicts.every(c=>mergeChoices[c.id]?.token===c.token);
+  });
+  if($('changes-dialog').open)$('changes-dialog').close();
+  if(!$('merge-dialog').open)$('merge-dialog').showModal();
+}
+function mergeDetail(c,value){return value===undefined?'<p>No entry / removed</p>':c.entry?billingRows(value):'<pre>'+esc(JSON.stringify(value,null,2))+'</pre>';}
+$('merge-save').onclick=safe(()=>syncSession(true));
+$('conflict-save').onclick=safe(()=>syncSession(true));
+$('conflict-discard').onclick=safe(discardLocal);
+$('changes-discard').onclick=safe(discardLocal);
 $('sync').onclick=safe(()=>syncSession(true));
 $('drive-connection').onclick=safe(()=>syncSession(false));
 $('lock').onclick=safe(async()=>{await persistRecovery();if(dirty&&!confirm('Changes remain on this device. Lock anyway? Reconnect on this browser to recover them.'))return;releaseLock?.();releaseLock=null;location.reload();});
@@ -249,7 +308,7 @@ $('portal-year').onchange=renderSettings;
 $('baseline-save').onclick=safe(()=>{const key=$('baseline-patient').value,value=$('baseline-date').value;if(!validDate(value)||value>today())throw new Error('Choose a valid past or current starting billing date.');const n=clone(ledger);n.baselines[key]={date:value,enteredAt:new Date().toISOString()};n.patients[key]=clone(person(key));commit(n);renderSettings();});
 $('baseline-patient').onchange=()=>{$('baseline-date').value=ledger.baselines[$('baseline-patient').value]?.date||'';enhanceDateInputs(document);};
 $('export-data').onclick=()=>download(`PRIVATE_TRIM_Billing_${today()}.json`,ledger);
-$('reload-data').onclick=safe(async()=>{if(saving||checking)throw new Error('Wait for the current save to finish.');if(!confirm('Discard this browser’s unsynced draft and reload the saved file? Download a private backup first if you need to reconcile changes.'))return;clearTimeout(timer);if(dirty)download(`PRIVATE_TRIM_Recovery_Before_Reload_${today()}.json`,ledger);const s=await adapter.load();ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;seq++;await persistRecovery();notice('');renderAll();status('Reloaded saved billing');});
+$('reload-data').onclick=safe(discardLocal);
 $('generate').onclick=safe(async()=>{
   guardWrite();
   await flush();if(dirty||blocked||saving)throw new Error('Save all changes successfully before creating the batch.');
@@ -276,9 +335,9 @@ function renderSaveControls(){
   $('local-changes').textContent=localRecoveryFailed?'! Local save needs attention':recoveryPending?'◌ Saving locally…':dirty?(count?'● Local changes · '+count+' patient'+(count===1?'':'s'):'● Local changes'):'✓ No local changes';
   $('local-changes').title=dirty?'Saved on this device, not in Drive. Click to review changes.':'Everything matches your last Drive save.';
   $('local-changes').disabled=!ledger;
-  $('sync').textContent=saving?'◌ Saving session…':'Save session to Drive';
+  $('sync').textContent=saving?'◌ Saving session…':blocked?'Save my changes to Drive':'Save session to Drive';
   $('sync').dataset.state=saving?'busy':dirty?'pending':'quiet';
-  $('sync').disabled=!dirty||saving||checking||blocked||!connectionVerified||syncFailed||offline;
+  $('sync').disabled=(!dirty&&!blocked)||saving||checking||offline;
   $('saved-time').textContent=dirty?'Not yet saved to Drive':savedBase?.updatedAt?'Saved '+formatTimestamp(savedBase.updatedAt):'No changes to save';
   if($('changes-save'))$('changes-save').disabled=$('sync').disabled;
   if($('changes-dialog').open)renderChanges();
@@ -300,10 +359,11 @@ function renderChanges(){
   const changes=localChanges();
   $('changes-summary').textContent=localRecoveryFailed?'Local recovery failed. Keep this tab open and download a private backup in Settings.':recoveryPending?'Saving the latest changes on this device…':dirty?'Saved on this device, not yet in Drive. Includes earlier sessions and backdated billing. Save before switching computers.':'No local changes waiting for Drive.';
   const removals=(ledger?.cancellations||[]).filter(c=>!c.undoneAt&&!savedBase?.cancellations?.some(b=>b.id===c.id));
-  $('changes-list').innerHTML=changes.map(r=>'<article class="change-row"><div><strong>'+esc(r.name)+'</strong><span>'+esc(formatDate(r.date))+'</span></div><b>'+esc(!r.after&&r.before?'Will be removed from Drive':r.kind)+'</b>'+(r.before?'<h4>Saved in Drive</h4>'+billingRows(r.before):'')+(r.after?'<h4>After this session save</h4>'+billingRows(r.after,!r.after.batchId)+'<button class="text-button danger" data-cancel-entry="'+esc(r.after.id)+'">Remove all billing for this date</button>':'')+(r.detail?'<p>'+esc(r.detail)+'</p>':'')+'</article>').join('')+removals.map(c=>'<article class="change-row removal-record"><strong>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+'</strong><p>'+esc(formatDate(c.before.date))+' · Removed '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</p><button data-undo-cancel="'+esc(c.id)+'" '+(writeUnavailable()||saving?'disabled':'')+'>Undo removal</button></article>').join('')||(dirty?'<p>A recovered session is waiting to save. No patient changes compared with the saved snapshot.</p>':'<p>✓ All changes saved.</p>');
+$('changes-list').innerHTML=changes.map(r=>'<article class="change-row"><div><strong>'+esc(r.name)+'</strong><span>'+esc(formatDate(r.date))+'</span></div><b>'+esc(!r.after&&r.before?'Will be removed from Drive':r.kind)+'</b>'+(r.before?'<h4>Before local changes</h4>'+billingRows(r.before):'')+(r.after?'<h4>After this session save</h4>'+billingRows(r.after,!r.after.batchId)+'<button class="text-button danger" data-cancel-entry="'+esc(r.after.id)+'">Remove all billing for this date</button>':'')+(r.detail?'<p>'+esc(r.detail)+'</p>':'')+'</article>').join('')+removals.map(c=>'<article class="change-row removal-record"><strong>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+'</strong><p>'+esc(formatDate(c.before.date))+' · Removed '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</p><button data-undo-cancel="'+esc(c.id)+'" '+(writeUnavailable()||saving?'disabled':'')+'>Undo removal</button></article>').join('')||(dirty?'<p>A recovered session is waiting to save. No patient changes compared with the saved snapshot.</p>':'<p>✓ All changes saved.</p>');
   $('changes-list').querySelectorAll('[data-cancel-entry]').forEach(b=>{b.disabled=writeUnavailable()||saving||Boolean(ledger.entries.find(e=>e.id===b.dataset.cancelEntry)?.batchId);b.onclick=safe(()=>cancelCode(b.dataset.cancelEntry,b.dataset.cancelCode||null));});
   $('changes-list').querySelectorAll('[data-undo-cancel]').forEach(b=>b.onclick=safe(()=>undoCancellation(b.dataset.undoCancel)));
-  $('changes-conflict').hidden=!blocked;$('changes-conflict').textContent='The saved file changed elsewhere. Nothing will be overwritten. Your local version is retained; use Settings to download it for reconciliation.';
+  $('changes-conflict').hidden=!blocked;$('changes-conflict').textContent='Drive has newer billing. Save my changes to Drive combines your local work with it. Or discard local changes to use Drive only.';
+  $('changes-save').textContent=blocked?'Save my changes to Drive':'Save session to Drive';
 }
 $('local-changes').onclick=()=>{renderChanges();$('changes-dialog').showModal();renderSaveControls();};
 $('changes-save').onclick=safe(()=>syncSession(true));
