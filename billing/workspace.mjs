@@ -1,5 +1,29 @@
 // Pure workspace helpers. No patient data or network access.
-import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261007-cancel1';
+import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261011-review1';
+
+// Display confirmed identity corrections as one history without rewriting records.
+// Names alone never establish identity; different recorded PHNs stay separate.
+export function patientHistoryGroups(ledger,patients){
+  const byKey=new Map(patients.map(p=>[p.key,p])),targets=new Map();
+  for(const [key,baseline] of Object.entries(ledger.baselines||{})){
+    const c=baseline.identityCorrection,previous=c?.previousPatientKey;
+    const old=byKey.get(previous),current=byKey.get(key);
+    if(!c?.confirmedInChat||!old||!current||previous===key||old.phn||c.previousPhn||
+      previous!==`roster:${c.rosterId}`||old.id!==c.rosterId||current.id!==c.rosterId||
+      !/^\d{10}$/.test(c.correctedPhn)||current.phn!==c.correctedPhn||key!==`phn:${c.correctedPhn}`||
+      !old.ava||String(old.ava)!==String(current.ava))continue;
+    if(!targets.has(previous))targets.set(previous,[]);
+    targets.get(previous).push(key);
+  }
+  const aliases=new Map([...targets].filter(([,keys])=>keys.length===1).map(([key,keys])=>[key,keys[0]]));
+  const groups=new Map();
+  for(const patient of patients){
+    const key=aliases.get(patient.key)||patient.key;
+    if(!groups.has(key))groups.set(key,{patient:byKey.get(key),keys:new Set()});
+    groups.get(key).keys.add(patient.key);
+  }
+  return [...groups.values()];
+}
 
 // Count changed charges, not people, timestamps, or cancellation audit records.
 export function changedBillCount(rows){
