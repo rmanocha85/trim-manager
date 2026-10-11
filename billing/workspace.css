@@ -101,3 +101,53 @@ header{height:64px;min-height:64px}
 .history-code-label{display:grid;gap:4px;min-width:0}
 .history-code-label strong{font-weight:600}
 .history-code-time{font-size:12px;font-variant-numeric:tabular-nums;color:var(--muted);white-space:normal}
+
+/* The selected service date is always visible, separate from save timestamps. */
+:root{--billing-header-height:72px}
+header{height:var(--billing-header-height);min-height:var(--billing-header-height);display:flex;align-items:center}
+header .version{display:none}
+#header-billing-date{margin-right:auto;border-left:1px solid #ffffff55;padding-left:16px;display:grid;gap:2px;flex-shrink:0;color:white}
+#header-billing-date small{text-transform:uppercase;letter-spacing:1.3px;font-size:10px;color:#d7e5db}
+#header-date-value{font-size:18px;line-height:1.25;white-space:nowrap}
+.sidebar{top:var(--billing-header-height);height:calc(100dvh - var(--billing-header-height))}
+.editor{top:calc(var(--billing-header-height) + 12px);max-height:calc(100dvh - var(--billing-header-height) - 24px)}
+.editor-date{display:none}
+.view-tabs{display:flex;gap:6px;margin:0 0 12px}
+.view-tabs[hidden],#history-patient-picker[hidden]{display:none}
+.view-tabs button{padding:7px 14px;font-size:13px}
+.view-tabs [aria-pressed=true]{background:var(--green);color:white;border-color:var(--green)}
+#billing[data-mode=routine] .roster-area{height:calc(100dvh - var(--billing-header-height) - 105px);display:flex;flex-direction:column;min-height:300px}
+#billing[data-mode=routine] #roster{max-height:none;flex:1;min-height:0}
+#routine-batch-panel{display:grid;grid-template-columns:minmax(210px,.65fr) minmax(0,1.35fr);gap:14px;align-items:start}
+#routine-batch-panel h2{font-size:18px;margin-bottom:10px}
+.batch-unit,.batch-patient{display:flex;flex-direction:row;align-items:start;gap:10px;padding:12px;border:1px solid var(--line);border-radius:7px;margin:8px 0;background:var(--paper);cursor:pointer}
+.batch-unit:has(input:checked),.batch-patient:has(input:checked){border-color:#97b29f;background:#f5f8f4}
+.batch-unit input,.batch-patient input{width:17px;height:17px;min-height:0;margin:3px 0;flex-shrink:0;accent-color:var(--green)}
+.batch-unit span,.batch-patient span{display:grid;gap:5px;min-width:0}
+.batch-unit small,.batch-patient small{font-size:12px;color:var(--muted)}
+.batch-patient-list{max-height:48vh;overflow:auto}
+.batch-needs-review{padding:12px;background:#fff6df;border-radius:7px;margin:12px 0}
+.batch-needs-review p{font-size:13px;margin:5px 0}
+.batch-build-actions{border-top:1px solid var(--line);padding-top:14px;margin-top:12px}
+.batch-build-actions button{width:100%}
+#routine-result{margin-top:12px;font-size:13px}
+#routine-result button{margin-top:8px}
+.history-table-wrap{overflow-x:auto}
+.history-code{max-width:none;min-width:190px;padding:12px 0;gap:16px}
+.history-code-label{gap:5px;overflow-wrap:anywhere}
+.history-code-label small{font-size:12px;color:var(--muted)}
+.history-reason,.history-comment{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.history-patient-link{padding:0;text-align:left;text-decoration:underline;text-underline-offset:3px}
+#history-patient-picker{margin-bottom:15px}
+#history-patient-picker>label{max-width:480px}
+#history-patient-results{display:flex;flex-wrap:wrap;gap:7px;max-height:190px;overflow:auto;margin:10px 0}
+#history-patient-results button{display:grid;gap:5px;text-align:left;padding:9px 12px;font-size:13px}
+#history-patient-results button small{font-size:11px;color:var(--muted)}
+#history-patient-results [aria-pressed=true]{border-color:var(--green);background:var(--pale)}
+#history-patient-summary:empty{display:none}
+#history-patient-summary{padding:12px 0}
+#history-patient-summary h2{font-size:21px;margin-bottom:6px}
+@media(max-width:1150px) and (min-width:761px){:root{--billing-header-height:112px}header{flex-wrap:wrap}header .brand strong{display:block}#header-billing-date{margin-right:0}.header-actions{margin-left:auto}.header-actions .save-control,.header-actions .session-save{width:174px;min-width:174px;flex-basis:174px}}
+@media(pointer:coarse) and (max-width:1150px) and (min-width:761px){:root{--billing-header-height:128px}}
+@media(max-width:1150px){.mode-heading span{display:none}}
+@media(max-width:760px){header{height:auto;gap:10px}#header-billing-date{padding-left:10px}#header-date-value{font-size:16px}.sidebar{height:auto;top:auto}.editor{max-height:none}#billing[data-mode=routine] .roster-area{height:auto;min-height:0}#billing[data-mode=routine] #roster{flex:none;max-height:none}#routine-batch-panel{grid-template-columns:1fr}.header-actions .save-control,.header-actions .session-save{min-width:0;width:calc((100vw - 40px)/3);flex-basis:calc((100vw - 40px)/3)}.header-actions #saved-time{white-space:normal;height:auto;font-size:9px}.header-actions #lock{margin-left:auto}#history .card{padding:12px}.history-table{min-width:660px}.batch-patient-list{max-height:none}}

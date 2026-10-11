@@ -1,4 +1,44 @@
 // Pure workspace helpers. No patient data or network access.
+import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261007-cancel1';
+
+// Count changed charges, not people, timestamps, or cancellation audit records.
+export function changedBillCount(rows){
+  return rows.reduce((count,r)=>{
+    if(!r.before&&!r.after)return count;
+    const before=new Map((r.before?.items||[]).map(i=>[i.code,i])),after=new Map((r.after?.items||[]).map(i=>[i.code,i]));
+    return count+[...new Set([...before.keys(),...after.keys()])].filter(code=>stable(before.get(code))!==stable(after.get(code))||r.before?.comment!==r.after?.comment).length;
+  },0);
+}
+export function routineCandidates(ledger,patients,date){
+  return patients.filter(p=>p.panel).map(patient=>{
+    const state=dueState(ledger,patient,date),diagnoses=String(patient.codes||'').trim().split(/[,;\s]+/).filter(Boolean);
+    const already=[...ledger.entries,...(ledger.historicalBillings||[])].some(e=>e.patientKey===patient.key&&e.date===date);
+    const problem=state.kind==='unknown'?'Starting billing history unknown':!diagnoses.length?'Usual ICD-9 missing':!diagnoses.every(validDiagnosis)?'Usual ICD-9 needs review':'';
+    return {patient,last:state.last,diagnosis:diagnoses[0]||'',usualCodes:diagnoses.join(', '),status:already?'billed':problem?'review':state.kind==='due'?'due':'later',reason:already?'Already billed on this date':problem||state.label};
+  });
+}
+export function addRoutineBatch(ledger,patients,date,keys){
+  if(!validDate(date)||date>today())throw new Error('Choose today or an earlier billing date.');
+  const selected=new Set(keys);if(!selected.size)throw new Error('Select patients you saw.');
+  const candidates=routineCandidates(ledger,patients,date),chosen=[...selected].map(key=>candidates.find(c=>c.patient.key===key));
+  if(chosen.some(c=>!c||c.status!=='due'))throw new Error('The selection changed or includes a patient who is not eligible. Review the list again.');
+  let next=clone(ledger);const entries=[];
+  for(const c of chosen){
+    next=upsertInteractiveEntry(next,c.patient,date,[{code:'00114',units:1,diagnosis:c.diagnosis,diagnosisMode:'per-charge'}]);
+    const entry=next.entries.find(e=>e.patientKey===c.patient.key&&e.date===date);
+    const issues=entryIssues(entry,next,c.patient);if(issues.length)throw new Error(issues.join(' '));
+    entries.push(clone(entry));
+  }
+  validateLedger(next);return {ledger:next,receipt:{date,entries}};
+}
+export function undoRoutineBatch(ledger,receipt){
+  if(!receipt?.entries?.length)throw new Error('No new routine batch to undo.');
+  for(const original of receipt.entries){
+    const current=ledger.entries.find(e=>e.id===original.id);
+    if(current&&(current.batchId||stable(current)!==stable(original)))throw new Error('A batch entry has since been edited. Remove its codes individually in History.');
+  }
+  const ids=new Set(receipt.entries.map(e=>e.id)),next=clone(ledger);next.entries=next.entries.filter(e=>!ids.has(e.id));validateLedger(next);return next;
+}
 export function newestBillingFirst(entries){
   const entered=e=>{const time=Date.parse(e.createdAt);return Number.isFinite(time)?time:0;};
   // Entry creation, not service date or last edit. Legacy records without a
@@ -18,7 +58,8 @@ export function sessionChanges(base,current){
   const newPeople=new Map((current.nonPanel||[]).map(p=>[p.key,p]));
   for(const key of new Set([...oldPeople.keys(),...newPeople.keys()]))if(stable(oldPeople.get(key))!==stable(newPeople.get(key)))rows.push({kind:!oldPeople.has(key)?'Added patient':!newPeople.has(key)?'Removed patient':'Updated patient',patientKey:key,name:(newPeople.get(key)||oldPeople.get(key)).name,date:'',detail:'Coverage list only; original roster unchanged.'});
   for(const key of new Set([...Object.keys(base.baselines),...Object.keys(current.baselines)]))if(stable(base.baselines[key])!==stable(current.baselines[key]))rows.push({kind:'Starting date',patientKey:key,name:current.patients[key]?.name||base.patients[key]?.name||'Patient',date:current.baselines[key]?.date||base.baselines[key]?.date,detail:current.baselines[key]?'Updated starting billing date.':'Removed starting billing date.'});
-  for(const [field,label] of [['cancellations','Billing removals'],['settings','Settings'],['batches','Batch handoff'],['historicalBillings','Billing history'],['imports','Reviewed import'],['reviewResolutions','Clarification'],['units','Location reference']])if(stable(base[field])!==stable(current[field]))rows.push({kind:label,name:'Workspace',date:'',detail:'Included in the next session save.'});
+  // Cancellations are already represented by patient/code changes and Undo rows.
+  for(const [field,label] of [['settings','Settings'],['batches','Batch handoff'],['historicalBillings','Billing history'],['imports','Reviewed import'],['reviewResolutions','Clarification'],['units','Location reference']])if(stable(base[field])!==stable(current[field]))rows.push({kind:label,name:label,date:'',detail:`${label} updated on this device; will be saved with the session.`});
   // Include identity updates not already represented by another change.
   for(const key of new Set([...Object.keys(base.patients),...Object.keys(current.patients)]))if(stable(base.patients[key])!==stable(current.patients[key])&&!rows.some(r=>r.patientKey===key))rows.push({kind:'Patient details',patientKey:key,name:current.patients[key]?.name||base.patients[key]?.name||'Patient',date:'',detail:'Saved patient details changed.'});
   return rows.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name));

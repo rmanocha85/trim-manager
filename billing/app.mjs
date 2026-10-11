@@ -5,9 +5,15 @@ import {timeField,bindTimeFields} from './time-entry.mjs?v=20261007-cancel1';
 import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261006-modes1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 import {renderReport} from './reports.mjs?v=20261007-dates1';
-import {sessionChanges,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst} from './workspace.mjs?v=20261008-history1';
+import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst} from './workspace.mjs?v=20261011-batch1';
 import {mergeSession} from './merge.mjs?v=20261008-merge1';
 const $=id=>document.getElementById(id);
+const headerDate=document.createElement('div');headerDate.id='header-billing-date';headerDate.setAttribute('aria-live','polite');headerDate.innerHTML='<small>Billing for</small><strong id="header-date-value"></strong>';document.querySelector('header .brand').after(headerDate);
+const routineViews=document.createElement('div');routineViews.id='routine-views';routineViews.className='view-tabs';routineViews.hidden=true;routineViews.innerHTML='<button id="routine-individual" aria-pressed="true">Individual</button><button id="routine-batch" aria-pressed="false">Batch by unit/floor</button>';$('billing-lock').after(routineViews);
+const routinePanel=document.createElement('section');routinePanel.id='routine-batch-panel';routinePanel.hidden=true;routinePanel.innerHTML='<div class="card"><h2>Choose units / floors</h2><p class="hint">Active TRIM Manager patients only. Counts use the selected billing date.</p><div id="routine-units"></div></div><div class="card"><h2>Review patients you saw</h2><div id="routine-review"></div><div class="batch-build-actions"><button id="routine-add" class="primary" disabled>Add 114 for 0 patients</button><p class="hint">Adds to local changes only. Save the session to Drive when finished.</p></div><div id="routine-result" role="status"></div></div>';$('billing').append(routinePanel);
+const historyViews=document.createElement('div');historyViews.className='view-tabs';historyViews.innerHTML='<button id="history-by-date" aria-pressed="true">By date</button><button id="history-by-patient" aria-pressed="false">By patient</button>';$('history-content').before(historyViews);
+const historySearch=document.createElement('section');historySearch.id='history-patient-picker';historySearch.hidden=true;historySearch.innerHTML='<label>Find a patient<input id="history-search" type="search" placeholder="Search name or PHN" autocomplete="off"></label><div id="history-patient-results"></div><div id="history-patient-summary"></div>';$('history-content').before(historySearch);
+let routineView='individual',routineUnits=new Set(),routineExcluded=new Set(),routineReceipt=null,historyView='date',historyPatient=null;
 let savedBase=null,billingMode='concern',lastChecked=null,driveReachable=false,localRecoveryFailed=false,ocrBusy=false,ocrRun=0,ocrAbort=null,imageURL=null;
 const localChanges=()=>dirty&&ledger&&savedBase?sessionChanges(savedBase,ledger):[];
 function checkedDrive(){driveReachable=true;lastChecked=new Date();}
@@ -31,6 +37,8 @@ function updateWriteLock(){
   const e=selected?currentEntry():null,historical=selected&&(ledger.historicalBillings||[]).some(h=>h.patientKey===selected&&h.date===date());
   $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset],[data-time-open]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON');});
   $('history-content').querySelectorAll('[data-history-remove],[data-history-undo]').forEach(el=>el.disabled=unavailable||busy);
+  $('routine-batch-panel').querySelectorAll('input,button').forEach(el=>el.disabled=unavailable||busy);
+  $('routine-add').disabled=unavailable||busy||!selectedRoutineCandidates().length;
   $('roster').querySelectorAll('[data-patient]').forEach(el=>el.disabled=busy);
   $('calendar').querySelectorAll('button').forEach(el=>el.disabled=busy||el.dataset.future==='true');
   const identityReady=$('other-form').elements.name.value.trim()&&/^\d{10}$/.test($('other-form').elements.phn.value);
@@ -45,9 +53,10 @@ function renderCalendar(){
   const billedDays=new Set(ledger?.entries.map(e=>e.date)||[]);
   $('calendar-days').innerHTML=calendarDays(calendarMonth).map(d=>d?`<button data-day="${d}" data-future="${d>today()}" ${d>today()?'disabled':''} aria-label="${esc(new Intl.DateTimeFormat('en-CA',{dateStyle:'full',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z')))}${billedDays.has(d)?', billing recorded':''}" aria-pressed="${d===date()}" ${d===today()?'aria-current="date"':''} class="${billedDays.has(d)?'has-billing':''}">${Number(d.slice(-2))}</button>`:'<span></span>').join('');
   $('selected-date-label').textContent=formatDate(date());
+  $('header-date-value').textContent=formatDate(date());
   $('calendar-days').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>selectDate(b.dataset.day));updateWriteLock();
 }
-function selectDate(value){if(saving||checking)return notice('Wait for this save before changing the billing date.');if(!validDate(value)||value>today())return notice('Choose today or an earlier service date.');$('service-date').value=value;calendarMonth=value.slice(0,7);editingId=null;renderCalendar();renderStats();renderRoster();renderEditor();}
+function selectDate(value){if(saving||checking)return notice('Wait for this save before changing the billing date.');if(!validDate(value)||value>today())return notice('Choose today or an earlier service date.');$('service-date').value=value;calendarMonth=value.slice(0,7);editingId=null;routineExcluded.clear();renderCalendar();renderStats();renderRoster();renderEditor();renderRoutineBatch();}
 function download(name,value){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 async function takeTabLock(id){if(!navigator.locks)throw new Error('This browser cannot protect against competing tabs. Use an up-to-date Chrome browser.');return new Promise((resolve,reject)=>navigator.locks.request(`trim-billing:${id}`,{ifAvailable:true},async lock=>{if(!lock)return reject(new Error('This billing file is already open for editing in another tab. Close or lock that tab first.'));resolve();await new Promise(r=>releaseLock=r);}));}
 async function recover(){
@@ -103,7 +112,7 @@ async function flush(){
 }
 function renderAll(){
   $('unit-filter').innerHTML='<option value="">All units</option>'+roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
-  renderStats();renderRoster();renderEditor();renderReports();renderHistory();renderSettings();renderCalendar();updateWriteLock();
+  renderStats();renderRoster();renderEditor();renderReports();renderHistory();renderSettings();renderCalendar();renderRoutineBatch();updateWriteLock();
 }
 function renderStats(){const pts=people(),own=pts.filter(p=>p.panel),day=ledger.entries.filter(e=>e.date===date());const missing=day.filter(e=>entryIssues(e,ledger,person(e.patientKey)).length);$('stats').innerHTML=[['My panel',own.length,'No patient limit'],['Selected this date',day.length,'Patients with billing'],['Needs information',missing.length,'Saved, incomplete'],['Due for review',own.filter(p=>dueState(ledger,p,date()).kind==='due').length,`${own.filter(p=>dueState(ledger,p,date()).kind==='unknown').length} with unknown history`]].map(([label,n,sub])=>`<div class="stat"><span>${label}</span><b>${n}</b><small>${sub}</small></div>`).join('');$('day-summary').textContent=`${formatDate(date())} · ${day.length} patients billed${missing.length?` · ${missing.length} need information`:''}`;}
 function renderRoster(){
@@ -158,14 +167,61 @@ function issuesFor(entries){return entries.flatMap(e=>entryIssues(e,ledger,perso
 function signature(){return JSON.stringify({entries:chosen(),layout:$('report-layout').value,revision:ledger.revision,parallel:ledger.settings.parallel});}
 function renderReports(){const entries=chosen(),issues=issuesFor(entries);$('batch-summary').innerHTML=`<p><strong>${entries.length}</strong> patient-date entries · <strong>${new Set(entries.map(e=>e.date)).size}</strong> dates · <strong>${new Set(entries.map(e=>e.patientKey)).size}</strong> patients</p>`;$('batch-issues').innerHTML=issues.length?`<div class="card"><h2>${issues.length} items need attention</h2>${issues.map(x=>`<div class="history-row"><span>${esc(x.text)}</span><button data-fix="${x.id}">Review</button></div>`).join('')}</div>`:'';$('batch-issues').querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>openEntry(b.dataset.fix));$('finalize').disabled=ledger.settings.parallel;}
 function sourceLabel(sources){return (sources||[]).map(s=>`${esc(s.file||'Source scan')} · page ${esc(s.page)}`).join('; ');}
+function historyPatientLink(key,fallback='Patient'){
+  return '<button class="text-button history-patient-link" data-history-patient="'+esc(key)+'">'+esc(person(key)?.name||ledger.patients[key]?.name||fallback)+'</button>';
+}
+function historyCodeHTML(i,e,imported=false){
+  // Show stored per-charge values. A legacy usual-code fallback is labelled,
+  // not presented as an explicitly recorded diagnosis.
+  const usual=ledger.patients[e.patientKey]?.codes||'';
+  const primary=i.code==='13334'?e.items?.find(x=>['00114','00127','13115'].includes(x.code))?.diagnosis:'';
+  const diagnosis=i.diagnosis||primary||(!imported?usual:'');
+  return '<div class="history-code"><span class="history-code-label"><strong>'+esc(i.code.replace(/^0+/,''))+(i.units>1?' × '+esc(i.units):'')+'</strong>'+
+    (i.reason?'<span class="history-reason">'+esc(i.reason)+'</span>':'')+
+    (diagnosis?'<small>ICD-9: '+esc(diagnosis)+(!i.diagnosis&&!primary?' · usual reference':'')+'</small>':'<small>ICD-9 not recorded</small>')+
+    (i.start||i.end||codeInfo(i.code)?.timed||i.customTimed?'<small class="history-code-time">'+(i.start||i.end?'Start '+esc(i.start||'not recorded')+' · End '+esc(i.end||'not recorded'):'Time not recorded')+'</small>':'')+
+    '</span>'+(!imported&&!e.batchId?'<button class="text-button danger" data-history-remove="'+esc(e.id)+'" data-history-code="'+esc(i.code)+'">Remove ×</button>':'')+'</div>';
+}
+function historyTable(records){
+  return '<div class="history-table-wrap"><table class="history-table"><thead><tr><th>Date</th><th>Patient</th><th>Billing details</th><th>Status</th><th></th></tr></thead><tbody>'+
+    records.map(({e,imported})=>'<tr><td>'+esc(formatDate(e.date))+'</td><td>'+historyPatientLink(e.patientKey,e.name)+'</td><td>'+
+      (imported?(e.codes||[]).map(code=>historyCodeHTML(e.items?.find(i=>i.code===code)||{code,diagnosis:e.diagnosis||e.icd9||''},e,true)).join(''):e.items.map(i=>historyCodeHTML(i,e)).join(''))+
+      (imported&&e.reason?'<p class="history-comment">'+esc(e.reason)+'</p>':'')+
+      (e.comment?'<p class="history-comment">Comment: '+esc(e.comment)+'</p>':'')+
+      '</td><td>'+(imported?'Already billed · imported':e.batchId?'Given to Suzy':'Current batch')+'</td><td>'+
+      (imported?'<small>'+sourceLabel(e.sources)+'</small>':'<div class="history-actions"><button data-history="'+esc(e.id)+'">'+(e.batchId?'View':'View / edit')+'</button>'+(!e.batchId?'<button class="text-button danger" data-history-remove="'+esc(e.id)+'">Remove all</button>':'')+'</div>')+
+      '</td></tr>').join('')+'</tbody></table></div>'+(records.length?'':'<div class="empty">No recorded billing.</div>');
+}
+function showPatientHistory(key){
+  historyPatient=key;historyView='patient';$('history-search').value=person(key)?.name||ledger.patients[key]?.name||'';switchTab('history');
+}
 function renderHistory(){
-  const entries=newestBillingFirst(ledger.entries),historical=[...(ledger.historicalBillings||[])].sort((a,b)=>b.date.localeCompare(a.date)),held=heldImports(ledger);
-  $('history-content').innerHTML=`<div class="card"><h2>Billing records</h2><table class="history-table"><thead><tr><th>Date</th><th>Patient</th><th>Codes</th><th>Status</th><th></th></tr></thead><tbody>${entries.map(e=>`<tr><td>${esc(formatDate(e.date))}</td><td>${esc(person(e.patientKey)?.name)}</td><td>${e.items.map(i=>`<div class="history-code"><span class="history-code-label"><strong>${esc(i.code.replace(/^0+/,''))}</strong>${i.start||i.end||codeInfo(i.code)?.timed||i.customTimed?`<small class="history-code-time">${i.start||i.end?`Start ${esc(i.start||'not recorded')} · End ${esc(i.end||'not recorded')}`:'Time not recorded'}</small>`:''}</span>${!e.batchId?`<button class="text-button danger" data-history-remove="${esc(e.id)}" data-history-code="${esc(i.code)}" ${writeUnavailable()||saving?'disabled':''}>Remove ×</button>`:''}</div>`).join('')}</td><td>${e.batchId?'Given to Suzy':'Current batch'}</td><td><div class="history-actions"><button data-history="${esc(e.id)}">${e.batchId?'View':'View / edit'}</button>${!e.batchId?`<button class="text-button danger" data-history-remove="${esc(e.id)}" ${writeUnavailable()||saving?'disabled':''}>Remove all</button>`:''}</div></td></tr>`).join('')}</tbody></table>${entries.length?'':'<div class="empty">No billing entries.</div>'}</div><div class="card"><h2>Already billed · ${historical.length} imported records</h2><p>Read-only. These records are never included in a new billing batch. Historical timed-code units were not inferred.</p><table class="history-table"><thead><tr><th>Date</th><th>Patient</th><th>Codes / reason</th><th>Source</th></tr></thead><tbody>${historical.map(h=>`<tr><td>${esc(formatDate(h.date))}</td><td>${esc(person(h.patientKey)?.name||h.name)}</td><td>${h.codes.map(esc).join(' · ')}<br>${esc(h.reason||'')}</td><td>${sourceLabel(h.sources)}</td></tr>`).join('')}</tbody></table></div><div class="card"><h2>Held for clarification · ${held.length}</h2><p>Not charges. Not included in reports or next-billing calculations.</p>${held.map(h=>`<div class="history-row"><span>${esc(formatDate(h.date))} · ${esc(h.name)}<br>${esc(h.reason)}<br><small>${sourceLabel([h.source])}</small></span></div>`).join('')}</div>${ledger.batches.map(b=>`<div class="card"><h3>${esc(formatDate(b.from))} → ${esc(formatDate(b.to))}</h3><p>${b.entryIds.length} entries · handed over ${esc(formatTimestamp(b.handedOverAt))}</p></div>`).join('')}`;
-  const recent=(ledger.cancellations||[]).filter(c=>!c.undoneAt&&!savedBase?.cancellations?.some(b=>b.id===c.id));
-  if(recent.length)$('history-content').insertAdjacentHTML('afterbegin','<section class="card history-removals"><h3>Removals waiting to save</h3><p>These changes are on this device until you save the session to Drive.</p>'+recent.map(c=>'<div class="history-row"><span>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+' · '+esc(formatDate(c.before.date))+'<small>Removed: '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</small></span><button data-history-undo="'+esc(c.id)+'" '+(writeUnavailable()||saving?'disabled':'')+'>Undo removal</button></div>').join('')+'</section>');
+  const patientMode=historyView==='patient';
+  $('history-by-date').setAttribute('aria-pressed',String(!patientMode));$('history-by-patient').setAttribute('aria-pressed',String(patientMode));
+  $('history-patient-picker').hidden=!patientMode;
+  const pts=people().filter(p=>matchesPatientSearch(p,$('history-search').value)).sort((a,b)=>a.name.localeCompare(b.name));
+  $('history-patient-results').innerHTML=pts.map(p=>'<button data-history-patient="'+esc(p.key)+'" aria-pressed="'+(historyPatient===p.key)+'"><strong>'+esc(p.name)+'</strong><small>PHN '+esc(p.phn||'not recorded')+'</small></button>').join('')||'<p>No matching patients.</p>';
+  const p=person(historyPatient),last=historyPatient?lastBilling(ledger,historyPatient):null;
+  $('history-patient-summary').innerHTML=patientMode&&p?'<h2>'+esc(p.name)+'</h2><p>Last recorded billing: <strong>'+esc(last?formatDate(last):'Unknown')+'</strong></p>'+
+    (ledger.baselines[p.key]?'<p class="hint">Starting date: '+esc(formatDate(ledger.baselines[p.key].date))+' (no charge details recorded for this starting date).</p>':''):'';
+  const matches=e=>!patientMode||e.patientKey===historyPatient;
+  const entries=newestBillingFirst(ledger.entries).filter(matches),historical=[...(ledger.historicalBillings||[])].filter(matches).sort((a,b)=>b.date.localeCompare(a.date));
+  const currentRows=entries.map(e=>({e,imported:false})),oldRows=historical.map(e=>({e,imported:true}));
+  if(patientMode){
+    $('history-content').innerHTML=historyPatient?'<div class="card"><h2>Patient billing history</h2>'+historyTable([...currentRows,...oldRows].sort((a,b)=>b.e.date.localeCompare(a.e.date)||String(b.e.createdAt||'').localeCompare(String(a.e.createdAt||''))))+'</div>':'<div class="card empty">Select a patient to see their previous billings.</div>';
+  }else{
+    const held=heldImports(ledger);
+    $('history-content').innerHTML='<div class="card"><h2>Billing records</h2><p class="hint">Most recently added first.</p>'+historyTable(currentRows)+'</div><div class="card"><h2>Already billed · '+historical.length+' imported records</h2><p>Read-only. Missing historical details are not inferred.</p>'+historyTable(oldRows)+'</div>'+
+      '<div class="card"><h2>Held for clarification · '+held.length+'</h2><p>Not charges. Not included in reports or next-billing calculations.</p>'+held.map(h=>'<div class="history-row"><span>'+esc(formatDate(h.date))+' · '+esc(h.name)+'<br>'+esc(h.reason)+'<br><small>'+sourceLabel([h.source])+'</small></span></div>').join('')+'</div>'+
+      ledger.batches.map(b=>'<div class="card"><h3>'+esc(formatDate(b.from))+' → '+esc(formatDate(b.to))+'</h3><p>'+b.entryIds.length+' entries · handed over '+esc(formatTimestamp(b.handedOverAt))+'</p></div>').join('');
+  }
+  const recent=(ledger.cancellations||[]).filter(c=>!c.undoneAt&&!savedBase?.cancellations?.some(b=>b.id===c.id)&&matches(c.before));
+  if(recent.length)$('history-content').insertAdjacentHTML('afterbegin','<section class="card history-removals"><h3>Removals waiting to save</h3><p>These changes are on this device until you save the session to Drive.</p>'+recent.map(c=>'<div class="history-row"><span>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+' · '+esc(formatDate(c.before.date))+'<small>Removed: '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</small></span><button data-history-undo="'+esc(c.id)+'">Undo removal</button></div>').join('')+'</section>');
+  $('history').querySelectorAll('[data-history-patient]').forEach(b=>b.onclick=()=>showPatientHistory(b.dataset.historyPatient));
   $('history-content').querySelectorAll('[data-history-remove]').forEach(b=>b.onclick=safe(()=>cancelCode(b.dataset.historyRemove,b.dataset.historyCode||null)));
   $('history-content').querySelectorAll('[data-history-undo]').forEach(b=>b.onclick=safe(()=>undoCancellation(b.dataset.historyUndo)));
   $('history-content').querySelectorAll('[data-history]').forEach(b=>b.onclick=()=>openEntry(b.dataset.history));
+  updateWriteLock();
 }
 function renderSettings(){
   const previousPatient=$('baseline-patient').value;
@@ -208,7 +264,42 @@ $('import-apply').onclick=async()=>{
   finally{importing=false;$('workspace').inert=false;$('import-file').disabled=false;$('import-close').disabled=false;$('import-apply').disabled=!stagedImport;}
 };
 function switchTab(name){if(name==='routine'){setBillingMode('routine');name='billing';}else if(name==='billing'){setBillingMode('concern');}tab=name;document.querySelectorAll('.tab').forEach(s=>s.hidden=s.id!==name);document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('active',name==='billing'?b.dataset.tab===(billingMode==='routine'?'routine':'billing'):b.dataset.tab===name));if(name==='reports')renderReports();if(name==='history')renderHistory();if(name==='settings')renderSettings();}
-function setBillingMode(mode){billingMode=mode;$('billing').dataset.mode=mode;$('panel-filter').value=mode==='routine'?'mine':'all';$('panel-filter').hidden=true;$('unit-filter').hidden=mode==='concern';$('routine-filters').hidden=mode==='concern';$('search-scope').hidden=mode==='routine';$('due-filter').checked=mode==='routine';$('add-patient-section').hidden=mode==='routine';$('mode-title').textContent=mode==='routine'?'Routine Billing':'Concern Billing';$('mode-help').textContent=mode==='routine'?'Your panel · due for 14-day billing review. Select each patient and code; nothing is added automatically. Uncheck Due for review to include patients with unknown history.':'Search any patient · record the concern, billing code and relevant details.';if(mode==='routine'&&selected&&!person(selected)?.panel){selected=null;editingId=null;}renderRoster();renderEditor();}
+function setBillingMode(mode){billingMode=mode;$('billing').dataset.mode=mode;$('panel-filter').value=mode==='routine'?'mine':'all';$('panel-filter').hidden=true;$('unit-filter').hidden=mode==='concern';$('routine-filters').hidden=mode==='concern';$('search-scope').hidden=mode==='routine';$('due-filter').checked=mode==='routine';$('add-patient-section').hidden=mode==='routine';$('mode-title').textContent=mode==='routine'?'Routine Billing':'Concern Billing';$('mode-help').textContent=mode==='routine'?'Your panel · due for 14-day billing review. Choose individual or batch billing.':'Search any patient · record the concern, billing code and relevant details.';if(mode==='routine'&&selected&&!person(selected)?.panel){selected=null;editingId=null;}renderRoster();renderEditor();renderRoutineBatch();}
+function selectedRoutineCandidates(){
+  return ledger&&roster?routineCandidates(ledger,people(),date()).filter(c=>c.status==='due'&&routineUnits.has(c.patient.unit)&&!routineExcluded.has(c.patient.key)):[];
+}
+function renderRoutineBatch(){
+  const batch=billingMode==='routine'&&routineView==='batch';
+  $('routine-views').hidden=billingMode!=='routine';$('routine-individual').setAttribute('aria-pressed',String(routineView==='individual'));$('routine-batch').setAttribute('aria-pressed',String(routineView==='batch'));
+  $('billing').querySelector('.billing-grid').hidden=batch;$('routine-batch-panel').hidden=!batch;
+  if(!ledger||!roster)return;
+  const candidates=routineCandidates(ledger,people(),date());
+  const units=[...roster.units];for(const c of candidates)if(!units.some(u=>u.id===c.patient.unit))units.push({id:c.patient.unit,name:c.patient.unit||'Location not recorded'});
+  $('routine-units').innerHTML=units.map(u=>{
+    const group=candidates.filter(c=>c.patient.unit===u.id);if(!group.length)return '';
+    return '<label class="batch-unit"><input type="checkbox" data-routine-unit="'+esc(u.id)+'" '+(routineUnits.has(u.id)?'checked':'')+'><span><strong>'+esc(u.name)+(u.floor?' · Floor '+esc(u.floor):'')+'</strong><small>'+group.filter(c=>c.status==='due').length+' due · '+group.filter(c=>c.status==='review').length+' need review · '+group.filter(c=>c.status==='billed').length+' already billed</small></span></label>';
+  }).join('');
+  const inUnits=candidates.filter(c=>routineUnits.has(c.patient.unit)),due=inUnits.filter(c=>c.status==='due'),review=inUnits.filter(c=>c.status==='review');
+  $('routine-review').innerHTML='<p><strong>'+esc(formatDate(date()))+'</strong> · '+due.length+' due across selected units</p>'+(!routineUnits.size?'<p class="empty">Choose units to review their patients.</p>':due.length?'<div class="batch-patient-list">'+due.map(c=>'<label class="batch-patient"><input type="checkbox" data-routine-patient="'+esc(c.patient.key)+'" '+(!routineExcluded.has(c.patient.key)?'checked':'')+'><span><strong>'+esc(c.patient.name)+'</strong><small>'+esc(units.find(u=>u.id===c.patient.unit)?.name||c.patient.unit)+' · Room '+esc(c.patient.room||'—')+' · Last billing '+esc(formatDate(c.last))+'</small><small>Usual ICD-9: '+esc(c.usualCodes)+' · Bill with '+esc(c.diagnosis)+'</small></span></label>').join('')+'</div>':'<p class="empty">No patients are due in these units for this date.</p>')+
+    (review.length?'<section class="batch-needs-review"><h3>Needs review · '+review.length+'</h3><p class="hint">Not included in this batch.</p>'+review.map(c=>'<p><strong>'+esc(c.patient.name)+'</strong> — '+esc(c.reason)+'</p>').join('')+'</section>':'')+
+    (routineUnits.size?'<p class="hint">Excluded: '+inUnits.filter(c=>c.status==='billed').length+' already billed for this date · '+inUnits.filter(c=>c.status==='later').length+' not yet due.</p>':'');
+  $('routine-units').querySelectorAll('[data-routine-unit]').forEach(el=>el.onchange=()=>{if(el.checked)routineUnits.add(el.dataset.routineUnit);else routineUnits.delete(el.dataset.routineUnit);renderRoutineBatch();});
+  $('routine-review').querySelectorAll('[data-routine-patient]').forEach(el=>el.onchange=()=>{if(el.checked)routineExcluded.delete(el.dataset.routinePatient);else routineExcluded.add(el.dataset.routinePatient);updateRoutineAction();});
+  const canUndo=routineReceipt&&routineReceipt.entries.some(e=>ledger.entries.some(x=>x.id===e.id))&&!routineReceipt.entries.some(e=>savedBase?.entries.some(x=>x.id===e.id));
+  $('routine-result').innerHTML=canUndo?'<p>Routine batch added for '+esc(formatDate(routineReceipt.date))+'. Saved locally, not yet in Drive.</p><button id="undo-routine-batch">Undo this routine batch</button>':'';
+  if($('undo-routine-batch'))$('undo-routine-batch').onclick=safe(()=>{guardWrite();commit(undoRoutineBatch(ledger,routineReceipt));routineReceipt=null;renderRoutineBatch();renderCalendar();renderHistory();notice('Routine batch undone locally. Other billing is unchanged.');});
+  updateRoutineAction();
+}
+function updateRoutineAction(){const count=selectedRoutineCandidates().length;$('routine-add').textContent='Add 114 for '+count+' patient'+(count===1?'':'s');updateWriteLock();}
+$('routine-individual').onclick=()=>{routineView='individual';renderRoutineBatch();};
+$('routine-batch').onclick=()=>{routineView='batch';renderRoutineBatch();};
+$('routine-add').onclick=safe(()=>{
+  guardWrite();const keys=selectedRoutineCandidates().map(c=>c.patient.key);
+  const result=addRoutineBatch(ledger,people(),date(),keys);commit(result.ledger);routineReceipt=result.receipt;routineExcluded.clear();renderRoutineBatch();renderCalendar();renderHistory();notice(keys.length+' routine 114 billings added locally. Save the session to Drive when finished.');
+});
+$('history-by-date').onclick=()=>{historyView='date';renderHistory();};
+$('history-by-patient').onclick=()=>{historyView='patient';renderHistory();};
+$('history-search').oninput=()=>renderHistory();
 $('connect').onclick=()=>{$('connection-error').textContent='';$('connection-dialog').showModal();};
 $('local-option').hidden=!['127.0.0.1','localhost'].includes(location.hostname);
 $('local-connect').onclick=()=>connect('local');$('cloud-connect').onclick=()=>connect('cloud');
@@ -330,9 +421,9 @@ function renderSaveControls(){
   $('drive-connection').textContent=checking?'◌ Checking Drive…':connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):'● Reconnect Drive';
   $('drive-connection').title=lastChecked?'Last checked '+formatTimestamp(lastChecked):'Check your connection without saving billing';
   $('drive-connection').disabled=saving||checking||!adapter;
-  const changes=localChanges(),count=new Set(changes.filter(r=>r.patientKey).map(r=>r.patientKey)).size;
+  const changes=localChanges(),count=changedBillCount(changes);
   $('local-changes').dataset.state=blocked||localRecoveryFailed?'error':dirty?'pending':'ok';
-  $('local-changes').textContent=localRecoveryFailed?'! Local save needs attention':recoveryPending?'◌ Saving locally…':dirty?(count?'● Local changes · '+count+' patient'+(count===1?'':'s'):'● Local changes'):'✓ No local changes';
+  $('local-changes').textContent=localRecoveryFailed?'! Local save needs attention':recoveryPending?'◌ Saving locally…':dirty?(count?'● '+count+' bill'+(count===1?'':'s')+' pending':'● Other local changes'):'✓ No local changes';
   $('local-changes').title=dirty?'Saved on this device, not in Drive. Click to review changes.':'Everything matches your last Drive save.';
   $('local-changes').disabled=!ledger;
   $('sync').textContent=saving?'◌ Saving session…':blocked?'Save my changes to Drive':'Save session to Drive';
