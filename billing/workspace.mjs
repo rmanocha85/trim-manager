@@ -24,7 +24,9 @@ export function addRoutineBatch(ledger,patients,date,keys){
   if(chosen.some(c=>!c||c.status!=='due'))throw new Error('The selection changed or includes a patient who is not eligible. Review the list again.');
   let next=clone(ledger);const entries=[];
   for(const c of chosen){
-    next=upsertInteractiveEntry(next,c.patient,date,[{code:'00114',units:1,diagnosis:c.diagnosis,diagnosisMode:'per-charge'}]);
+    // Match individual routine billing: no per-charge override, so reports use
+    // the patient's complete usual ICD-9 set, not an arbitrarily chosen code.
+    next=upsertInteractiveEntry(next,c.patient,date,[{code:'00114',units:1}]);
     const entry=next.entries.find(e=>e.patientKey===c.patient.key&&e.date===date);
     const issues=entryIssues(entry,next,c.patient);if(issues.length)throw new Error(issues.join(' '));
     entries.push(clone(entry));
