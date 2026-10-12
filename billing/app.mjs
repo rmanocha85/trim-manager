@@ -2,8 +2,9 @@ import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=202610
 import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261011-review1';
 import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261011-review1';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261007-cancel1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261006-modes1';
-import {saveRecovery,loadRecovery} from './recovery.mjs';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261012-backup1';
+import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
+import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261007-dates1';
 import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261011-review1';
 import {mergeSession} from './merge.mjs?v=20261008-merge1';
@@ -23,6 +24,17 @@ let setupCandidate,connecting=false;
 let mergeChoices={},mergeConflicts=[];
 let stagedImport=null,importing=false,importRead=0;
 let connectionVerified=false,syncFailed=false,checking=false,calendarMonth=today().slice(0,7),saveFocus=null;
+const backups=backupUI({state:()=>({adapter,saved:savedBase,dirty,busy:saving||checking}),showSettings:()=>switchTab('settings'),restore:async(next,preserve)=>{
+  guardWrite();if(dirty)throw new Error('Save or discard local changes first.');
+  saving=true;updateWriteLock();
+  try{
+    const current=await adapter.load();if(current.etag!==etag)throw new Error('Drive changed. Reconnect / reload saved billing before restoring.');
+    await preserve(current.ledger);
+    const saved=await adapter.restoreBackup(next,current.etag);
+    selected=null;editingId=null;await adoptSaved(saved);
+  }catch(e){connectionVerified=false;syncFailed=true;throw e;
+  }finally{saving=false;updateWriteLock();}
+}});
 const date=()=>$('service-date').value||today();
 const people=()=>rosterView(roster,ledger);
 const person=k=>people().find(p=>p.key===k);
@@ -93,6 +105,7 @@ async function connect(mode,create=false){
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();document.title='TRIM Billing · Parallel review';
     $('storage-note').textContent=mode==='local'?'Local preview · saves to this laptop’s Drive folder. Cloud sync is not verified. Original roster: read-only.':'Google Drive connected · original roster: read-only.';
     renderAll();setBillingMode(billingMode);document.querySelector('.version').textContent=ledger.settings.parallel?'PAPER COMPARISON':'BILLING';status(blocked?'Draft conflict — action needed':dirty?'Saved on this device — not yet in Drive':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
+    void backups.connected(adapter,s.ledger);
     return true;
   }catch(e){if(releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;$('connection-error').dataset.state='error';}
   finally{connecting=false;}
@@ -107,6 +120,7 @@ async function flush(){
     await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;savedBase=clone(saved.ledger);checkedDrive();
     if(seq===currentSeq){ledger=saved.ledger;dirty=false;}else{ledger.revision=saved.ledger.revision;ledger.updatedAt=saved.ledger.updatedAt;ledger.localWriter=saved.ledger.localWriter;}
     syncFailed=false;connectionVerified=true;await persistRecovery();status(dirty?'More changes waiting to save':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);
+    await backups.capture(saved.ledger);
   }catch(e){connectionError(e);syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice('Drive changed during saving. Your work is retained. Click Save my changes to Drive to try again.');}else{notice(e.message+' Your draft remains on this device. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
   finally{saving=false;updateWriteLock();if(!dirty&&!writeUnavailable()){renderCalendar();if(tab==='history')renderHistory();if(saveFocus?.el.isConnected&&!saveFocus.el.disabled&&document.activeElement===document.body){saveFocus.el.focus();if(saveFocus.start!==null)saveFocus.el.setSelectionRange(saveFocus.start,saveFocus.end);}}saveFocus=null;}
 }
@@ -365,6 +379,7 @@ async function adoptSaved(s){
   checkedDrive();await persistRecovery();notice('');renderAll();
   if($('merge-dialog').open)$('merge-dialog').close();
   status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
+  await backups.capture(s.ledger);
 }
 async function discardLocal(){
   if(saving||checking)return;
@@ -417,7 +432,7 @@ $('print-report').onclick=()=>{printedSignature=signature();$('report-frame').co
 $('finalize').onclick=safe(async()=>{guardWrite();await flush();if(dirty||blocked||saving)throw new Error('Save changes before handoff.');if(printedSignature!==signature())throw new Error('Generate and print/save the current batch first.');if(issuesFor(chosen()).length)throw new Error('Resolve the flagged billing information first.');if(!confirm('Confirm this exact batch was successfully saved/printed, reviewed, and actually given to Suzy. It will leave the next print batch, but its billing history stays saved.'))return;commit(finalizeBatch(ledger,chosen(),{from:$('batch-from').value,to:$('batch-to').value,layout:$('report-layout').value,reviewed:$('rules-reviewed').checked,delivered:true}));await flush();renderReports();renderHistory();updateWriteLock();});
 window.addEventListener('offline',()=>{driveReachable=false;connectionVerified=false;syncFailed=true;status('Offline — billing locked',true);});
 window.addEventListener('online',()=>verifyConnection());
-window.addEventListener('beforeunload',e=>{if(dirty||recoveryPending){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if(dirty||recoveryPending||backups.busy()){e.preventDefault();e.returnValue='';}});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)verifyConnection();});
 setInterval(verifyConnection,45000);
 

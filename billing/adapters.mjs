@@ -61,4 +61,13 @@ export class DriveAdapter {
     await this.request(`https://www.googleapis.com/upload/drive/v2/files/${this.fileId}?uploadType=media`,{method:'PUT',headers:{'Content-Type':'application/json','If-Match':etag},body:JSON.stringify(next)});
     const verified=await this.load();if(JSON.stringify(verified.ledger)!==JSON.stringify(next)){const e=new Error('Drive read-back did not match. Stop editing and reconcile.');e.status=409;throw e;}return verified;
   }
+  // Explicit full-file recovery only: the UI first verifies a safety backup and
+  // obtains confirmation. Ordinary saves retain all assertImmutable checks.
+  async restoreBackup(ledger,etag){
+    validateLedger(ledger);
+    if(!this.fileId||this.fileId===ROSTER||!etag||ledger.datasetId!==this.current?.datasetId)throw new Error('Wrong recovery target.');
+    const next={...ledger,revision:this.current.revision+1,updatedAt:new Date().toISOString()};
+    await this.request(`https://www.googleapis.com/upload/drive/v2/files/${this.fileId}?uploadType=media`,{method:'PUT',headers:{'Content-Type':'application/json','If-Match':etag},body:JSON.stringify(next)});
+    const verified=await this.load();if(JSON.stringify(verified.ledger)!==JSON.stringify(next))throw new Error('Restored file could not be verified. Reload before further changes.');return verified;
+  }
 }
