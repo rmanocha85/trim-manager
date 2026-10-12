@@ -105,12 +105,12 @@ function appHarness(){
   const elements=new Map();
   const element=id=>{if(!elements.has(id))elements.set(id,{value:'',checked:false,style:{},dataset:{},setAttribute(){},classList:{add(){},remove(){}},textContent:'',innerHTML:''});return elements.get(id);};
   const alerts=[];
-  const ctx=vm.createContext({TrimRoster:R,structuredClone,Date,console,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,setInterval(){},navigator:{onLine:true},window:{addEventListener(){}},alert:x=>alerts.push(x),localStorage:{removeItem(){}},document:{addEventListener(){},getElementById:element,body:{classList:{add(){},remove(){}}},querySelectorAll:()=>[],title:''}});
+  const ctx=vm.createContext({TrimRoster:R,structuredClone,Date,console,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,setInterval(){},navigator:{onLine:true},window:{addEventListener(){}},alert:x=>alerts.push(x),confirm:()=>false,localStorage:{removeItem(){}},document:{addEventListener(){},getElementById:element,body:{classList:{add(){},remove(){}}},querySelectorAll:()=>[],title:''}});
   const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   const script=html.match(/<script>\s*([\s\S]*?)<\/script>/)[1].replace(/init\(\);\s*$/,'');
   vm.runInContext(script,ctx);
   const run=code=>vm.runInContext(code,ctx);
-  ctx.fixture=fixture();run("applyRoster(fixture);state.googleConnected=true;state.googleToken='synthetic';driveEtag='revision1';maybeSaveDailySnapshot=async()=>{};");
+  ctx.fixture=fixture();run("applyRoster(fixture);loadedRosterJSON=JSON.stringify(currentRoster());state.googleConnected=true;state.googleToken='synthetic';driveEtag='revision1';maybeSaveDailySnapshot=async()=>{};");
   return {ctx,run,alerts,element};
 }
 test('app serializes saves, uses conditional roster-only writes and preserves unknown fields',async()=>{
@@ -130,13 +130,13 @@ test('app stale revision locks writes, does not create a replacement, refuses hi
   assert.equal(await h.run('saveDrive()'),false);assert.equal(calls,1);
   h.run('writeBlocked=false;inHistoryView=true;');assert.equal(await h.run('saveDrive()'),false);assert.equal(calls,1);
 });
-test('app load expires retained records with verified save; active counts and prints exclude retained',async()=>{
+test('manual load filters expired records without writes; active counts and prints exclude retained',async()=>{
   const h=appHarness();let disk=R.remove(fixture(),patient.id,'2020-01-31'),rev=1,writes=0;
   h.ctx.fetch=async(url,opts)=>{
     if(opts.method==='PUT'){writes++;disk=JSON.parse(opts.body);rev++;return {ok:true,json:async()=>({})};}
     return {ok:true,json:async()=>url.includes('alt=media')?structuredClone(disk):{etag:'r'+rev}};
   };
-  assert.equal(await h.run('loadDrive()'),true);assert.equal(disk.removedPatients.length,0);assert.equal(writes,1);
+  assert.equal(await h.run('loadDrive()'),true);assert.equal(h.run('state.removedPatients.length'),0);assert.equal(disk.removedPatients.length,1);assert.equal(writes,0);
   h.ctx.retained=R.remove(fixture(),patient.id,R.today());h.run('applyRoster(retained);renderStats();buildTrimList();buildTrimBilling();renderRemoved();');
   assert.equal(h.element('print-trim').innerHTML.includes(patient.name),false);
   assert.equal(h.element('print-billing').innerHTML.includes(patient.name),false);
@@ -152,7 +152,7 @@ test('connection verification is read-only and preserves unsaved data, revision 
     return {ok:true,json:async()=>url.includes('alt=media')?fixture():{etag:'revision1'}};
   };
   h.run("state.patients[0].room='UNSAVED';writeBlocked=true;setSS('NOT SAVED — conflict',false);");
-  const promise=h.run('gConnect()');
+  const promise=h.run('checkDriveConnection()');
   assert.equal(h.element('btn-connect').textContent,'◌ Checking Drive…');
   release();assert.equal(await promise,true);
   assert.equal(h.element('btn-connect').textContent,'● Drive connected');
@@ -175,7 +175,7 @@ test('changed revision is connected but cannot replace current roster or clear w
   const h=appHarness();
   h.ctx.fetch=async(url)=>({ok:true,json:async()=>url.includes('alt=media')?fixture():{etag:'remote-new'}});
   h.run("state.patients[0].room='UNSAVED';");
-  assert.equal(await h.run('gConnect()'),true);
+  assert.equal(await h.run('checkDriveConnection()'),true);
   assert.equal(h.element('btn-connect').dataset.state,'ok');
   assert.equal(h.run('writeBlocked'),true);assert.equal(h.run('driveEtag'),'revision1');
   assert.equal(h.run('state.patients[0].room'),'UNSAVED');
@@ -214,4 +214,34 @@ test('deferred daily snapshot keeps the pre-edit roster and runs only when an ed
   h.run("applyRoster(TrimRoster.edit(currentRoster(),'synthetic-1',{room:'NEW'}));");
   assert.equal(await h.run('saveDrive()'),true);
   assert.equal(captured.patients[0].room,'1');assert.equal(disk.patients[0].room,'NEW');
+});
+
+test('Drive click reloads external changes without writes and clears a clean conflict',async()=>{
+  const h=appHarness(),disk=fixture();disk.patients[0].room='REMOTE';disk.otherPatients=[{id:'coverage'}];
+  const requests=[];
+  h.ctx.fetch=async(url,opts)=>{requests.push(opts.method||'GET');return {ok:true,json:async()=>url.includes('alt=media')?disk:{etag:'new'}};};
+  await h.run('checkDriveConnection()');assert.equal(h.run('writeBlocked'),true);
+  assert.equal(await h.run('gConnect()'),true);
+  assert.equal(h.run('state.patients[0].room'),'REMOTE');assert.equal(h.run('driveEtag'),'new');
+  assert.equal(h.run('writeBlocked'),false);assert.equal(h.run('currentRoster().otherPatients.length'),1);
+  assert.ok(requests.every(x=>x==='GET'));
+});
+test('refresh cancellation preserves unsaved work and confirmation explicitly replaces it',async()=>{
+  const h=appHarness(),disk=fixture();let prompts=0;
+  h.ctx.fetch=async url=>({ok:true,json:async()=>url.includes('alt=media')?disk:{etag:'new'}});
+  h.run("state.patients[0].room='UNSAVED';writeBlocked=true;setSS('NOT SAVED',false);");
+  h.ctx.confirm=()=>{prompts++;return false;};
+  assert.equal(await h.run('gConnect()'),false);assert.equal(prompts,1);
+  assert.equal(h.run('state.patients[0].room'),'UNSAVED');assert.equal(h.run('driveEtag'),'revision1');
+  assert.equal(h.element('ss').textContent,'NOT SAVED');assert.equal(h.run('writeBlocked'),true);
+  h.ctx.confirm=()=>true;
+  assert.equal(await h.run('gConnect()'),true);assert.equal(h.run('state.patients[0].room'),'1');
+  assert.equal(h.run('writeBlocked'),false);assert.equal(h.run('hasUnsavedRosterChanges()'),false);
+});
+test('unfinished patient forms are kept when refresh is cancelled',async()=>{
+  const h=appHarness();h.ctx.fetch=async url=>({ok:true,json:async()=>url.includes('alt=media')?fixture():{etag:'new'}});
+  h.element('in-name').value='Draft patient';
+  assert.equal(await h.run('gConnect()'),false);assert.equal(h.element('in-name').value,'Draft patient');
+  h.element('in-name').value='';h.run("editId='synthetic-1';");
+  assert.equal(await h.run('gConnect()'),false);assert.equal(h.run('editId'),'synthetic-1');
 });

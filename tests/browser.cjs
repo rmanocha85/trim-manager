@@ -50,7 +50,7 @@ const R=require('../roster-core.js');
     const before=structuredClone(disk);rev++;
     await page.evaluate(()=>{promptDel('synthetic-1');confirmDel();});await page.evaluate(()=>saveQueue);
     assert.deepEqual(disk,before);assert.equal(await page.evaluate(()=>writeBlocked),true);
-    await page.evaluate(()=>forceSyncFromDrive());assert.equal(await page.evaluate(()=>state.patients.length),1);
+    await page.evaluate(()=>gConnect());assert.equal(await page.evaluate(()=>state.patients.length),1);
     assert.deepEqual(errors,[]);console.log('Browser smoke passed: old-schema load, removal, removed view, reactivation, stale-save refusal and sync recovery.');
   }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
