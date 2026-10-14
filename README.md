@@ -2,6 +2,14 @@
 
 The original roster app is `index.html` (green T favicon). `billing/` is a separate application. Never commit private patient data. Develop outside Google Drive.
 
+## Other patients
+
+The Other patients tab reads `otherPatients` from the same private roster JSON, with the existing table styling, unit grouping, PHN copy controls and Ava chart links. Search by name, PHN or Ava number, or filter by doctor. Missing units appear under Unit not recorded; no locations or physician assignments are inferred. These patients never enter the active panel, its counts, or printed active lists.
+
+The optional `otherPatients[].doctor` string stores a selected physician name; an empty/missing value means Unassigned. Changes use the existing conditional Drive save and conflict protection. Failed saves remain visibly unsaved and cannot overwrite a newer roster. Unknown previously recorded doctors remain visible. `OTHER_DOCTORS` contains the other physicians documented in the private TRIM Management physician-group reference, reviewed October 13, 2026; the onboarding status remains explicit. Update those options when the maintained physician-group record changes. This does not transfer patients into or out of the active panel or create billing entries.
+
+Run `node tests/other-patients.browser.cjs` with Playwright available for synthetic chart-link, search, filter, assignment, reload and conflict coverage.
+
 ## Roster retention contract
 
 - `patients` remains the active panel. Active lists, counts and printed lists use only this array.

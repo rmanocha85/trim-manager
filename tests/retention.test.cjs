@@ -103,7 +103,7 @@ test('expiry cannot rewrite independent saved billing identity or charges',async
 
 function appHarness(){
   const elements=new Map();
-  const element=id=>{if(!elements.has(id))elements.set(id,{value:'',checked:false,style:{},dataset:{},setAttribute(){},classList:{add(){},remove(){}},textContent:'',innerHTML:''});return elements.get(id);};
+  const element=id=>{if(!elements.has(id))elements.set(id,{value:'',checked:false,style:{},dataset:{},setAttribute(){},querySelectorAll:()=>[],classList:{add(){},remove(){}},textContent:'',innerHTML:''});return elements.get(id);};
   const alerts=[];
   const ctx=vm.createContext({TrimRoster:R,structuredClone,Date,console,crypto:require('node:crypto').webcrypto,setTimeout,clearTimeout,setInterval(){},navigator:{onLine:true},window:{addEventListener(){}},alert:x=>alerts.push(x),confirm:()=>false,localStorage:{removeItem(){}},document:{addEventListener(){},getElementById:element,body:{classList:{add(){},remove(){}}},querySelectorAll:()=>[],title:''}});
   const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
@@ -217,7 +217,7 @@ test('deferred daily snapshot keeps the pre-edit roster and runs only when an ed
 });
 
 test('Drive click reloads external changes without writes and clears a clean conflict',async()=>{
-  const h=appHarness(),disk=fixture();disk.patients[0].room='REMOTE';disk.otherPatients=[{id:'coverage'}];
+  const h=appHarness(),disk=fixture();disk.patients[0].room='REMOTE';disk.otherPatients=[{id:'coverage',name:'Synthetic Coverage',phn:'9000000002',ava:'900002',unit:'',room:'',codes:''}];
   const requests=[];
   h.ctx.fetch=async(url,opts)=>{requests.push(opts.method||'GET');return {ok:true,json:async()=>url.includes('alt=media')?disk:{etag:'new'}};};
   await h.run('checkDriveConnection()');assert.equal(h.run('writeBlocked'),true);

@@ -338,6 +338,7 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
 
 <div class="tabs-bar">
   <button class="tab-btn active" onclick="showTab('patients',this)">Patients</button>
+  <button class="tab-btn" onclick="showTab('other-patients',this)">Other patients</button>
   <button class="tab-btn" onclick="showTab('billing-dates',this)">Billing Dates</button>
   <button class="tab-btn" onclick="showTab('units',this)">Units</button>
   <button class="tab-btn" onclick="showTab('history',this)">📅 Past Lists</button>
@@ -368,6 +369,20 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
     </div>
   </div>
   <div id="ulist"></div>
+</div>
+
+<!-- OTHER PATIENTS -->
+<div id="tab-other-patients" class="panel">
+  <div class="stats-row" id="other-stats"></div>
+  <div class="card">
+    <h3>Other TRIM patients</h3>
+    <p>Patients outside your panel. Click a name or Ava number to open the chart. Doctor selections save automatically to Drive.</p>
+    <div class="fg">
+      <div class="fgrp" style="flex:2;min-width:220px"><label class="flbl" for="other-search">Find a patient</label><input class="inp" id="other-search" placeholder="Name, PHN or Ava number" oninput="renderOtherPatients()"/></div>
+      <div class="fgrp" style="flex:1;min-width:220px"><label class="flbl" for="other-doctor-filter">Doctor</label><select class="sel" id="other-doctor-filter" onchange="renderOtherPatients()"><option value="">All doctors</option><option value="__unassigned">Unassigned</option></select></div>
+    </div>
+  </div>
+  <div id="other-list"></div>
 </div>
 
 <!-- BILLING DATES -->
@@ -464,6 +479,15 @@ const FILE_NAME='trim-patients-data.json';
 const ROSTER_FILE_ID='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 const SCOPE='https://www.googleapis.com/auth/drive.file';
 const OAUTH_CLIENT_ID='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
+// Documented physician group: TRIM Management, reviewed October 13, 2026.
+// Assignments stay private in otherPatients[].doctor; do not infer ownership.
+const OTHER_DOCTORS=[
+  {name:'Dr. Adam Siemens'},
+  {name:'Dr. Celine Laferriere'},
+  {name:'Dr. Kirti Aneja'},
+  {name:'Dr. Tarun Soni'},
+  {name:'Dr. Hamzah Nasir',status:'Onboarding'}
+];
 const DAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -497,6 +521,7 @@ function renderConnection(){
   button.dataset.state=checking?'busy':connected?'ok':'error';
   button.textContent=checking?'◌ Checking Drive…':connected?'● Drive connected':(rosterDocument?'● Reconnect Drive':'● Connect to Drive');
   button.disabled=connectionChecking||pendingSaves>0;
+  document.querySelectorAll('[data-other-doctor]').forEach(el=>el.disabled=!canAssignOtherDoctor());
   button.setAttribute('aria-busy',String(connectionChecking));
   button.title='Click to connect and load the latest patient list from Drive.'+(lastDriveCheck?' Last verified '+lastDriveCheck.toLocaleString()+'.':'')+' Save status is shown separately.';
 }
@@ -708,6 +733,7 @@ function showTab(name,btn){
   if(name==='billing-dates'){renderCal();renderDates();}
   if(name==='history')renderSnapshotList();
   if(name==='removed')renderRemoved();
+  if(name==='other-patients')renderOtherPatients();
 }
 function renderRemoved(){
   const el=g('removed-list');
@@ -934,7 +960,7 @@ document.addEventListener('keydown',function(e){
 });
 
 // ── RENDER ──
-function render(){renderStats();renderUList();populateUSel();renderDates();renderRemoved()}
+function render(){renderStats();renderUList();populateUSel();renderDates();renderRemoved();renderOtherPatients()}
 
 function renderStats(){
   const t=state.patients.length,pct=Math.round(t/MAX_P*100);
@@ -1012,6 +1038,48 @@ function renderUList(){
 function toggleU(id){
   const b=g('ub-'+id),c=g('chev-'+id);
   const h=b.style.display==='none';b.style.display=h?'':'none';c.classList.toggle('open',h);
+}
+
+function otherPatients(){return Array.isArray(rosterDocument?.otherPatients)?rosterDocument.otherPatients:[];}
+function canAssignOtherDoctor(){return !inHistoryView&&!writeBlocked&&!connectionChecking&&!pendingSaves&&navigator.onLine!==false&&state.googleConnected&&!!state.googleToken&&!!driveEtag;}
+function doctorOptions(selected='',filter=false){
+  const saved=[...new Set(otherPatients().map(p=>p.doctor).filter(Boolean))];
+  const known=OTHER_DOCTORS.map(d=>d.name);
+  return OTHER_DOCTORS.map(d=>`<option value="${esc(d.name)}"${d.name===selected?' selected':''}>${esc(d.name)}${d.status?' · '+esc(d.status):''}</option>`).join('')+
+    saved.filter(n=>!known.includes(n)).map(n=>`<option value="${esc(n)}"${n===selected?' selected':''}${filter?'':' disabled'}>${esc(n)} (previously recorded)</option>`).join('');
+}
+async function setOtherDoctor(id,value){
+  if(!canAssignOtherDoctor()||!canEdit()){renderOtherPatients();return;}
+  if(value&&!OTHER_DOCTORS.some(d=>d.name===value)){alert('Choose a doctor from the list.');renderOtherPatients();return;}
+  const matches=otherPatients().filter(p=>String(p.id)===String(id));
+  if(matches.length!==1){alert('Patient could not be uniquely identified. Reload the list.');return;}
+  if((matches[0].doctor||'')===value)return;
+  applyRoster({...currentRoster(),otherPatients:otherPatients().map(p=>p===matches[0]?{...p,doctor:value}:p)});
+  await saveDrive();renderOtherPatients();
+}
+function renderOtherPatients(){
+  const list=g('other-list'),stats=g('other-stats'),filter=g('other-doctor-filter');
+  if(!list)return;
+  if(!rosterDocument||!driveEtag){stats.innerHTML='';list.innerHTML='<div class="banner b-info">Connect Google Drive to load other patients.</div>';return;}
+  if(inHistoryView){stats.innerHTML='';list.innerHTML='<div class="banner b-info">Return to Today (Live) to see other patients.</div>';return;}
+  const all=otherPatients(),assigned=all.filter(p=>p.doctor).length;
+  stats.innerHTML=[['Other patients',all.length],['Doctor assigned',assigned],['Unassigned',all.length-assigned]].map(([label,n])=>`<div class="stat-card"><div class="stat-label">${label}</div><div class="stat-value">${n}</div></div>`).join('');
+  const selectedDoctor=filter.value;
+  filter.innerHTML='<option value="">All doctors</option><option value="__unassigned">Unassigned</option>'+doctorOptions(selectedDoctor,true);
+  filter.value=selectedDoctor;
+  const query=g('other-search').value.trim().toLowerCase(),digits=query.replace(/\D/g,'');
+  const pts=all.filter(p=>(!query||p.name.toLowerCase().includes(query)||(digits&&[p.phn,p.ava].some(v=>String(v||'').replace(/\D/g,'').includes(digits))))&&(!selectedDoctor||(selectedDoctor==='__unassigned'?!p.doctor:p.doctor===selectedDoctor)));
+  const known=new Set(state.units.map(u=>u.id)),groups=[...state.units,{id:'__unknown',name:'Unit not recorded'}];
+  list.innerHTML=groups.map((unit,index)=>{
+    const rows=pts.filter(p=>unit.id==='__unknown'?!known.has(p.unit):p.unit===unit.id).sort((a,b)=>(a.room||'').localeCompare(b.room||'',undefined,{numeric:true})||a.name.localeCompare(b.name));
+    if(!rows.length)return '';
+    const key='other-'+index;
+    return `<div class="usec"><div class="uhdr" onclick="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name</th><th style="width:160px">PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
+      const ava=String(p.ava||'');const url=/^\d{6,10}$/.test(ava)?'https://www.avaemr.ca/patients/'+ava:'';
+      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
+    }).join('')}</tbody></table></div></div>`;
+  }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
+  list.querySelectorAll('[data-other-doctor]').forEach(el=>el.addEventListener('change',()=>setOtherDoctor(el.dataset.otherDoctor,el.value)));
 }
 
 function renderUMng(){
