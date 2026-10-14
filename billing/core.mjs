@@ -86,17 +86,23 @@ export function blankLedger(id=crypto.randomUUID()) {return {app:APP,schema:SCHE
 export function patientKey(p) {const phn=String(p.phn||'').replace(/\D/g,'');return phn?`phn:${phn}`:`roster:${String(p.id)}`;}
 export function normalizeRoster(raw) {
   if(!Array.isArray(raw?.patients)||!Array.isArray(raw?.units)) throw new Error('Not a TRIM roster file.');
-  const seen=new Set();
-  const patients=raw.patients.map(p=>{
+  if(raw.otherPatients!==undefined&&!Array.isArray(raw.otherPatients)) throw new Error('Invalid other-patient directory in TRIM roster.');
+  const normalizePatients=(records,panel)=>{
+   const seen=new Set();
+   return records.map(p=>{
     if(!p.id||!p.name) throw new Error('Roster contains an incomplete identity.');
     const key=patientKey(p); if(seen.has(key)) throw new Error('Duplicate patient identity in roster; source must be reviewed.');seen.add(key);
-    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel:true};
-  });
-  return {patients,units:raw.units.map(u=>({id:String(u.id),name:String(u.name),floor:u.floor??''}))};
+    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel};
+   });
+  };
+  return {patients:normalizePatients(raw.patients,true),otherPatients:normalizePatients(raw.otherPatients||[],false),units:raw.units.map(u=>({id:String(u.id),name:String(u.name),floor:u.floor??''}))};
 }
 export function rosterView(roster, ledger) {
   const map=new Map(Object.entries(ledger.patients).map(([key,p])=>[key,{...p,key,panel:false,retained:true}]));
   for(const p of ledger.nonPanel) map.set(p.key,{...p,panel:false});
+  // The Manager directory refreshes coverage details; active panel membership wins.
+  // PHN/roster identity joins existing bills without rewriting historical records.
+  for(const p of roster.otherPatients||[]) map.set(p.key,{...p,panel:false});
   for(const p of roster.patients) map.set(p.key,p);
   return [...map.values()];
 }

@@ -1,14 +1,15 @@
 import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=20261007-dates1';
-import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261011-review1';
-import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261011-review1';
+import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261013-directory1';
+import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261013-directory1';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261007-cancel1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261012-backup1';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261013-directory1';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
 import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261007-dates1';
 import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261011-review1';
 import {mergeSession} from './merge.mjs?v=20261008-merge1';
 const $=id=>document.getElementById(id);
+$('search-scope').textContent='All TRIM Manager residents · your panel, other residents and saved coverage patients';
 const headerDate=document.createElement('div');headerDate.id='header-billing-date';headerDate.setAttribute('aria-live','polite');headerDate.innerHTML='<small>Billing for</small><strong id="header-date-value"></strong>';document.querySelector('header .brand').after(headerDate);
 const routineViews=document.createElement('div');routineViews.id='routine-views';routineViews.className='view-tabs';routineViews.hidden=true;routineViews.innerHTML='<button id="routine-individual" aria-pressed="true">Individual</button><button id="routine-batch" aria-pressed="false">Batch by unit/floor</button>';$('billing-lock').after(routineViews);
 const routinePanel=document.createElement('section');routinePanel.id='routine-batch-panel';routinePanel.hidden=true;routinePanel.innerHTML='<div class="card"><h2>Choose units / floors</h2><p class="hint">Active TRIM Manager patients only. Counts use the selected billing date.</p><div id="routine-units"></div></div><div class="card"><h2>Review patients you saw</h2><div id="routine-review"></div><div class="batch-build-actions"><button id="routine-add" class="primary" disabled>Add 114 for 0 patients</button><p class="hint">Adds to local changes only. Save the session to Drive when finished.</p></div><div id="routine-result" role="status"></div></div>';$('billing').append(routinePanel);
