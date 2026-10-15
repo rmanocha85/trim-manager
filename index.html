@@ -142,6 +142,10 @@ header h1{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:
 .ptbl tr:last-child td{border-bottom:none}
 .ptbl tr:hover td{background:#faf9f7}
 .pnm{font-weight:500;display:flex;align-items:center;gap:5px}.pnm a{color:var(--text);text-decoration:none;font-weight:500}.pnm a:hover{color:var(--accent);text-decoration:underline}
+.notes-upload{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-size:10px;color:var(--accent);cursor:pointer}
+.notes-upload input{width:17px;height:17px;margin:0 3px 0 0;accent-color:var(--accent);cursor:pointer}
+.notes-upload input:disabled{cursor:not-allowed}
+.notes-upload-help{font-size:12px;color:var(--muted);margin:0 0 12px}
 .pflag{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--accent);color:#fff;font-family:var(--mono);font-size:10px;font-weight:600;line-height:1;flex:0 0 17px}
 .p-toggle{height:35px;min-width:35px;border:1.5px solid var(--border);border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s}
 .p-toggle:hover{border-color:var(--accent);background:var(--accent-light)}
@@ -368,6 +372,7 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
       <button class="btn btn-green" onclick="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
     </div>
   </div>
+  <p class="notes-upload-help"><strong id="notes-upload-count"></strong> Tick the box beside a name after adding their TRIM Notes documents to Incoming.</p>
   <div id="ulist"></div>
 </div>
 
@@ -382,6 +387,7 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
       <div class="fgrp" style="flex:1;min-width:220px"><label class="flbl" for="other-doctor-filter">Doctor</label><select class="sel" id="other-doctor-filter" onchange="renderOtherPatients()"><option value="">All doctors</option><option value="__unassigned">Unassigned</option></select></div>
     </div>
   </div>
+  <p class="notes-upload-help"><strong id="other-notes-upload-count"></strong> Tick the box beside a name after adding their TRIM Notes documents to Incoming.</p>
   <div id="other-list"></div>
 </div>
 
@@ -522,6 +528,7 @@ function renderConnection(){
   button.textContent=checking?'◌ Checking Drive…':connected?'● Drive connected':(rosterDocument?'● Reconnect Drive':'● Connect to Drive');
   button.disabled=connectionChecking||pendingSaves>0;
   document.querySelectorAll('[data-other-doctor]').forEach(el=>el.disabled=!canAssignOtherDoctor());
+  refreshNotesUploadControls();
   button.setAttribute('aria-busy',String(connectionChecking));
   button.title='Click to connect and load the latest patient list from Drive.'+(lastDriveCheck?' Last verified '+lastDriveCheck.toLocaleString()+'.':'')+' Save status is shown separately.';
 }
@@ -1019,7 +1026,7 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${p.ava?`<a href="https://www.avaemr.ca/patients/${esc(p.ava)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
+                  <div class="pnm">${notesUploadControl(p,'patients')}${p.ava?`<a href="https://www.avaemr.ca/patients/${esc(p.ava)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
                   <div class="pphn">${phnWithCopy(p.phn,'')}</div>
                 </td>
                 <td><span class="pphn">${phnWithCopy(p.phn)}</span></td>
@@ -1033,6 +1040,38 @@ function renderUList(){
     </div>`;
   });
   g('ulist').innerHTML=html||`<div class="banner b-info">No units. Add them in the Units tab.</div>`;
+  refreshNotesUploadControls();
+}
+
+// Manual document-upload sign-off only; clinical summaries are maintained by TRIM Notes.
+function notesUploadControl(p,collection){
+  return `<label class="notes-upload"><input type="checkbox" data-notes-upload="${esc(p.id)}" data-collection="${collection}" aria-label="TRIM Notes data uploaded for ${esc(p.name)}"${p.notesDataUploaded===true?' checked':''}${canAssignOtherDoctor()?'':' disabled'}/><span aria-live="polite"></span></label>`;
+}
+function refreshNotesUploadControls(){
+  const saved=loadedRosterJSON?JSON.parse(loadedRosterJSON):{};
+  document.querySelectorAll('[data-notes-upload]').forEach(el=>{
+    const collection=el.dataset.collection;
+    const p=(collection==='patients'?state.patients:otherPatients()).find(p=>String(p.id)===el.dataset.notesUpload);
+    if(!p)return;
+    const previous=(saved[collection]||[]).find(x=>String(x.id)===String(p.id));
+    const changed=!inHistoryView&&((p.notesDataUploaded===true)!==(previous?.notesDataUploaded===true)||(p.notesDataUploadedAt||null)!==(previous?.notesDataUploadedAt||null));
+    el.checked=p.notesDataUploaded===true;
+    el.disabled=!canAssignOtherDoctor();
+    el.parentElement.querySelector('span').textContent=changed?(pendingSaves?'Saving…':'Not saved'):(el.checked?'Uploaded':'');
+    el.parentElement.title=changed?'Upload sign-off has not been verified as saved.':el.checked?'TRIM Notes data marked uploaded'+(p.notesDataUploadedAt?' on '+new Date(p.notesDataUploadedAt).toLocaleString():'')+'. Untick to clear.':'Mark after adding this patient’s documents to Incoming.';
+    el.onchange=()=>setNotesUploaded(collection,el.dataset.notesUpload,el.checked);
+  });
+  for(const [id,patients] of [['notes-upload-count',state.patients],['other-notes-upload-count',otherPatients()]]){
+    const el=g(id);if(el)el.textContent=`TRIM Notes: ${patients.filter(p=>p.notesDataUploaded===true).length} of ${patients.length} uploaded.`;
+  }
+}
+async function setNotesUploaded(collection,id,uploaded){
+  if(!['patients','otherPatients'].includes(collection)||!canAssignOtherDoctor()||!canEdit()){refreshNotesUploadControls();return;}
+  const roster=currentRoster(),patients=roster[collection]||[],matches=patients.filter(p=>String(p.id)===String(id));
+  if(matches.length!==1){alert('Patient could not be uniquely identified. Reload the list.');refreshNotesUploadControls();return;}
+  if((matches[0].notesDataUploaded===true)===uploaded)return;
+  applyRoster({...roster,[collection]:patients.map(p=>p===matches[0]?{...p,notesDataUploaded:uploaded,notesDataUploadedAt:uploaded?new Date().toISOString():null}:p)});
+  await saveDrive();refreshNotesUploadControls();
 }
 
 function toggleU(id){
@@ -1076,10 +1115,11 @@ function renderOtherPatients(){
     const key='other-'+index;
     return `<div class="usec"><div class="uhdr" onclick="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name</th><th style="width:160px">PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
       const ava=String(p.ava||'');const url=/^\d{6,10}$/.test(ava)?'https://www.avaemr.ca/patients/'+ava:'';
-      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
+      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${notesUploadControl(p,'otherPatients')}${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
     }).join('')}</tbody></table></div></div>`;
   }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
   list.querySelectorAll('[data-other-doctor]').forEach(el=>el.addEventListener('change',()=>setOtherDoctor(el.dataset.otherDoctor,el.value)));
+  refreshNotesUploadControls();
 }
 
 function renderUMng(){

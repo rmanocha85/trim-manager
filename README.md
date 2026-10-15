@@ -10,6 +10,14 @@ The optional `otherPatients[].doctor` string stores a selected physician name; a
 
 Run `node tests/other-patients.browser.cjs` with Playwright available for synthetic chart-link, search, filter, assignment, reload and conflict coverage.
 
+## TRIM Notes upload tracking
+
+Both patient lists have a manual checkbox immediately before each patient's name and a separate uploaded count. Tick after adding source documents to the private Routine notes Incoming folder. This records document upload only, not extraction, clinical review or note completion. Nothing is inferred from existing records or automatically checked.
+
+The same private roster stores optional patient fields `notesDataUploaded` (boolean) and `notesDataUploadedAt` (UTC ISO timestamp for the latest sign-off; null when cleared). Missing fields mean unchecked. Conditional Drive saving, verified readback, offline/history restrictions and conflict recovery apply. Pending and failed changes show Saving or Not saved beside the checkbox. These fields survive normal edits, removal and reactivation and do not affect billing, chart links or printed lists. TRIM Notes patient summaries stay in their separate existing store.
+
+Run `node tests/notes-upload.browser.cjs` with Playwright available for synthetic placement, persistence, clearing, history/offline and conflict checks.
+
 ## Roster retention contract
 
 - `patients` remains the active panel. Active lists, counts and printed lists use only this array.
