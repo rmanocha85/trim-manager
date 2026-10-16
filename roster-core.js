@@ -64,7 +64,7 @@
     const retained=roster.removedPatients.filter(matches);
     if(retained.length>1||retained.some(p=>digits(p.phn)!==phn||digits(p.ava)!==ava))throw new Error('Returning patient identifiers conflict. Verify both PHN and Ava before reactivation.');
     const old=retained[0];
-    const patient={...old,...fields,id:old?.id||newId(),phn,ava};
+    const patient={...old,...fields,id:old?.id||newId(),phn,ava,...(!old?{panelAddedDate:asOf,newPanelPatient:true}:{newPanelPatient:false})};
     delete patient.removedDate;
     return validate({...roster,patients:[...roster.patients,patient],removedPatients:roster.removedPatients.filter(p=>p!==old)});
   }

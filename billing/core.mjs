@@ -92,7 +92,7 @@ export function normalizeRoster(raw) {
    return records.map(p=>{
     if(!p.id||!p.name) throw new Error('Roster contains an incomplete identity.');
     const key=patientKey(p); if(seen.has(key)) throw new Error('Duplicate patient identity in roster; source must be reviewed.');seen.add(key);
-    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel};
+    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel,...(validDate(p.panelAddedDate)?{panelAddedDate:p.panelAddedDate,newPanelPatient:p.newPanelPatient===true}:{})};
    });
   };
   return {patients:normalizePatients(raw.patients,true),otherPatients:normalizePatients(raw.otherPatients||[],false),units:raw.units.map(u=>({id:String(u.id),name:String(u.name),floor:u.floor??''}))};
@@ -122,7 +122,13 @@ export function validateLedger(l) {
     if(!l.routineStarts||typeof l.routineStarts!=='object'||Array.isArray(l.routineStarts))throw new Error('Invalid first routine billing setup.');
     for(const [key,s] of Object.entries(l.routineStarts))if(!l.patients[key]||!validDate(s.admissionDate)||s.admissionDate>today()||!validDate(s.firstRoutineDate)||s.firstRoutineDate<=s.admissionDate||s.admissionBilledExternally!==true)throw new Error('Invalid first routine billing setup.');
   }
+  if(l.newPatientStarts!==undefined){
+    if(!l.newPatientStarts||typeof l.newPatientStarts!=='object'||Array.isArray(l.newPatientStarts))throw new Error('Invalid new-patient planning.');
+    for(const [key,s] of Object.entries(l.newPatientStarts))if(!l.patients[key]||!validDate(s.addedDate)||(s.firstRoutineDate!==null&&(!validDate(s.firstRoutineDate)||s.firstRoutineDate<=s.addedDate)))throw new Error('Invalid new-patient review date.');
+  }
   if(typeof l.settings.parallel!=='boolean'||!Array.isArray(l.settings.portalYears))throw new Error('Invalid billing settings.');
+  const calendar=l.settings.trimVisitCalendar;
+  if(calendar!==undefined&&(!calendar||!validDate(calendar.from)||!validDate(calendar.through)||calendar.through<calendar.from||!Array.isArray(calendar.dates)||calendar.dates.some(d=>!validDate(d)||d<calendar.from||d>calendar.through)||!Number.isFinite(Date.parse(calendar.checkedAt))))throw new Error('Invalid saved visit calendar.');
   const patientDates=new Set();
   for(const e of l.entries){const k=`${e.patientKey}|${e.date}`;if(patientDates.has(k))throw new Error('Duplicate patient/date billing.');patientDates.add(k);}
   if(l.historicalBillings!==undefined&&!Array.isArray(l.historicalBillings))throw new Error('Invalid historical billing.');
@@ -161,6 +167,12 @@ export function lastBilling(ledger,key,asOf='9999-12-31',resetOnly=false,exclude
 export function dueState(ledger,patient,date=today()) {
   if(!patient.panel) return {label:'Ad hoc only',kind:'adhoc',last:lastBilling(ledger,patient.key,date)};
   const last=lastBilling(ledger,patient.key,date,true);
+  const automatic=ledger.newPatientStarts?.[patient.key];
+  if(!last&&automatic&&automatic.addedDate<=date){
+    const due=automatic.firstRoutineDate;
+    if(!due)return {last:null,firstRoutine:true,kind:'unknown',label:'Calendar date needed'};
+    return {last:null,due,firstRoutine:true,kind:due<=date?'due':'later',label:due<=date?'First routine billing review':`First routine review ${due}`};
+  }
   const start=ledger.routineStarts?.[patient.key];
   if(!last&&start&&start.admissionDate<=date){
     const due=start.firstRoutineDate;
@@ -168,6 +180,26 @@ export function dueState(ledger,patient,date=today()) {
   }
   if(!last) return {label:'History needed',kind:'unknown',last:null};
   const due=addDays(last,14); return {last,due,kind:due<=date?'due':'later',label:due<=date?'Due for billing review':`Next ${due}`};
+}
+// Only explicit new-panel markers qualify. Legacy patients and reactivations
+// are not inferred from missing billing, names, or timestamp-shaped roster IDs.
+export function planNewPatients(ledger,roster,asOf=today(),now=Date.now()){
+  const next=clone(ledger),calendar=next.settings.trimVisitCalendar;
+  const fresh=calendar&&Number.isFinite(Date.parse(calendar.checkedAt))&&now-Date.parse(calendar.checkedAt)>=0&&now-Date.parse(calendar.checkedAt)<86400000;
+  for(const p of roster.patients){
+    if(!p.panel||!p.newPanelPatient||!validDate(p.panelAddedDate)||p.panelAddedDate>asOf||next.routineStarts?.[p.key])continue;
+    const identities=Object.entries(next.patients).filter(([key,old])=>key===p.key||String(old.id)===p.id||(p.ava&&old.ava===p.ava));
+    if(identities.some(([key])=>lastBilling(next,key,'9999-12-31',true)))continue;
+    const existing=next.newPatientStarts?.[p.key];
+    const start=existing||{addedDate:p.panelAddedDate,firstRoutineDate:null};
+    // Refresh future/unresolved plans only; never rewrite an already-due plan
+    // or an actual charge when an event moves later.
+    if(fresh&&calendar.from<=start.addedDate&&calendar.through>start.addedDate&&(!start.firstRoutineDate||start.firstRoutineDate>asOf)){
+      start.firstRoutineDate=calendar.dates.filter(d=>validDate(d)&&d>start.addedDate&&d<=calendar.through).sort()[0]||null;
+    }
+    next.patients[p.key]??=clone(p);next.newPatientStarts??={};next.newPatientStarts[p.key]=start;
+  }
+  return validateLedger(next);
 }
 // Planning metadata only: never creates an admission charge or a future visit.
 export function setFirstRoutineReview(ledger,patient,admissionDate,firstRoutineDate) {

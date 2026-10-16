@@ -1,5 +1,5 @@
 // Pure workspace helpers. No patient data or network access.
-import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261015-first-routine1';
+import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261015-auto-routine1';
 
 // Display confirmed identity corrections as one history without rewriting records.
 // Names alone never establish identity; different recorded PHNs stay separate.
@@ -37,7 +37,7 @@ export function routineCandidates(ledger,patients,date){
   return patients.filter(p=>p.panel).map(patient=>{
     const state=dueState(ledger,patient,date),diagnoses=String(patient.codes||'').trim().split(/[,;\s]+/).filter(Boolean);
     const already=[...ledger.entries,...(ledger.historicalBillings||[])].some(e=>e.patientKey===patient.key&&e.date===date);
-    const problem=state.kind==='unknown'?'Starting billing history unknown':!diagnoses.length?'Usual ICD-9 missing':!diagnoses.every(validDiagnosis)?'Usual ICD-9 needs review':'';
+    const problem=state.kind==='unknown'?(state.firstRoutine?'Calendar date needed':'Starting billing history unknown'):!diagnoses.length?'Usual ICD-9 missing':!diagnoses.every(validDiagnosis)?'Usual ICD-9 needs review':'';
     return {patient,last:state.last,diagnosis:diagnoses[0]||'',usualCodes:diagnoses.join(', '),status:already?'billed':problem?'review':state.kind==='due'?'due':'later',reason:already?'Already billed on this date':problem||state.label};
   });
 }
@@ -85,6 +85,7 @@ export function sessionChanges(base,current){
   for(const key of new Set([...oldPeople.keys(),...newPeople.keys()]))if(stable(oldPeople.get(key))!==stable(newPeople.get(key)))rows.push({kind:!oldPeople.has(key)?'Added patient':!newPeople.has(key)?'Removed patient':'Updated patient',patientKey:key,name:(newPeople.get(key)||oldPeople.get(key)).name,date:'',detail:'Coverage list only; original roster unchanged.'});
   for(const key of new Set([...Object.keys(base.baselines),...Object.keys(current.baselines)]))if(stable(base.baselines[key])!==stable(current.baselines[key]))rows.push({kind:'Starting date',patientKey:key,name:current.patients[key]?.name||base.patients[key]?.name||'Patient',date:current.baselines[key]?.date||base.baselines[key]?.date,detail:current.baselines[key]?'Updated starting billing date.':'Removed starting billing date.'});
   // Cancellations are already represented by patient/code changes and Undo rows.
+  for(const key of new Set([...Object.keys(base.newPatientStarts||{}),...Object.keys(current.newPatientStarts||{})]))if(stable(base.newPatientStarts?.[key])!==stable(current.newPatientStarts?.[key]))rows.push({kind:'First routine review',patientKey:key,name:current.patients[key]?.name||base.patients[key]?.name||'Patient',date:current.newPatientStarts?.[key]?.firstRoutineDate||'',detail:'New-patient review plan updated. No charge has been created.'});
   for(const [field,label] of [['settings','Settings'],['batches','Batch handoff'],['historicalBillings','Billing history'],['imports','Reviewed import'],['reviewResolutions','Clarification'],['units','Location reference']])if(stable(base[field])!==stable(current[field]))rows.push({kind:label,name:label,date:'',detail:`${label} updated on this device; will be saved with the session.`});
   // Include identity updates not already represented by another change.
   for(const key of new Set([...Object.keys(base.patients),...Object.keys(current.patients)]))if(stable(base.patients[key])!==stable(current.patients[key])&&!rows.some(r=>r.patientKey===key))rows.push({kind:'Patient details',patientKey:key,name:current.patients[key]?.name||base.patients[key]?.name||'Patient',date:'',detail:'Saved patient details changed.'});

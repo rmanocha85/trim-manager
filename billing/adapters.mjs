@@ -1,9 +1,35 @@
-import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261015-first-routine1';
+import {blankLedger,validateLedger,normalizeRoster,assertImmutable,validDate,addDays,today} from './core.mjs?v=20261015-auto-routine1';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
+export function visitEventDate(event){
+  if(event.status==='cancelled'||String(event.summary||'').trim().toUpperCase()!=='TRIM VISIT DAY')return null;
+  if(validDate(event.start?.date))return event.start.date;
+  if(!event.start?.dateTime||!Number.isFinite(Date.parse(event.start.dateTime)))return null;
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Vancouver',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(event.start.dateTime));
+  return ['year','month','day'].map(k=>parts.find(p=>p.type===k).value).join('-');
+}
+// Calendar access is separate from Drive, read-only, and never stores its token.
+export class VisitCalendar {
+  async connect(){
+    if(!globalThis.google?.accounts?.oauth2)await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(new Error('Google Calendar sign-in could not load.'));document.head.append(s);});
+    return new Promise((resolve,reject)=>google.accounts.oauth2.initTokenClient({client_id:CLIENT,scope:'https://www.googleapis.com/auth/calendar.events.readonly',hint:'rmanocha85@gmail.com',callback:r=>{if(r.error)return reject(new Error('Calendar permission was not granted.'));this.token=r.access_token;resolve();},error_callback:()=>reject(new Error('Calendar connection cancelled; billing is unchanged.'))}).requestAccessToken());
+  }
+  async read(from=addDays(today(),-90),through=addDays(today(),180)){
+    const dates=new Set(),pages=new Set();let page='';
+    do{
+      const q=new URLSearchParams({q:'TRIM VISIT DAY',singleEvents:'true',orderBy:'startTime',timeZone:'America/Vancouver',timeMin:from+'T00:00:00Z',timeMax:addDays(through,1)+'T23:59:59Z',maxResults:'250',fields:'nextPageToken,items(summary,status,start)',...(page?{pageToken:page}:{})});
+      const r=await fetch('https://www.googleapis.com/calendar/v3/calendars/rmanocha85%40gmail.com/events?'+q,{cache:'no-store',headers:{Authorization:`Bearer ${this.token}`}});
+      if(!r.ok)throw new Error(r.status===403?'Google Calendar access is unavailable. Check calendar permission and that Calendar API is enabled for this app.':'Calendar could not be read. Reconnect Calendar and retry.');
+      const result=await r.json();if(!Array.isArray(result.items))throw new Error('Calendar returned an incomplete response.');
+      for(const event of result.items){const date=visitEventDate(event);if(date&&date>=from&&date<=through)dates.add(date);}
+      page=result.nextPageToken||'';if(page&&pages.has(page))throw new Error('Calendar pagination did not complete.');pages.add(page);
+    }while(page);
+    return {from,through,dates:[...dates].sort(),checkedAt:new Date().toISOString()};
+  }
+}
 export class LocalAdapter {
   mode='local';label='Laptop Drive folder';
-  async connect(){const r=await fetch('/api/connect',{method:'POST',headers:{'X-Trim-Local':'1'}});const j=await r.json();if(!r.ok)throw new Error(j.error);this.csrf=j.csrf;}
+  async connect(){const r=await fetch('/api/connect',{method:'POST',headers:{'X-Trim-Local':'1'}});const j=await r.json();if(!r.ok)throw new Error(j.error);this.csrf=j.csrf;try{this.planningReady=(await (await fetch('/health')).json()).version==='20261015-auto-routine1';}catch{this.planningReady=false;}}
   async request(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,'X-Trim-Session':this.csrf}});const j=await r.json();if(!r.ok){const e=new Error(j.error);e.status=r.status;throw e;}return j;}
   roster(){return this.request('/api/roster');}
   load(){return this.request('/api/billing');}

@@ -2,7 +2,15 @@
 
 The original roster app is `index.html` (green T favicon). `billing/` is a separate application. Never commit private patient data. Develop outside Google Drive.
 
-## Other patients
+## New-panel first routine review
+
+Manager stamps genuinely new additions with `panelAddedDate` (Pacific calendar date) and `newPanelPatient: true`; returning retained patients are marked false. Billing uses these markers, not a guessed admission bill or missing history, to stage a first review on the next exact `TRIM VISIT DAY` after addition. No charges are created. Existing billed history and legacy manual first-review plans remain intact.
+
+In Billing Settings, **Connect / refresh visit calendar** requests read-only Google Calendar events access, separately from Drive. The existing OAuth project must enable Calendar API and authorize this scope/origin. Tokens remain in memory. Only the filtered visit dates and check time enter the private billing JSON; new assignments require a read within 24 hours. Missing access/events or stale dates show **Calendar date needed**, without blocking unrelated billing. Save the session to share this metadata across computers. Future/unresolved plans update on refresh; actual charges and already-due plans do not change.
+
+Synthetic regression: `node --test tests/new-patient-planning.test.mjs`.
+
+## Other-patient directory
 
 The Other patients tab reads `otherPatients` from the same private roster JSON, with the existing table styling, unit grouping, PHN copy controls and Ava chart links. Search by name, PHN or Ava number, or filter by doctor. Missing units appear under Unit not recorded; no locations or physician assignments are inferred. These patients never enter the active panel, its counts, or printed active lists.
 

@@ -1,13 +1,14 @@
 import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=20261007-dates1';
-import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261015-first-routine1';
-import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261015-first-routine1';
+import {CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261015-auto-routine1';
+import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261015-auto-routine1';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261007-cancel1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261015-first-routine1';
+import {LocalAdapter,DriveAdapter,VisitCalendar} from './adapters.mjs?v=20261015-auto-routine1';
+import {planNewPatients,addDays} from './core.mjs?v=20261015-auto-routine1';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
 import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261007-dates1';
-import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261015-first-routine1';
-import {mergeSession} from './merge.mjs?v=20261015-first-routine1';
+import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261015-auto-routine1';
+import {mergeSession} from './merge.mjs?v=20261015-auto-routine1';
 const $=id=>document.getElementById(id);
 $('search-scope').textContent='All TRIM Manager residents · your panel, other residents and saved coverage patients';
 const headerDate=document.createElement('div');headerDate.id='header-billing-date';headerDate.setAttribute('aria-live','polite');headerDate.innerHTML='<small>Billing for</small><strong id="header-date-value"></strong>';document.querySelector('header .brand').after(headerDate);
@@ -87,6 +88,50 @@ async function recover(){
 function persistRecovery(){const snapshot={ledger:clone(ledger),baseLedger:clone(savedBase),etag,dirty,savedAt:new Date().toISOString()};recoveryPending++;
   recoveryQueue=recoveryQueue.catch(()=>{}).then(()=>saveRecovery(snapshot.ledger.datasetId,snapshot)).then(()=>{recoveryPending--;localRecoveryFailed=false;}).catch(e=>{recoveryPending--;localRecoveryFailed=true;blocked=true;status('Recovery save failed — keep this tab open',true);notice(`Device recovery failed: ${e.message}. Download a private backup before closing.`);throw e;});return recoveryQueue;
 }
+const visitCalendar=new VisitCalendar();
+let visitCalendarBusy=false,visitCalendarMessage='';
+function applyNewPatientPlans(){
+  if(!ledger||!roster||writeUnavailable()||saving)return;
+  const next=planNewPatients(ledger,roster);
+  if(!sameBillingContent(next,ledger))commit(next);
+}
+function renderVisitCalendar(){
+  if(!$('visit-calendar')){
+    const card=document.createElement('div');card.className='card';card.id='visit-calendar';
+    card.innerHTML='<h2>New patients · first routine review</h2><p>New panel patients start on the next TRIM VISIT DAY after they are added. Admission billing stays in your office EMR. This plans a review; it never creates a charge.</p><p id="visit-calendar-status" role="status"></p><button id="visit-calendar-connect">Connect / refresh visit calendar</button><p class="hint">Read-only Google Calendar access. Save the session to share the dates with your other computer. If the calendar cannot be read, new patients wait for a date; other billing still works.</p>';
+    $('settings').querySelector('.settings-grid').prepend(card);
+    $('visit-calendar-connect').onclick=safe(refreshVisitCalendar);
+  }
+  const c=ledger?.settings.trimVisitCalendar;
+  if(!$('new-patient-calendar-prompt')){
+    const prompt=document.createElement('p');prompt.id='new-patient-calendar-prompt';prompt.className='issue-box';prompt.hidden=true;
+    prompt.innerHTML='<span></span> <button type="button">Calendar settings</button>';
+    prompt.querySelector('button').onclick=()=>{switchTab('settings');$('visit-calendar').scrollIntoView({block:'center'});};
+    $('routine-views').after(prompt);
+  }
+  const waiting=roster?.patients.filter(p=>dueState(ledger,p,today()).label==='Calendar date needed').length||0;
+  $('new-patient-calendar-prompt').hidden=!waiting&&adapter?.planningReady!==false;
+  $('new-patient-calendar-prompt').querySelector('span').textContent=adapter?.planningReady===false?'Restart the laptop app to enable automatic new-patient planning. Existing billing is unchanged.':waiting+' new patient'+(waiting===1?' needs':'s need')+' a calendar date.';
+  $('visit-calendar-status').textContent=visitCalendarMessage||(c?'Calendar checked '+formatTimestamp(c.checkedAt)+' · '+c.dates.length+' visit days.':'Connect Calendar to automatically date new-patient reviews.');
+  $('visit-calendar-connect').disabled=visitCalendarBusy||!ledger||writeUnavailable()||saving;
+}
+async function refreshVisitCalendar(){
+  guardWrite();if(visitCalendarBusy)return;visitCalendarBusy=true;visitCalendarMessage='Reading visit days…';renderVisitCalendar();
+  const connectedAdapter=adapter;
+  try{
+    await visitCalendar.connect();
+    const earliest=Object.values(ledger.newPatientStarts||{}).map(s=>s.addedDate).sort()[0];
+    const from=earliest&&earliest<addDays(today(),-90)?earliest:addDays(today(),-90);
+    const calendar=await visitCalendar.read(from);
+    const freshRoster=await connectedAdapter.roster();
+    if(adapter!==connectedAdapter)throw new Error('Billing connection changed; reconnect Calendar.');
+    guardWrite();roster=freshRoster;
+    const next=clone(ledger);next.settings.trimVisitCalendar=calendar;
+    commit(planNewPatients(next,roster));renderAll();
+    visitCalendarMessage=calendar.dates.length?'Visit days loaded. New-patient plans are included in your next Save session to Drive.':'No TRIM VISIT DAY events found. New patients remain awaiting a calendar date.';
+  }catch(e){visitCalendarMessage=e.message;throw e;}
+  finally{visitCalendarBusy=false;renderVisitCalendar();}
+}
 async function connect(mode,create=false){
   if(connecting)return;connecting=true;
   $('create-cloud').hidden=true;$('setup-note').hidden=true;
@@ -103,6 +148,7 @@ async function connect(mode,create=false){
     await takeTabLock(s.ledger.datasetId);
     adapter=candidate;roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;
     await recover();
+    if(!blocked)applyNewPatientPlans();
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();document.title='TRIM Billing · Parallel review';
     $('storage-note').textContent=mode==='local'?'Local preview · saves to this laptop’s Drive folder. Cloud sync is not verified. Original roster: read-only.':'Google Drive connected · original roster: read-only.';
     renderAll();setBillingMode(billingMode);document.querySelector('.version').textContent=ledger.settings.parallel?'PAPER COMPARISON':'BILLING';status(blocked?'Draft conflict — action needed':dirty?'Saved on this device — not yet in Drive':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
@@ -126,6 +172,7 @@ async function flush(){
   finally{saving=false;updateWriteLock();if(!dirty&&!writeUnavailable()){renderCalendar();if(tab==='history')renderHistory();if(saveFocus?.el.isConnected&&!saveFocus.el.disabled&&document.activeElement===document.body){saveFocus.el.focus();if(saveFocus.start!==null)saveFocus.el.setSelectionRange(saveFocus.start,saveFocus.end);}}saveFocus=null;}
 }
 function renderAll(){
+  renderVisitCalendar();
   $('unit-filter').innerHTML='<option value="">All units</option>'+roster.units.map(u=>`<option value="${esc(u.id)}">${esc(u.name)}</option>`).join('');
   renderStats();renderRoster();renderEditor();renderReports();renderReview();renderHistory();renderSettings();renderCalendar();renderRoutineBatch();updateWriteLock();
 }
@@ -135,7 +182,7 @@ function renderRoster(){
   // Concern search always spans the full roster, regardless of stale routine filters.
   const pts=people().filter(p=>matchesPatientSearch(p,q)&&(billingMode==='concern'||(p.panel&&(!unit||p.unit===unit)&&(!dueOnly||dueState(ledger,p,date()).kind==='due'||ledger.entries.some(e=>e.patientKey===p.key&&e.date===date())))));
   const units=[...roster.units];for(const p of pts)if(!units.some(u=>u.id===p.unit))units.push({id:p.unit,name:p.unit||'OTHER',floor:''});
-  $('roster').innerHTML=units.map(u=>{const group=pts.filter(p=>p.unit===u.id).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})||a.name.localeCompare(b.name));if(!group.length)return '';return `<section class="unit"><div class="unit-heading"><span>${esc(u.name)}${u.floor?` · FLOOR ${esc(u.floor)}`:''}</span><span>${group.length}</span></div>${group.map(p=>{const e=ledger.entries.find(e=>e.patientKey===p.key&&e.date===date());const d=dueState(ledger,p,date());return `<button class="patient ${selected===p.key?'selected':''}" data-patient="${esc(p.key)}"><span class="room">${esc(p.room||'—')}</span><span><span class="patient-name">${esc(p.name)}${p.pFlag?'<span class="pflag">P</span>':''}</span><span class="patient-detail">${d.last?`Last billing ${formatDate(d.last)}${billingMode==='routine'?` · ${Math.round((Date.parse(date())-Date.parse(d.last))/86400000)} days ago`:''}`:d.firstRoutine?'Admission billed in office EMR':p.panel?'Starting history not supplied':'Reason required for coverage billing'}</span></span><span class="patient-right">${e?`<span class="pill">${e.items.map(i=>esc(i.code.replace(/^0+/,''))).join(' · ')}</span><span class="patient-detail">${e.batchId?'Handed over':entryIssues(e,ledger,p).length?'Needs information':'Selected'}</span>`:`<span class="pill ${d.kind==='unknown'?'warn':''}">${esc(d.kind==='later'?`Next ${formatDate(d.due)}`:d.label)}</span>`}</span></button>`;}).join('')}</section>`;}).join('')||'<div class="empty">No patients match these filters.</div>';
+  $('roster').innerHTML=units.map(u=>{const group=pts.filter(p=>p.unit===u.id).sort((a,b)=>a.room.localeCompare(b.room,undefined,{numeric:true})||a.name.localeCompare(b.name));if(!group.length)return '';return `<section class="unit"><div class="unit-heading"><span>${esc(u.name)}${u.floor?` · FLOOR ${esc(u.floor)}`:''}</span><span>${group.length}</span></div>${group.map(p=>{const e=ledger.entries.find(e=>e.patientKey===p.key&&e.date===date());const d=dueState(ledger,p,date());return `<button class="patient ${selected===p.key?'selected':''}" data-patient="${esc(p.key)}"><span class="room">${esc(p.room||'—')}</span><span><span class="patient-name">${esc(p.name)}${p.pFlag?'<span class="pflag">P</span>':''}</span><span class="patient-detail">${d.last?`Last billing ${formatDate(d.last)}${billingMode==='routine'?` · ${Math.round((Date.parse(date())-Date.parse(d.last))/86400000)} days ago`:''}`:d.firstRoutine?'New patient · first routine review':p.panel?'Starting history not supplied':'Reason required for coverage billing'}</span></span><span class="patient-right">${e?`<span class="pill">${e.items.map(i=>esc(i.code.replace(/^0+/,''))).join(' · ')}</span><span class="patient-detail">${e.batchId?'Handed over':entryIssues(e,ledger,p).length?'Needs information':'Selected'}</span>`:`<span class="pill ${d.kind==='unknown'?'warn':''}">${esc(d.kind==='later'?`Next ${formatDate(d.due)}`:d.label)}</span>`}</span></button>`;}).join('')}</section>`;}).join('')||'<div class="empty">No patients match these filters.</div>';
   $('roster').querySelectorAll('[data-patient]').forEach(b=>b.onclick=()=>{if(saving||checking)return;selected=b.dataset.patient;editingId=null;renderRoster();renderEditor();});updateWriteLock();
 }
 function currentEntry(){return editingId?ledger.entries.find(e=>e.id===editingId):ledger.entries.find(e=>e.patientKey===selected&&e.date===date());}
@@ -341,7 +388,7 @@ async function verifyConnection(){
   checking=true;updateWriteLock();
   try{if(!navigator.onLine)throw new Error('No internet connection.');await adapter.verify(etag);checkedDrive();connectionVerified=true;syncFailed=false;status(dirty?'Saved on this device — not yet in Drive':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);}
   catch(e){connectionError(e);connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);notice(e.message);}
-  finally{checking=false;updateWriteLock();}
+  finally{checking=false;applyNewPatientPlans();updateWriteLock();renderVisitCalendar();}
 }
 async function syncSession(save=true){
   if(saving||checking)return;checking=true;updateWriteLock();
@@ -349,8 +396,8 @@ async function syncSession(save=true){
     if(!navigator.onLine)throw new Error('Reconnect to the internet. Your local work is retained.');
     if(!driveReachable)await adapter.connect();
     await recoveryQueue;
-    const current=await adapter.load();checkedDrive();
-    if(!dirty||sameBillingContent(ledger,current.ledger)){roster=await adapter.roster();await adoptSaved(current);return;}
+    const current=await adapter.load();checkedDrive();roster=await adapter.roster();
+    if(!dirty||sameBillingContent(ledger,current.ledger)){await adoptSaved(current);checking=false;applyNewPatientPlans();if(save&&dirty)await flush();renderAll();return;}
     if(!save){
       blocked=current.etag!==etag;connectionVerified=!blocked;syncFailed=false;
       notice(blocked?'Drive has newer billing. Click Save my changes to Drive to add your local work.':'');
@@ -363,7 +410,7 @@ async function syncSession(save=true){
     }
     // Rebase the local recovery before the one conditional upload. If the upload
     // fails, retry uses the same changes against the newly loaded Drive version.
-    ledger=merged.ledger;savedBase=clone(current.ledger);etag=current.etag;seq++;
+    ledger=planNewPatients(merged.ledger,roster);savedBase=clone(current.ledger);etag=current.etag;seq++;
     dirty=!sameBillingContent(ledger,current.ledger);blocked=false;syncFailed=false;connectionVerified=true;
     printedSignature=null;mergeChoices={};mergeConflicts=[];await persistRecovery();
     if($('merge-dialog').open)$('merge-dialog').close();
