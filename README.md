@@ -4,9 +4,9 @@ The original roster app is `index.html` (green T favicon). `billing/` is a separ
 
 ## New-panel first routine review
 
-Manager stamps genuinely new additions with `panelAddedDate` (Pacific calendar date) and `newPanelPatient: true`; returning retained patients are marked false. Billing uses these markers, not a guessed admission bill or missing history, to stage a first review on the next exact `TRIM VISIT DAY` after addition. No charges are created. Existing billed history and legacy manual first-review plans remain intact.
+Manager stamps genuinely new panel additions with `panelAddedDate` (Pacific date) and `newPanelPatient: true`; returning retained patients are marked false. New panel patients become available for routine billing immediately, without a Calendar connection, scheduled visit day, admission date or waiting period. Existing actual billing remains authoritative for subsequent due dates. Billing only creates charges when the physician selects them.
 
-In Billing Settings, **Connect / refresh visit calendar** requests read-only Google Calendar events access, separately from Drive. The existing OAuth project must enable Calendar API and authorize this scope/origin. Tokens remain in memory. Only the filtered visit dates and check time enter the private billing JSON; new assignments require a read within 24 hours. Missing access/events or stale dates show **Calendar date needed**, without blocking unrelated billing. Save the session to share this metadata across computers. Future/unresolved plans update on refresh; actual charges and already-due plans do not change.
+Legacy future first-review dates no longer delay eligibility. They remain readable for compatibility; unused Calendar cache metadata retires on normal session saving. No existing charges or historical records are rewritten.
 
 Synthetic regression: `node --test tests/new-patient-planning.test.mjs`.
 
