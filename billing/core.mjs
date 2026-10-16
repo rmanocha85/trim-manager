@@ -1,6 +1,6 @@
 export const SCHEMA = 1;
 export const APP = 'trim-billing';
-export const RESET_CODES = ['00114','00115','00127','13115'];
+export const RESET_CODES = ['00114','00115','00127'];
 export const CODES = [
   {code:'00114', label:'LTC in-person', note:'Routine interval check is a planning aid; early claims require a reason.'},
   {code:'00115', label:'Urgent assessment', reason:true, request:true, attendance:true, note:'08:00–23:00, within 24 hours of facility request; verify urgency criteria.'},
@@ -118,6 +118,10 @@ export function validateLedger(l) {
     if(!e.items.length||e.items.some(i=>!/^\d{5}$/.test(i.code)||!Number.isInteger(Number(i.units))||Number(i.units)<1||Number(i.units)>99)) throw new Error('Invalid billing code or units.');
   }
   for(const b of Object.values(l.baselines)) if(!validDate(b.date)||b.date>today()) throw new Error('Invalid starting billing date.');
+  if(l.routineStarts!==undefined){
+    if(!l.routineStarts||typeof l.routineStarts!=='object'||Array.isArray(l.routineStarts))throw new Error('Invalid first routine billing setup.');
+    for(const [key,s] of Object.entries(l.routineStarts))if(!l.patients[key]||!validDate(s.admissionDate)||s.admissionDate>today()||!validDate(s.firstRoutineDate)||s.firstRoutineDate<=s.admissionDate||s.admissionBilledExternally!==true)throw new Error('Invalid first routine billing setup.');
+  }
   if(typeof l.settings.parallel!=='boolean'||!Array.isArray(l.settings.portalYears))throw new Error('Invalid billing settings.');
   const patientDates=new Set();
   for(const e of l.entries){const k=`${e.patientKey}|${e.date}`;if(patientDates.has(k))throw new Error('Duplicate patient/date billing.');patientDates.add(k);}
@@ -156,8 +160,25 @@ export function lastBilling(ledger,key,asOf='9999-12-31',resetOnly=false,exclude
 }
 export function dueState(ledger,patient,date=today()) {
   if(!patient.panel) return {label:'Ad hoc only',kind:'adhoc',last:lastBilling(ledger,patient.key,date)};
-  const last=lastBilling(ledger,patient.key,date,true);if(!last) return {label:'History needed',kind:'unknown',last:null};
+  const last=lastBilling(ledger,patient.key,date,true);
+  const start=ledger.routineStarts?.[patient.key];
+  if(!last&&start&&start.admissionDate<=date){
+    const due=start.firstRoutineDate;
+    return {last:null,due,firstRoutine:true,kind:due<=date?'due':'later',label:due<=date?'First routine billing review':`First routine review ${due}`};
+  }
+  if(!last) return {label:'History needed',kind:'unknown',last:null};
   const due=addDays(last,14); return {last,due,kind:due<=date?'due':'later',label:due<=date?'Due for billing review':`Next ${due}`};
+}
+// Planning metadata only: never creates an admission charge or a future visit.
+export function setFirstRoutineReview(ledger,patient,admissionDate,firstRoutineDate) {
+  if(!patient.panel)throw new Error('First routine review is for active panel patients only.');
+  const next=clone(ledger);
+  next.patients[patient.key]??=clone(patient);
+  next.routineStarts??={};
+  const start={admissionDate,firstRoutineDate,admissionBilledExternally:true};
+  if(next.routineStarts[patient.key]&&JSON.stringify(next.routineStarts[patient.key])!==JSON.stringify(start))throw new Error('First routine review already exists; review it before replacing.');
+  next.routineStarts[patient.key]=start;
+  return validateLedger(next);
 }
 export function upsertEntry(ledger,patient,date,items,comment='',id=null) {
   if(!validDate(date)||date>today()) throw new Error('Choose a valid service date, not a future date.');
