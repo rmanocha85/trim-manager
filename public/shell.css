@@ -1,13 +1,27 @@
 [hidden]{display:none!important}
-.app-sections{display:flex;gap:6px;padding:10px 20px;background:#fff;border-bottom:1px solid #dce4db;align-items:center}
-.app-sections button{font-size:16px;font-weight:650;padding:12px 22px;border:0;border-radius:8px;background:transparent;color:#34563c}
-.app-sections button[aria-pressed=true]{background:#dfece0;color:#183c27;box-shadow:inset 0 -3px #2d5b40}
-.app-sections .utility{margin-left:auto;font-size:14px}
+:root{--billing-header-height:72px}
+#workspace>header{display:grid;grid-template-areas:"brand sections date actions";grid-template-columns:auto auto minmax(0,1fr) auto;gap:10px;padding:6px 12px}
+#workspace>header .brand{grid-area:brand}
+.app-sections{grid-area:sections;display:flex;gap:2px;align-items:center}
+.app-sections button{font-size:14px;font-weight:650;padding:9px 10px;border:0;border-radius:7px;background:transparent;color:#fff;white-space:nowrap}
+.app-sections button:hover{background:#ffffff1a}
+.app-sections button[aria-pressed=true]{background:#e4eee3;color:#183c27;box-shadow:inset 0 -3px #b8d0bb}
+.app-sections button:focus-visible{outline-color:#d8edc9}
+.app-sections .utility{font-size:12px}
+#workspace>header #header-billing-date{grid-area:date;margin:0;padding-left:10px}
+#workspace>header #header-date-value{font-size:15px}
+#workspace>header .header-actions{grid-area:actions;margin:0;gap:6px;flex-wrap:nowrap}
+#workspace>header .header-actions .save-control,#workspace>header .header-actions .session-save{width:120px;min-width:120px;flex-basis:120px}
+#workspace>header #switch-version{max-width:85px;line-height:1.3;align-self:center}
 #session-status:not(:empty){padding:10px 24px;background:#fff3d4;border-bottom:1px solid #e6cf91;color:#584216}
 #patients-workspace{background:#f6f7f4;min-height:70vh}
 #patients-print-dialog{width:96vw;max-width:1300px;height:92vh;padding:0;border:1px solid #ccc;border-radius:10px}
 #patients-print-dialog .report-top{display:flex;align-items:center;gap:14px;padding:12px 20px}
 #patients-print-title{flex:1;margin:0;font-size:20px}
 #patients-print-frame{width:100%;height:calc(100% - 76px);border:0;background:white}
-@media(max-width:900px){.app-sections{padding:8px;gap:2px}.app-sections button{padding:10px;font-size:14px}#session-status{font-size:13px}header .header-actions{flex-wrap:wrap}}
+@media(max-width:1279px) and (min-width:761px){:root{--billing-header-height:112px}#workspace>header{grid-template-areas:"brand sections sections" "date date actions";grid-template-columns:auto 1fr auto;row-gap:3px}#workspace>header .app-sections{justify-self:start}#workspace>header #header-billing-date{border:0;padding-left:0}}
+@media(max-width:1000px) and (min-width:761px){#workspace>header .header-actions .save-control,#workspace>header .header-actions .session-save{width:104px;min-width:104px;flex-basis:104px}}
+@media(pointer:coarse) and (min-width:761px) and (max-width:1279px){:root{--billing-header-height:128px}}
+@media(max-width:760px){#workspace>header{grid-template-areas:"brand sections" "date date" "actions actions";grid-template-columns:auto 1fr;height:auto;position:static;gap:7px}#workspace>header .app-sections{flex-wrap:wrap;justify-content:flex-end}.app-sections button{font-size:12px;padding:8px}#workspace>header #header-billing-date{border:0;padding:0}#workspace>header .header-actions{flex-wrap:wrap;justify-content:flex-end}#workspace>header .header-actions .save-control,#workspace>header .header-actions .session-save{width:calc((100vw - 36px)/3);min-width:0;flex-basis:calc((100vw - 36px)/3)}#session-status{font-size:13px}}
+@media(max-width:480px){#workspace>header{grid-template-areas:"sections" "date" "actions";grid-template-columns:1fr}#workspace>header .brand{display:none}#workspace>header .app-sections{justify-content:space-between;gap:0}.app-sections button{padding:8px 5px}}
 @media print{.app-sections,#session-status{display:none}}
