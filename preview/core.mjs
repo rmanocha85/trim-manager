@@ -1,0 +1,378 @@
+export const SCHEMA = 1;
+export const APP = 'trim-billing';
+export const RESET_CODES = ['00114','00115','00127'];
+export const CODES = [
+  {code:'00114', label:'LTC in-person', note:'Routine interval check is a planning aid; early claims require a reason.'},
+  {code:'00115', label:'Urgent assessment', reason:true, request:true, attendance:true, note:'08:00–23:00, within 24 hours of facility request; verify urgency criteria.'},
+  {code:'00127', label:'Palliative facility visit', note:'Verify palliative criteria and any additional same-day claim requirements.'},
+  {code:'13115', label:'LTC admission', reason:true, admission:true, note:'Initial in-person admission, once per patient per physician. Confirm reconciliation, care plan and MOST; not a return from hospital or physician transfer.'},
+  {code:'13334', label:'First visit bonus', note:'Once per physician/day; requires qualifying visit. Not with urgent assessment.'},
+  {code:'14077', label:'Provider conference', timed:true, portal:true, annual:18, note:'Two-way clinical conference, not routine-round communication. Start/end in claim and chart. Reason and participant documentation stays in the clinical note. Annual units shown are recorded here only.'},
+  {code:'13121', label:'Family conference', timed:true, annual:100, physicianLimit:true, note:'Care planning/consent criteria, not routine updates. Separate time from other services. Reason and participant documentation stays in the clinical note.'},
+  {code:'14067', label:'Brief provider conference', participants:true, reason:true, portal:true, annual:150, physicianLimit:true, note:'Clinical conferencing criteria; not an administrative or family conversation.'},
+  {code:'13005', label:'Allied-worker advice', request:true, reason:true, note:'Document caller, request time and advice; same-day service restrictions apply.'},
+  {code:'01200', label:'Evening call-out', request:true, attendance:true, reason:true, callout:true, note:'Special call and travel; first patient only. Check time-window and same-day restrictions.'},
+  {code:'01201', label:'Night call-out', request:true, attendance:true, reason:true, callout:true, note:'Special call and travel; first patient only. Check time-window and same-day restrictions.'},
+  {code:'01202', label:'Weekend / holiday call-out', request:true, attendance:true, reason:true, callout:true, note:'Special call and travel; first patient only. Check time-window and same-day restrictions.'}
+];
+export const codeInfo = code => CODES.find(x => x.code === code);
+export const COMMON_CODES = ['00114','00127','14077','13121'];
+export const CONFERENCE_CODES = ['14077','13121'];
+export const REASON_PRESETS = [
+  {reason:'Fall and trauma',diagnosis:'959'},
+  {reason:'Sepsis/fever',diagnosis:'038.9'},
+  {reason:'Cough and shortness of breath',diagnosis:'786.2'},
+  {reason:'Abdominal pain',diagnosis:'789'},
+  {reason:'Cellulitis/wound infection',diagnosis:'682'},
+  {reason:'Worsening behavioral issues',diagnosis:'298'},
+  {reason:'Worsening chronic pain',diagnosis:'338'},
+  {reason:'Influenza',diagnosis:'487'},
+  {reason:'Cough and COVID',diagnosis:'C19'},
+  {reason:'Hyperglycemia and diabetes management',diagnosis:'250'}
+];
+// Only a deliberate start-time edit fills a missing end; imports and manual ends are untouched.
+export function defaultConferenceEnd(item){
+  if(!CONFERENCE_CODES.includes(item.code)||item.end)return item.end;
+  const start=minutes(item.start);
+  if(start===null||start+10>=1440)return item.end;
+  const end=start+10;return `${String(Math.floor(end/60)).padStart(2,'0')}:${String(end%60).padStart(2,'0')}`;
+}
+export const today = () => {const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+export const clone = value => structuredClone(value);
+// A save may reach Drive before this browser records its acknowledgement.
+// Ignore ONLY server-owned root save metadata; every billing field must match.
+export function sameBillingContent(a,b){
+  const stable=value=>value&&typeof value==='object'?(Array.isArray(value)?value.map(stable):Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]))):value;
+  const content=value=>{const copy=clone(value);delete copy.revision;delete copy.updatedAt;return JSON.stringify(stable(copy));};
+  return Boolean(a&&b&&a.datasetId===b.datasetId)&&content(a)===content(b);
+}
+export function validDate(s) { if(!/^\d{4}-\d{2}-\d{2}$/.test(s||'')) return false; const d=new Date(`${s}T12:00:00Z`); return !Number.isNaN(+d)&&d.toISOString().slice(0,10)===s; }
+export function addDays(s,n) {if(!validDate(s)) return null; const d=new Date(`${s}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);}
+export function daysBetween(a,b) {return (Date.parse(`${b}T12:00:00Z`)-Date.parse(`${a}T12:00:00Z`))/86400000;}
+export function minutes(s) {return /^([01]\d|2[0-3]):[0-5]\d$/.test(s||'')?Number(s.slice(0,2))*60+Number(s.slice(3)):null;}
+export function normalizeManualTime(value){
+  const text=String(value||'').trim();
+  const match=text.match(/^(\d{1,2}):(\d{2})$/)||text.match(/^(\d{1,2})(\d{2})$/);
+  if(!match)return null;
+  const result=`${match[1].padStart(2,'0')}:${match[2]}`;
+  return minutes(result)===null?null:result;
+}
+// Defaults apply only to newly selected services, never to imported/saved entries.
+export function roundedPacificTime(now=new Date()){
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Los_Angeles',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(now);
+  const part=k=>Number(parts.find(p=>p.type===k).value);
+  const rounded=(Math.round((part('hour')*60+part('minute')+part('second')/60)/10)*10)%1440;
+  return `${String(Math.floor(rounded/60)).padStart(2,'0')}:${String(rounded%60).padStart(2,'0')}`;
+}
+export function timeDefaults(code,now=new Date()){
+  const info=codeInfo(code);if(!info?.timed&&!info?.attendance)return {};
+  const start=roundedPacificTime(now);
+  return info.timed?{start,end:tenMinutesLater(start),endAuto:true}:{start};
+}
+export function tenMinutesLater(start){
+  const value=minutes(start);if(value===null||value+10>=1440)return '';
+  return `${String(Math.floor((value+10)/60)).padStart(2,'0')}:${String((value+10)%60).padStart(2,'0')}`;
+}
+export function editBillingTime(item,field,value){
+  const changed={...item,[field]:normalizeManualTime(value)||value.trim()};
+  if(field==='end')changed.endAuto=false;
+  if(field==='start'&&(codeInfo(item.code)?.timed||item.customTimed)&&(item.endAuto===true||!item.end)){
+    changed.end=tenMinutesLater(changed.start);changed.endAuto=true;
+  }
+  return changed;
+}
+export const escapeHTML = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function blankLedger(id=crypto.randomUUID()) {return {app:APP,schema:SCHEMA,datasetId:id,revision:0,updatedAt:null,entries:[],baselines:{},nonPanel:[],patients:{},units:[],batches:[],settings:{parallel:true,portalYears:[]}};}
+export function patientKey(p) {const phn=String(p.phn||'').replace(/\D/g,'');return phn?`phn:${phn}`:`roster:${String(p.id)}`;}
+export function normalizeRoster(raw) {
+  if(!Array.isArray(raw?.patients)||!Array.isArray(raw?.units)) throw new Error('Not a TRIM roster file.');
+  if(raw.otherPatients!==undefined&&!Array.isArray(raw.otherPatients)) throw new Error('Invalid other-patient directory in TRIM roster.');
+  const normalizePatients=(records,panel)=>{
+   const seen=new Set();
+   return records.map(p=>{
+    if(!p.id||!p.name) throw new Error('Roster contains an incomplete identity.');
+    const key=patientKey(p); if(seen.has(key)) throw new Error('Duplicate patient identity in roster; source must be reviewed.');seen.add(key);
+    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel,...(validDate(p.panelAddedDate)?{panelAddedDate:p.panelAddedDate,newPanelPatient:p.newPanelPatient===true}:{})};
+   });
+  };
+  return {patients:normalizePatients(raw.patients,true),otherPatients:normalizePatients(raw.otherPatients||[],false),units:raw.units.map(u=>({id:String(u.id),name:String(u.name),floor:u.floor??''}))};
+}
+export function rosterView(roster, ledger) {
+  const map=new Map(Object.entries(ledger.patients).map(([key,p])=>[key,{...p,key,panel:false,retained:true}]));
+  for(const p of ledger.nonPanel) map.set(p.key,{...p,panel:false});
+  // The Manager directory refreshes coverage details; active panel membership wins.
+  // PHN/roster identity joins existing bills without rewriting historical records.
+  for(const p of roster.otherPatients||[]) map.set(p.key,{...p,panel:false});
+  for(const p of roster.patients) map.set(p.key,p);
+  return [...map.values()];
+}
+export function validateLedger(l) {
+  if(l?.app!==APP||l.schema!==SCHEMA||typeof l.datasetId!=='string'||!Number.isInteger(l.revision)||l.revision<0) throw new Error('Unsupported billing file; original roster files are never writable here.');
+  for(const k of ['entries','nonPanel','units','batches']) if(!Array.isArray(l[k])) throw new Error(`Invalid ${k}.`);
+  for(const k of ['patients','baselines','settings']) if(!l[k]||typeof l[k]!=='object'||Array.isArray(l[k])) throw new Error(`Invalid ${k}.`);
+  const ids=new Set();
+  for(const e of l.entries) {
+    if(!e.id||ids.has(e.id)||!e.patientKey||!validDate(e.date)||!Array.isArray(e.items)) throw new Error('Invalid/duplicate billing entry.');
+    ids.add(e.id);
+    if(!l.patients[e.patientKey]) throw new Error('Billing entry is missing its patient identity.');
+    if(!e.items.length||e.items.some(i=>!/^\d{5}$/.test(i.code)||!Number.isInteger(Number(i.units))||Number(i.units)<1||Number(i.units)>99)) throw new Error('Invalid billing code or units.');
+  }
+  for(const b of Object.values(l.baselines)) if(!validDate(b.date)||b.date>today()) throw new Error('Invalid starting billing date.');
+  if(l.routineStarts!==undefined){
+    if(!l.routineStarts||typeof l.routineStarts!=='object'||Array.isArray(l.routineStarts))throw new Error('Invalid first routine billing setup.');
+    for(const [key,s] of Object.entries(l.routineStarts))if(!l.patients[key]||!validDate(s.admissionDate)||s.admissionDate>today()||!validDate(s.firstRoutineDate)||s.firstRoutineDate<=s.admissionDate||s.admissionBilledExternally!==true)throw new Error('Invalid first routine billing setup.');
+  }
+  if(l.newPatientStarts!==undefined){
+    if(!l.newPatientStarts||typeof l.newPatientStarts!=='object'||Array.isArray(l.newPatientStarts))throw new Error('Invalid new-patient planning.');
+    for(const [key,s] of Object.entries(l.newPatientStarts))if(!l.patients[key]||!validDate(s.addedDate)||(s.firstRoutineDate!==null&&(!validDate(s.firstRoutineDate)||s.firstRoutineDate<=s.addedDate)))throw new Error('Invalid new-patient review date.');
+  }
+  if(typeof l.settings.parallel!=='boolean'||!Array.isArray(l.settings.portalYears))throw new Error('Invalid billing settings.');
+  const patientDates=new Set();
+  for(const e of l.entries){const k=`${e.patientKey}|${e.date}`;if(patientDates.has(k))throw new Error('Duplicate patient/date billing.');patientDates.add(k);}
+  if(l.historicalBillings!==undefined&&!Array.isArray(l.historicalBillings))throw new Error('Invalid historical billing.');
+  for(const h of l.historicalBillings||[]) {
+    const key=`${h.patientKey}|${h.date}`;
+    if(!h.id||ids.has(h.id)||patientDates.has(key)||!l.patients[h.patientKey]||!validDate(h.date)||h.date>today()||h.status!=='already_billed'||!Array.isArray(h.codes)||!h.codes.length||h.codes.some(c=>!/^\d{5}$/.test(c)))throw new Error('Invalid or duplicate already-billed history.');
+    ids.add(h.id);patientDates.add(key);
+  }
+  if(l.imports!==undefined&&(!Array.isArray(l.imports)||l.imports.some(i=>!i.sourceDatasetId||!i.sha256||!Array.isArray(i.review?.held))))throw new Error('Invalid import receipt.');
+  if(l.reviewResolutions!==undefined&&!Array.isArray(l.reviewResolutions))throw new Error('Invalid review resolutions.');
+  const resolved=new Set(),held=allHeldImports(l);
+  for(const r of l.reviewResolutions||[]){if(!r.key||resolved.has(r.key)||!held.some(h=>heldKey(h)===r.key)||!['included','excluded'].includes(r.disposition)||!r.reason?.trim()||!r.resolvedAt||(r.disposition==='included'&&!r.entryId))throw new Error('Invalid or duplicate held-item resolution.');resolved.add(r.key);}
+  const batchIds=new Set();
+  for(const b of l.batches) {
+    if(!b.id||batchIds.has(b.id)||!Array.isArray(b.entryIds)||new Set(b.entryIds).size!==b.entryIds.length) throw new Error('Invalid batch.');
+    batchIds.add(b.id);
+    for(const id of b.entryIds) if(!l.entries.some(e=>e.id===id&&e.batchId===b.id)) throw new Error('Batch/entry mismatch.');
+  }
+  for(const e of l.entries) if(e.batchId&&!l.batches.some(b=>b.id===e.batchId&&b.entryIds.includes(e.id))) throw new Error('Finalized entry has no batch.');
+  return l;
+}
+export function assertImmutable(previous,next) {
+  if(previous.datasetId!==next.datasetId) throw new Error('Wrong billing dataset.');
+  for(const b of previous.batches) if(JSON.stringify(b)!==JSON.stringify(next.batches.find(x=>x.id===b.id))) throw new Error('Handed-over batches cannot be altered.');
+  for(const e of previous.entries.filter(e=>e.batchId)) if(JSON.stringify(e)!==JSON.stringify(next.entries.find(x=>x.id===e.id))) throw new Error('Handed-over billing cannot be altered.');
+  for(const h of previous.historicalBillings||[])if(JSON.stringify(h)!==JSON.stringify(next.historicalBillings?.find(x=>x.id===h.id)))throw new Error('Already-billed history cannot be altered.');
+  for(const i of previous.imports||[])if(JSON.stringify(i)!==JSON.stringify(next.imports?.find(x=>x.sourceDatasetId===i.sourceDatasetId)))throw new Error('Import receipts cannot be altered.');
+  for(const r of previous.reviewResolutions||[])if(JSON.stringify(r)!==JSON.stringify(next.reviewResolutions?.find(x=>x.key===r.key)))throw new Error('Review resolutions cannot be altered.');
+}
+export function lastBilling(ledger,key,asOf='9999-12-31',resetOnly=false,excludeId=null) {
+  const dates=ledger.entries.filter(e=>e.patientKey===key&&e.date<=asOf&&e.id!==excludeId&&(!resetOnly||e.items.some(i=>RESET_CODES.includes(i.code)))).map(e=>e.date);
+  dates.push(...(ledger.historicalBillings||[]).filter(h=>h.patientKey===key&&h.date<=asOf&&(!resetOnly||h.codes.some(c=>RESET_CODES.includes(c)))).map(h=>h.date));
+  const base=ledger.baselines[key];if(base?.date<=asOf) dates.push(base.date);
+  return dates.sort().at(-1)||null;
+}
+export function dueState(ledger,patient,date=today()) {
+  if(!patient.panel) return {label:'Ad hoc only',kind:'adhoc',last:lastBilling(ledger,patient.key,date)};
+  const last=lastBilling(ledger,patient.key,date,true);
+  // Existing saved calendar plans are readable but no longer delay a new patient.
+  const added=ledger.newPatientStarts?.[patient.key]?.addedDate||
+    (patient.newPanelPatient?patient.panelAddedDate:null)||ledger.routineStarts?.[patient.key]?.admissionDate;
+  if(!last&&validDate(added)&&added<=date)return {last:null,due:added,firstRoutine:true,kind:'due',label:'First routine billing review'};
+  if(!last) return {label:'History needed',kind:'unknown',last:null};
+  const due=addDays(last,14); return {last,due,kind:due<=date?'due':'later',label:due<=date?'Due for billing review':`Next ${due}`};
+}
+// Only explicit new-panel markers qualify. Legacy patients and reactivations
+// are not inferred from missing billing, names, or timestamp-shaped roster IDs.
+export function planNewPatients(ledger,roster,asOf=today()){
+  const next=clone(ledger);
+  // Retire only unused schedule-cache metadata. Billing and legacy provenance stay intact.
+  delete next.settings.trimVisitCalendar;
+  for(const p of roster.patients){
+    if(!p.panel||!p.newPanelPatient||!validDate(p.panelAddedDate)||p.panelAddedDate>asOf||next.routineStarts?.[p.key])continue;
+    const identities=Object.entries(next.patients).filter(([key,old])=>key===p.key||String(old.id)===p.id||(p.ava&&old.ava===p.ava));
+    if(identities.some(([key])=>lastBilling(next,key,'9999-12-31',true)))continue;
+    const start=next.newPatientStarts?.[p.key]||{addedDate:p.panelAddedDate,firstRoutineDate:null};
+    next.patients[p.key]??=clone(p);next.newPatientStarts??={};next.newPatientStarts[p.key]=start;
+  }
+  return validateLedger(next);
+}
+// Planning metadata only: never creates an admission charge or a future visit.
+export function setFirstRoutineReview(ledger,patient,admissionDate,firstRoutineDate) {
+  if(!patient.panel)throw new Error('First routine review is for active panel patients only.');
+  const next=clone(ledger);
+  next.patients[patient.key]??=clone(patient);
+  next.routineStarts??={};
+  const start={admissionDate,firstRoutineDate,admissionBilledExternally:true};
+  if(next.routineStarts[patient.key]&&JSON.stringify(next.routineStarts[patient.key])!==JSON.stringify(start))throw new Error('First routine review already exists; review it before replacing.');
+  next.routineStarts[patient.key]=start;
+  return validateLedger(next);
+}
+export function upsertEntry(ledger,patient,date,items,comment='',id=null) {
+  if(!validDate(date)||date>today()) throw new Error('Choose a valid service date, not a future date.');
+  if(!items.length) throw new Error('Select at least one code.');
+  if(ledger.historicalBillings?.some(h=>h.patientKey===patient.key&&h.date===date))throw new Error('This patient/date is already billed in imported history. It cannot be added to pending billing.');
+  const l=clone(ledger);const existing=id?l.entries.find(e=>e.id===id):l.entries.find(e=>e.patientKey===patient.key&&e.date===date);
+  if(id&&!existing) throw new Error('Entry no longer exists. Reload before editing.');
+  if(existing?.batchId) throw new Error('This entry has already been handed over.');
+  if(l.entries.some(e=>e.patientKey===patient.key&&e.date===date&&e.id!==existing?.id)) throw new Error('A billing entry already exists for this patient/date. Edit that entry instead.');
+  l.patients[patient.key]=clone(patient);
+  const entry={id:existing?.id||crypto.randomUUID(),patientKey:patient.key,panelAtBilling:existing?.panelAtBilling??patient.panel,date,items:clone(items),comment,createdAt:existing?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString(),batchId:null};
+  if(existing) l.entries[l.entries.findIndex(e=>e.id===existing.id)]=entry; else l.entries.push(entry);
+  return l;
+}
+export function removeEntry(ledger,id) {
+  const e=ledger.entries.find(e=>e.id===id);if(!e) throw new Error('Entry not found.');if(e.batchId) throw new Error('Handed-over entries cannot be removed.');
+  const l=clone(ledger);l.entries=l.entries.filter(e=>e.id!==id);return l;
+}
+// Preserve a small reversible cancellation record; never alter handed-over history.
+export function cancelBillingCodes(ledger,id,code=null){
+  const before=ledger.entries.find(e=>e.id===id);
+  if(!before)throw new Error('Billing entry no longer exists.');
+  if(before.batchId)throw new Error('Handed-over billing is read-only.');
+  if(code&&!before.items.some(i=>i.code===code))throw new Error('Billing code no longer exists.');
+  let items=code?before.items.filter(i=>i.code!==code):[];
+  if(!items.some(i=>['00114','00127','13115'].includes(i.code)))items=items.filter(i=>i.code!=='13334');
+  const next=clone(ledger),after=items.length?{...clone(before),items:clone(items),updatedAt:new Date().toISOString()}:null;
+  next.entries=next.entries.filter(e=>e.id!==id);if(after)next.entries.push(after);
+  (next.cancellations??=[]).push({id:crypto.randomUUID(),cancelledAt:new Date().toISOString(),before:clone(before),after:clone(after)});
+  return next;
+}
+export function undoBillingCancellation(ledger,id){
+  const record=ledger.cancellations?.find(r=>r.id===id);
+  if(!record||record.undoneAt)throw new Error('This removal has already been undone.');
+  const current=ledger.entries.find(e=>e.id===record.before.id)||null;
+  if(JSON.stringify(current)!==JSON.stringify(record.after))throw new Error('This billing changed after removal. Review it before restoring.');
+  if(ledger.entries.some(e=>e.patientKey===record.before.patientKey&&e.date===record.before.date&&e.id!==record.before.id))throw new Error('Another entry now exists for this patient/date.');
+  const next=clone(ledger);next.entries=next.entries.filter(e=>e.id!==record.before.id);next.entries.push(clone(record.before));
+  next.cancellations.find(r=>r.id===id).undoneAt=new Date().toISOString();validateLedger(next);return next;
+}
+export function inheritConferenceDiagnoses(items,usual=''){
+  const primary=items.find(i=>i.code==='00114');
+  const usualPrimary=String(usual).trim().split(/[,;\s]+/)[0]||'';
+  return items.map(i=>CONFERENCE_CODES.includes(i.code)&&i.diagnosisSource==='primary114'?{...i,diagnosis:primary?primary.diagnosis||usualPrimary:i.diagnosis||usualPrimary}:i);
+}
+// Only interactive new qualifying selections receive an automatic bonus. Imports,
+// historical records and merely opening an existing day are never retrofitted.
+export function upsertInteractiveEntry(ledger,patient,date,items,comment='',id=null){
+  const existing=id?ledger.entries.find(e=>e.id===id):ledger.entries.find(e=>e.patientKey===patient.key&&e.date===date);
+  const qualifies=list=>list.some(i=>['00114','00127'].includes(i.code));
+  const cleaned=clone(items).filter(i=>!(i.code==='13334'&&i.autoAdded&&!qualifies(items)));
+  if(!cleaned.length)return existing?removeEntry(ledger,existing.id):clone(ledger);
+  const n=upsertEntry(ledger,patient,date,cleaned,comment,id);
+  const day=ledger.entries.filter(e=>e.date===date),history=(ledger.historicalBillings||[]).filter(e=>e.date===date);
+  if(qualifies(cleaned)&&!day.some(e=>qualifies(e.items)||e.items.some(i=>['13334','00115'].includes(i.code)))&&!history.some(h=>h.codes.some(c=>['00114','00127','13334','00115'].includes(c)))&&!cleaned.some(i=>['13334','00115'].includes(i.code))){
+    n.entries.find(e=>e.patientKey===patient.key&&e.date===date).items.push({code:'13334',units:1,autoAdded:true});
+  }
+  return n;
+}
+export function calendarDays(month){
+  if(!/^\d{4}-\d{2}$/.test(month)||!validDate(month+'-01'))throw new Error('Invalid calendar month.');
+  const first=new Date(month+'-01T12:00:00Z'),offset=(first.getUTCDay()+6)%7,last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+  return [...Array(offset).fill(null),...Array.from({length:last},(_,i)=>`${month}-${String(i+1).padStart(2,'0')}`)];
+}
+export function validDiagnosis(value){return /^(?:C19|\d{3}(?:\.\d{1,2})?|\d{4,5}|V\d{2}(?:\.\d{1,2})?|V\d{3,4}|E\d{3}(?:\.\d)?|E\d{4})$/i.test(String(value||'').trim());}
+export function batchEntries(ledger,from,to) {return ledger.entries.filter(e=>!e.batchId&&e.date>=from&&e.date<=to).sort((a,b)=>a.date.localeCompare(b.date)||a.patientKey.localeCompare(b.patientKey));}
+export function entryIssues(entry,ledger,patient) {
+  const errors=[]; const required=(ok,msg)=>{if(!ok)errors.push(msg);};
+  const codes=entry.items.map(i=>i.code); const all=ledger.entries;
+  if(entry.date>today()) errors.push('Future service date.');
+  if(new Set(codes).size!==codes.length) errors.push('Duplicate code on the same entry.');
+  for(const i of entry.items) {
+    const info=codeInfo(i.code); const prefix=`${i.code}: `;
+    if(!info) {required(i.customVerified===true&&Boolean(i.customLabel?.trim()),prefix+'custom code needs a description and physician rule confirmation.');if(i.customTimed){required(minutes(i.start)!==null&&minutes(i.end)!==null&&minutes(i.end)>minutes(i.start),prefix+'custom timed code needs valid start/end times.');}}
+    if(i.code!=='00127'&&(info?.reason||i.concernBilling===true||((entry.panelAtBilling??patient?.panel)===false&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code)))) required(Boolean(i.reason?.trim()),prefix+'reason required.');
+    if(i.diagnosis?.trim())required(validDiagnosis(i.diagnosis),prefix+'enter a valid ICD-9 diagnosis code.');
+    if(i.code==='00114'&&i.diagnosisMode==='per-charge'&&i.reason?.trim())required(Boolean(i.diagnosis?.trim()),prefix+'enter the ICD-9 for this billing reason.');
+    if(info?.participants) required(Boolean(i.participants?.trim()),prefix+'participants / roles required.');
+    if(info?.request) required(Boolean(i.requester?.trim())&&Boolean(i.requestAt)&&!Number.isNaN(Date.parse(i.requestAt)),prefix+'requesting person and request date/time required.');
+    if(info?.attendance) required(minutes(i.start)!==null,prefix+'attendance time required.');
+    if(info?.admission||info?.callout) required(i.attested===true,prefix+'confirm the code-specific criteria.');
+    // Annual portal submission is handled by the MOA, outside this app.
+    if(info?.timed) {
+      const a=minutes(i.start),b=minutes(i.end);required(a!==null&&b!==null&&b>a,prefix+'valid start/end times required (same-day interval).');
+      if(a!==null&&b!==null&&b>a) {
+        required(b-a>=8,prefix+'less than eight minutes; review the appropriate code.');
+        required(Number(i.units)<=Math.min(2,Math.floor((b-a+7)/15)),prefix+'units exceed documented time or daily maximum.');
+        const overlap=all.some(e=>e.date===entry.date&&e.items.some(x=>!(e.id===entry.id&&x===i)&&codeInfo(x.code)?.timed&&minutes(x.start)!==null&&minutes(x.end)!==null&&a<minutes(x.end)&&b>minutes(x.start)));
+        required(!overlap,prefix+'overlapping timed service recorded for this physician.');
+      }
+    } else if(info) required(Number(i.units)===1,prefix+'use one unit; additional services need separate review.');
+    if(info?.annual) {
+      const total=all.filter(e=>e.date.slice(0,4)===entry.date.slice(0,4)&&(info.physicianLimit||e.patientKey===entry.patientKey)).flatMap(e=>e.items).filter(x=>x.code===i.code).reduce((sum,x)=>sum+Number(x.units),0);
+      required(total<=info.annual,prefix+`recorded-here annual total ${total} exceeds reference limit ${info.annual}.`);
+      const imported=(ledger.historicalBillings||[]).filter(h=>h.date.slice(0,4)===entry.date.slice(0,4)&&(info.physicianLimit||h.patientKey===entry.patientKey)&&h.codes.includes(i.code));
+      // 13121 legacy unit reconciliation is intentionally not a handoff blocker.
+      // Keep the recorded-unit limit check and preserve all imported history.
+      if(i.code!=='13121')required(!imported.length,prefix+'imported billed history contains this code without verified units; reconcile annual usage before handoff.');
+    }
+    if(i.code==='13115') required(!all.some(e=>e.id!==entry.id&&e.patientKey===entry.patientKey&&e.items.some(x=>x.code==='13115'))&&!(ledger.historicalBillings||[]).some(h=>h.patientKey===entry.patientKey&&h.codes.includes('13115')),prefix+'another admission charge is already recorded.');
+    if(i.code==='00114') {
+      const prior=lastBilling(ledger,entry.patientKey,entry.date,true,entry.id);
+      if(prior&&daysBetween(prior,entry.date)<14) required(Boolean(i.reason?.trim()),prefix+'within 14 days of recorded billing; explanatory claim note required.');
+    }
+    if(i.code==='00115'&&i.requestAt&&minutes(i.start)!==null) {
+      const gap=(Date.parse(`${entry.date}T${i.start}`)-Date.parse(i.requestAt))/3600000;
+      required(gap>=0&&gap<=24,prefix+'attendance must be within 24 hours after request.');
+      required(minutes(i.start)>=480&&minutes(i.start)<=1380,prefix+'outside 08:00–23:00; review code.');
+    }
+  }
+  if(codes.includes('13334')) {
+    required(codes.some(c=>['00114','00127','13115'].includes(c)),'13334 requires a qualifying same-day visit on this entry.');
+    required(!all.some(e=>e.date===entry.date&&e.id!==entry.id&&e.items.some(i=>i.code==='13334')),'13334 already recorded on this date.');
+    required(!(ledger.historicalBillings||[]).some(h=>h.date===entry.date&&h.codes.includes('13334')),'13334 already recorded in billed history for this date.');
+    required(!all.some(e=>e.date===entry.date&&e.items.some(i=>i.code==='00115')),'13334 with an urgent assessment on this date requires review; blocked in this prototype.');
+  }
+  if(codes.includes('00115')&&codes.some(c=>['13334','01200','01201','01202'].includes(c))) errors.push('Urgent assessment cannot be combined with these bonus/call-out codes.');
+  if(codes.includes('14067')&&codes.some(c=>['14077','14018'].includes(c))) errors.push('14067 cannot be combined with 14077/14018.');
+  if(codes.includes('14077')&&codes.includes('14018')) errors.push('14077 cannot be combined with 14018.');
+  if(codes.includes('13005')&&codes.some(c=>!['13005','14076'].includes(c))) errors.push('13005 has same-day service restrictions.');
+  if(codes.includes('13115')&&codes.some(c=>['00114','00115'].includes(c))) required(entry.items.filter(i=>['00114','00115'].includes(i.code)).every(i=>i.reason?.trim()),'Admission plus visit requires a medical-necessity claim note.');
+  return [...new Set(errors)];
+}
+export function finalizeBatch(ledger,entries,{from,to,layout,reviewed=false,delivered=false}) {
+  if(ledger.settings.parallel) throw new Error('Paper comparison mode is active. Explicitly end it in Settings before final handoff.');
+  if(!reviewed||!delivered||!entries.length) throw new Error('Confirm review and actual delivery before finalizing.');
+  if(entries.some(e=>e.batchId||!ledger.entries.some(x=>x.id===e.id))) throw new Error('Batch selection changed.');
+  const l=clone(ledger);const b={id:crypto.randomUUID(),from,to,layout,entryIds:entries.map(e=>e.id),handedOverAt:new Date().toISOString()};
+  l.batches.push(b);for(const e of l.entries) if(b.entryIds.includes(e.id)) e.batchId=b.id;return l;
+}
+
+// Reviewed import packages are additive. Conflicts stop the whole import; no
+// patient/date, finalized charge, setting or existing identity is overwritten.
+export function parseImport(text) {
+  if(typeof text!=='string'||text.length>8_000_000)throw new Error('Import file exceeds the supported size.');
+  const p=JSON.parse(text,(key,value)=>{if(['__proto__','prototype','constructor'].includes(key))throw new Error('Unsafe import key.');return value;});
+  validateLedger(p);
+  if(!Array.isArray(p.historicalBillings)||!Array.isArray(p.importReview?.held)||p.batches.length||p.entries.some(e=>e.batchId)||p.nonPanel.length)throw new Error('Choose a reviewed billing import package, not a backup or roster.');
+  for(const [key,patient] of Object.entries(p.patients))if(!patient.name||patient.key!==key||patientKey(patient)!==key)throw new Error('Import patient identity mismatch.');
+  for(const [key] of Object.entries(p.baselines))if(!Object.hasOwn(p.patients,key))throw new Error('Starting date has no patient identity.');
+  for(const e of p.entries)if(e.date>today())throw new Error('Import contains a future pending date.');
+  for(const h of p.importReview.held)if(!h.name||!validDate(h.date)||!h.reason||h.status!=='held_not_imported')throw new Error('Invalid held review item.');
+  if(p.importReview.resolutions!==undefined&&!Array.isArray(p.importReview.resolutions))throw new Error('Invalid clarification package.');
+  return p;
+}
+export function importSummary(p) {return {billed:p.historicalBillings.length,pending:p.entries.length,baselines:Object.keys(p.baselines).length,held:p.importReview.held.length,resolved:p.importReview.resolutions?.length||0};}
+export function mergeImport(current,source,sha256) {
+  validateLedger(current);const p=parseImport(JSON.stringify(source));
+  if(!/^[a-f0-9]{64}$/.test(sha256))throw new Error('Import fingerprint is missing.');
+  const receipt=current.imports?.find(i=>i.sourceDatasetId===p.datasetId);
+  if(receipt){if(receipt.sha256!==sha256)throw new Error('This import was changed after it was loaded. Review it separately.');return {ledger:clone(current),duplicate:true,summary:importSummary(p)};}
+  if(current.importReview)throw new Error('This workspace already contains a direct import. Review before combining packages.');
+  const n=clone(current);n.historicalBillings||=[];n.imports||=[];
+  const occupied=new Set([...n.entries,...n.historicalBillings].map(e=>`${e.patientKey}|${e.date}`));
+  const ids=new Set([...n.entries,...n.historicalBillings].map(e=>e.id));
+  for(const e of [...p.entries,...p.historicalBillings])if(occupied.has(`${e.patientKey}|${e.date}`)||ids.has(e.id))throw new Error('Import overlaps an existing patient/date or record ID. Nothing was changed; reconcile the overlap first.');
+  for(const [key,patient] of Object.entries(p.patients)){
+    if(Object.hasOwn(n.patients,key)){if(patientKey(n.patients[key])!==key)throw new Error('Existing patient identity mismatch.');}
+    else n.patients[key]=clone(patient);
+  }
+  n.entries.push(...clone(p.entries));n.historicalBillings.push(...clone(p.historicalBillings));
+  for(const [key,base] of Object.entries(p.baselines))if(!n.baselines[key]||n.baselines[key].date<base.date)n.baselines[key]=clone(base);
+  n.imports.push({sourceDatasetId:p.datasetId,sha256,importedAt:new Date().toISOString(),summary:importSummary(p),review:clone(p.importReview)});
+  n.reviewResolutions||=[];
+  for(const r of p.importReview.resolutions||[]){
+    const h=allHeldImports(current).find(h=>heldKey(h)===r.key);
+    if(!h||n.reviewResolutions.some(x=>x.key===r.key))throw new Error('Clarification does not match an unresolved source item.');
+    if(r.disposition==='included'){
+      const e=n.entries.find(e=>e.id===r.entryId);
+      if(!e||e.date!==h.date||n.patients[e.patientKey]?.name!==h.name)throw new Error('Clarified billing does not match the held patient/date.');
+    }
+    n.reviewResolutions.push({...clone(r),resolvedAt:new Date().toISOString(),sourceDatasetId:p.datasetId});
+  }
+  validateLedger(n);assertImmutable(current,n);
+  return {ledger:n,duplicate:false,summary:importSummary(p)};
+}
+export function heldKey(h){return JSON.stringify([h.source?.driveFileId,h.source?.page,h.date,h.name]);}
+function allHeldImports(l){return [...(l.importReview?.held||[]),...(l.imports||[]).flatMap(i=>i.review.held)];}
+export function heldImports(l){const resolved=new Set((l.reviewResolutions||[]).map(r=>r.key));return allHeldImports(l).filter(h=>!resolved.has(heldKey(h)));}
