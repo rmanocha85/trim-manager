@@ -3,4 +3,17 @@ work/
 *.tmp
 trim-patients*.json
 trim-billing-data*.json
+.env*
+*.log
+*.lock
+!pnpm-lock.yaml
+.auth/
+auth.json
+*credentials*.json
+patient-context.json
+visits/
+sources/
+handoffs/
+runs/
+*backups/
 

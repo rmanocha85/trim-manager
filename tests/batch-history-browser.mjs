@@ -1,0 +1,60 @@
+// All account, roster and billing responses are synthetic; no live API access.
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+import {createServer} from './server-fixture.mjs';
+import {blankLedger,upsertEntry} from '../public/core.mjs';
+const {chromium}=createRequire(import.meta.url)('playwright');
+const patients=Array.from({length:24},(_,n)=>({id:'s'+n,key:'phn:'+String(n).padStart(10,'0'),phn:String(n).padStart(10,'0'),name:'SYNTHETIC, Patient '+String(n).padStart(2,'0'),unit:n<5?'a':'b',room:String(100+n),codes:n===4?'':'401, 250',panel:true}));
+const units=[{id:'a',name:'Example North',floor:'1'},{id:'b',name:'Example South',floor:'2'}];
+let cloud=blankLedger('batch-history-synthetic'),revision=1,writes=0;
+for(const p of patients){cloud.patients[p.key]=p;if(p!==patients[3])cloud.baselines[p.key]={date:p===patients[5]?'2026-10-07':'2026-09-01'};}
+cloud=upsertEntry(cloud,patients[1],'2026-10-08',[{code:'13121',units:1,start:'11:10',end:'11:20',reason:'Synthetic reason',diagnosis:'250'}],'Synthetic comment');
+cloud.historicalBillings=[{id:'old-test',patientKey:patients[0].key,date:'2026-09-01',status:'already_billed',codes:['00114'],reason:'Historical synthetic concern',diagnosis:'401',sources:[]}];
+const original=structuredClone(cloud);const errors=[];
+const server=createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const browser=await chromium.launch({channel:'chrome',headless:true}),context=await browser.newContext({viewport:{width:1366,height:900},timezoneId:'America/Los_Angeles'}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+await context.route('https://accounts.google.com/gsi/client',r=>r.fulfill({contentType:'text/javascript',body:'globalThis.google={accounts:{oauth2:{initTokenClient:({callback})=>({requestAccessToken:()=>callback({access_token:"synthetic"})})}}};'}));
+await context.route('https://www.googleapis.com/**',async route=>{const req=route.request(),url=req.url();let data={},status=200;
+ if(url.includes('1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3')&&url.includes('fields=id,etag'))data={etag:'roster1'};else if(url.includes('1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3'))data={patients,units};
+ else if(url.includes('/files?q='))data={items:[{id:'synthetic-ledger'}]};
+ else if(url.includes('uploadType=media')){if(req.headers()['if-match']!==`"v${revision}"`)status=412;else{cloud=JSON.parse(req.postData());revision++;writes++;}}
+ else if(url.includes('alt=media'))data=cloud;else data={id:'synthetic-ledger',etag:`"v${revision}"`};await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
+});
+const connect=async()=>{await page.locator('#connect').click();await page.locator('#cloud-connect').click();await page.locator('.patient').first().waitFor();};
+const local=()=>page.locator('#local-changes').filter({hasText:'pending'}).waitFor();
+try{
+ await page.goto(`http://127.0.0.1:${server.address().port}/?connection=manual`);await connect();
+ await page.locator('[data-day="2026-10-08"]').click();assert.equal(await page.locator('#header-date-value').innerText(),'Thu, Oct 8, 2026');
+ await page.locator('[data-tab=routine]').click();assert.equal(await page.locator('#add-patient-section').isVisible(),false);
+ const rosterBox=await page.locator('#roster').boundingBox();assert.ok(rosterBox.y+rosterBox.height>820,'Routine list uses available height');
+ await page.locator('#routine-batch').click();await page.locator('[data-routine-unit=a]').check();
+ assert.equal(await page.locator('[data-routine-patient]').count(),2);assert.match(await page.locator('#routine-review').innerText(),/Needs review · 2/);
+ await page.locator('[data-routine-patient]').last().uncheck();assert.equal(await page.locator('#routine-add').innerText(),'Add 114 for 1 patient');
+ await page.screenshot({path:'work/routine-batch-preview.png',fullPage:true});
+ await page.locator('#routine-add').click();await local();assert.equal(writes,0);assert.deepEqual(cloud,original);
+ assert.match(await page.locator('#local-changes').innerText(),/Billing pending/);
+ await page.locator('#undo-routine-batch').click();await local();assert.equal(await page.locator('[data-routine-patient]').count(),2);
+ await page.locator('#routine-add').click();await local();assert.match(await page.locator('#local-changes').innerText(),/Billing pending/);
+ assert.equal(await page.locator('#routine-add').isEnabled(),false);
+ await context.setOffline(true);assert.equal(await page.locator('#undo-routine-batch').isEnabled(),false);await context.setOffline(false);await page.locator('#drive-connection:not(:disabled)').waitFor();
+ await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();assert.equal(writes,1);
+ assert.equal(cloud.entries.filter(e=>e.date==='2026-10-08').length,3);assert.equal(cloud.entries.flatMap(e=>e.items).filter(i=>i.code==='13334').length,1);
+ assert.equal(await page.locator('#undo-routine-batch').count(),0);
+ await page.locator('[data-day="2026-10-10"]').click();assert.match(await page.locator('#routine-review').innerText(),/1 due/);assert.match(await page.locator('#routine-review').innerText(),/2 not yet due/);
+ await page.locator('[data-tab=history]').click();assert.equal(await page.locator('#history-by-date').getAttribute('aria-pressed'),'true');
+ const timed=page.locator('.history-code').filter({has:page.locator('[data-history-code="13121"]')});
+ assert.match(await timed.innerText(),/Synthetic reason/);assert.match(await timed.innerText(),/ICD-9: 250/);assert.match(await timed.innerText(),/Start 11:10 · End 11:20/);assert.match(await page.locator('#history-content').innerText(),/Synthetic comment/);
+ await page.locator('#history-content [data-history-patient="'+patients[0].key+'"]').first().click();
+ assert.equal(await page.locator('#history-by-patient').getAttribute('aria-pressed'),'true');assert.match(await page.locator('#history-patient-summary').innerText(),/Thu, Oct 8, 2026/);
+ const rows=page.locator('#history-content tbody tr');assert.equal(await rows.count(),2);assert.equal(await rows.last().locator('[data-history-remove]').count(),0);assert.match(await rows.last().innerText(),/Historical synthetic concern/);
+ await page.locator('#history-search').fill(patients[1].phn);assert.equal(await page.locator('#history-patient-results button').count(),1);await page.locator('#history-patient-results button').click();
+ assert.match(await page.locator('#history-content').innerText(),/Synthetic reason/);await page.screenshot({path:'work/patient-history-preview.png',fullPage:true});
+ await page.locator('[data-history-code="13121"]').click();await local();assert.match(await page.locator('#history-content').innerText(),/Removals waiting to save/);
+ await page.locator('#local-changes').click();assert.doesNotMatch(await page.locator('#changes-list').innerText(),/Workspace/);assert.match(await page.locator('#local-changes').innerText(),/Billing pending/);
+ await page.locator('[data-undo-cancel]').click();await page.locator('#changes-dialog [data-close]').click();
+ assert.equal(writes,1);assert.deepEqual(cloud.historicalBillings,original.historicalBillings);
+ await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await page.setViewportSize({width:1366,height:900});await page.locator('[data-tab=billing]').click();assert.equal(await page.locator('#add-patient-section').isVisible(),true);
+ await page.reload();await connect();await page.locator('[data-tab=history]').click();assert.match(await page.locator('#history-content').innerText(),/Synthetic reason/);
+ assert.deepEqual(errors,[]);console.log('PASS batch review, exclusions, explicit save, Undo, daily bonus, date header, bill counts, patient history, details, removals, recovery and responsive layout.');
+}finally{await browser.close();await new Promise(r=>server.close(r));}

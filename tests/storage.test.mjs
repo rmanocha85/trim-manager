@@ -1,0 +1,21 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile,writeFile,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {BillingStore} from '../storage.mjs';
+import {createServer} from './server-fixture.mjs';
+test('atomic save, read-back, stale revision and wrong schema',async t=>{const dir=await mkdtemp(join(tmpdir(),'trim-unit-'));t.after(()=>rm(dir,{recursive:true,force:true}));const store=new BillingStore(join(dir,'data.json'),join(dir,'lock'),'test');const a=await store.load();const b=await store.save(a.ledger,a.etag);assert.equal(b.ledger.revision,1);assert.deepEqual((await store.load()).ledger,b.ledger);await assert.rejects(store.save(a.ledger,a.etag),/changed/);await assert.rejects(store.save({patients:[]},b.etag),/Unsupported/);});
+test('two simultaneous saves cannot silently overwrite',async t=>{const dir=await mkdtemp(join(tmpdir(),'trim-unit-'));t.after(()=>rm(dir,{recursive:true,force:true}));const store=new BillingStore(join(dir,'data.json'),join(dir,'lock'),'test');const a=await store.load();const results=await Promise.allSettled([store.save(a.ledger,a.etag),store.save(a.ledger,a.etag)]);assert.equal(results.filter(x=>x.status==='fulfilled').length,1);});
+test('different local-preview computer is refused',async t=>{const dir=await mkdtemp(join(tmpdir(),'trim-unit-'));t.after(()=>rm(dir,{recursive:true,force:true}));const a=new BillingStore(join(dir,'data.json'),join(dir,'lock'),'laptop');const first=await a.load();const saved=await a.save(first.ledger,first.etag);const b=new BillingStore(join(dir,'data.json'),join(dir,'lock'),'office');await assert.rejects(b.save(saved.ledger,saved.etag),/another local/);});
+test('local API rejects unauthenticated/cross-origin requests and serves no source files',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'trim-http-'));t.after(()=>rm(dir,{recursive:true,force:true}));const rp=join(dir,'roster.json');const original=JSON.stringify({patients:[{id:'1',name:'SYNTHETIC',phn:'0000000001'}],units:[]});await writeFile(rp,original);
+ const server=createServer({rosterPath:rp,billingPath:join(dir,'bills.json'),lockPath:join(dir,'lock')});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));const origin=`http://127.0.0.1:${server.address().port}`;
+ assert.equal((await fetch(origin+'/api/roster')).status,401);assert.equal((await fetch(origin+'/BUILD-PLAN.md')).status,404);
+ assert.equal((await fetch(origin+'/api/connect',{method:'POST',headers:{Origin:'https://evil.example','X-Trim-Local':'1'}})).status,403);
+ const c=await fetch(origin+'/api/connect',{method:'POST',headers:{Origin:origin,'X-Trim-Local':'1'}});assert.equal(c.status,200);const {csrf}=await c.json();const headers={Cookie:c.headers.get('set-cookie').split(';')[0],'X-Trim-Session':csrf,Origin:origin};
+ assert.equal((await (await fetch(origin+'/api/roster',{headers})).json()).patients.length,1);
+ const initial=await (await fetch(origin+'/api/billing',{headers})).json();assert.equal((await fetch(origin+'/api/billing',{method:'PUT',headers:{...headers,'If-Match':initial.etag},body:JSON.stringify(initial.ledger)})).status,200);
+ assert.equal((await fetch(origin+'/api/billing',{method:'PUT',headers:{...headers,'If-Match':'new'},body:JSON.stringify(initial.ledger)})).status,409);
+ assert.equal(await readFile(rp,'utf8'),original);
+});

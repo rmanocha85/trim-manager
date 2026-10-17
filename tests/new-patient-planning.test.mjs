@@ -1,11 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import vm from 'node:vm';
-import {blankLedger,normalizeRoster,planNewPatients,dueState,upsertEntry,validateLedger,setFirstRoutineReview} from '../billing/core.mjs';
-import {routineCandidates,sessionChanges,changedBillCount,addRoutineBatch} from '../billing/workspace.mjs';
-import {mergeSession} from '../billing/merge.mjs';
-const sandbox={};vm.runInNewContext(readFileSync(new URL('../roster-core.js',import.meta.url),'utf8'),sandbox);const manager=sandbox.TrimRoster;
+import * as manager from '../public/patients-core.mjs';
+import {blankLedger,normalizeRoster,planNewPatients,dueState,upsertEntry,validateLedger,setFirstRoutineReview} from '../public/core.mjs';
+import {routineCandidates,sessionChanges,changedBillCount,addRoutineBatch} from '../public/workspace.mjs';
+import {mergeSession} from '../public/merge.mjs';
 const fields={name:'EXAMPLE, New',phn:'0000000001',ava:'123456',unit:'a',room:'1',codes:'401'};
 const raw={patients:[],removedPatients:[],units:[{id:'a',name:'Synthetic unit'}],billingDates:[]};
 const added=manager.add(raw,fields,'2026-09-01',()=> 'new');

@@ -1,55 +1,39 @@
-# TRIM Manager
+# TRIM
 
-The original roster app is `index.html` (green T favicon). `billing/` is a separate application. Never commit private patient data. Develop outside Google Drive.
+One maintained application for **TRIM Patients**, **TRIM Notes** and **TRIM Billing**, owned by Dr. Rahul Manocha. Local development: `C:\Users\rmano\Documents\Codex\trim-app`. Records and reusable workflows remain in the existing TRIM AI folders in Drive. Never commit patient data, auth material, browser profiles or backups.
 
-## New-panel first routine review
+## Run and verify
 
-Manager stamps genuinely new panel additions with `panelAddedDate` (Pacific date) and `newPanelPatient: true`; returning retained patients are marked false. New panel patients become available for routine billing immediately, without a Calendar connection, scheduled visit day, admission date or waiting period. Existing actual billing remains authoritative for subsequent due dates. Billing only creates charges when the physician selects them.
+Use `Start-TRIM.cmd` (or `Start-TRIM.ps1`). The app uses `http://127.0.0.1:4317/`, preserving the previous laptop origin and encrypted recovery keys. One laptop/profile edits the synced folder; other computers must use verified Google Drive access. Closing or locking does not discard local changes.
 
-Legacy future first-review dates no longer delay eligibility. They remain readable for compatibility; unused Calendar cache metadata retires on normal session saving. No existing charges or historical records are rewritten.
+- Install: `pnpm install --frozen-lockfile` (Node 22+).
+- Unit, storage, security, retention and billing rules: `pnpm test`.
+- Browser scenarios: `pnpm test:browser` (installed Chrome).
+- Syntax: `pnpm check`.
 
-Synthetic regression: `node --test tests/new-patient-planning.test.mjs`.
+Tests use synthetic temporary records and fake AI/Google responses. Their server fixture refuses production data paths. Browser logs and synthetic screenshots go to ignored `work/`. The handoff integration test also verifies the existing canonical TRIM routine-billing helper; it does not enter an EMR.
 
-## Other-patient directory
+## Application structure
 
-The Other patients tab reads `otherPatients` from the same private roster JSON, with the existing table styling, unit grouping, PHN copy controls and Ava chart links. Search by name, PHN or Ava number, or filter by doctor. Missing units appear under Unit not recorded; no locations or physician assignments are inferred. These patients never enter the active panel, its counts, or printed active lists.
+`public/app.mjs` owns navigation and common save controls. `session.mjs` coordinates explicit saves in Patients, Notes, Billing order, stopping and reporting partial success on error. Each section retains its own selection and work; selecting a patient does not move another section's selection.
 
-The optional `otherPatients[].doctor` string stores a selected physician name; an empty/missing value means Unassigned. Changes use the existing conditional Drive save and conflict protection. Failed saves remain visibly unsaved and cannot overwrite a newer roster. Unknown previously recorded doctors remain visible. `OTHER_DOCTORS` contains the other physicians documented in the private TRIM Management physician-group reference, reviewed October 13, 2026; the onboarding status remains explicit. Update those options when the maintained physician-group record changes. This does not transfer patients into or out of the active panel or create billing entries.
+- Patients: `patients-ui.mjs`, `patients-core.mjs`, `patients.html`, `patients.css`, `roster-repository.mjs`. The familiar tables, Ava links, doctor assignments, document-upload checkboxes, removal/reactivation and both print layouts are retained. Print dates affect the legacy printable sheet only.
+- Notes: `notes-ui.mjs`, `notes-core.mjs`, `notes-storage.mjs`. Review is local. Prepare dated Meditech handoff stages the exact reviewed text; **Save to Drive** writes it. Later edits invalidate a staged handoff. Generation and handoffs do not bill or enter an EMR.
+- Billing: `billing-ui.mjs` with existing pure billing, report, merge, date, OCR and backup modules. Imports and marking a printed batch handed over remain local until **Save to Drive**. Historical starting dates are collapsed under Settings. First-time empty-file creation and confirmed full backup restoration are explicit recovery/setup operations.
+- Local service: `server.mjs`, `storage.mjs`, `roster-storage.mjs`, `notes-local.mjs`, `backup-storage.mjs`, `notes-auth.mjs`. Loopback only, same-origin and session checks, restricted static files, conditional writes and verified readback. No patient data is served before local connection.
 
-Run `node tests/other-patients.browser.cjs` with Playwright available for synthetic chart-link, search, filter, assignment, reload and conflict coverage.
+## Saving and data preservation
 
-## TRIM Notes upload tracking
+Normal edits automatically save an encrypted recovery draft in the current browser; **Save to Drive** saves the whole dirty session. A patient form must first be completed with Add or the row's Save button. The header distinguishes local pending work, conflicts, and completed saves. Local Drive-folder writes cannot verify cloud synchronization; the UI says so. A failed section leaves itself and subsequent sections pending. Lost acknowledgments can be retried without duplication. Roster conflicts require review and explicit reload/discard; an encrypted discarded copy remains on the device.
 
-Both patient lists have a manual checkbox immediately before each patient's name and a separate uploaded count. Tick after adding source documents to the private Routine notes Incoming folder. This records document upload only, not extraction, clinical review or note completion. Nothing is inferred from existing records or automatically checked.
+The original roster, billing ledger and Notes documents remain separate at their existing identities and paths. Patients saves the complete roster, including unknown fields, `otherPatients`, doctor assignments, upload flags, `removedPatients`, units and print dates. Billing's reduced roster view is never written as the complete roster. Returning retained patients preserve their IDs. Three-calendar-month removal retention uses Pacific dates and clamps month ends. Expiry occurs on an explicit roster save; it never deletes billing history.
 
-The same private roster stores optional patient fields `notesDataUploaded` (boolean) and `notesDataUploadedAt` (UTC ISO timestamp for the latest sign-off; null when cleared). Missing fields mean unchecked. Conditional Drive saving, verified readback, offline/history restrictions and conflict recovery apply. Pending and failed changes show Saving or Not saved beside the checkbox. These fields survive normal edits, removal and reactivation and do not affect billing, chart links or printed lists. TRIM Notes patient summaries stay in their separate existing store.
+Before-edit daily roster snapshots go to `TRIM AI/Backups/Roster`; older `TRIM Snapshots` remain readable. Every saved billing version enters a durable backup queue. Local-folder and direct Google connections support verified snapshots under `TRIM AI/Backups/Billing` (Google access can fall back to its existing private app-owned folder). Matching backups expire after three calendar months only after verifying the retained copy. Independent laptop backup remains optional. Full restore requires a reviewed selection, confirmation and verified safety copy. Clinical and billing history are not pruned by backup retention.
 
-Run `node tests/notes-upload.browser.cjs` with Playwright available for synthetic placement, persistence, clearing, history/offline and conflict checks.
+`scripts/update_trim_roster.ps1` remains an explicit transactional helper for the established physician-authorized roster workflows. It is not the app's autosave path. It verifies schema and file hashes and never infers clinical facts.
 
-## Roster retention contract
+## Cutover and older code
 
-- `patients` remains the active panel. Active lists, counts and printed lists use only this array.
-- `removedPatients` is optional on legacy input and an array on new writes. Each entry is the complete former patient record, including its existing `id` and unknown fields, plus `removedDate: "YYYY-MM-DD"`. Other root fields, `units` and `billingDates` survive saves.
-- The removal date is the current **America/Los_Angeles** calendar date. No death date or reason is required. No deleted patients or dates are reconstructed.
-- Expiry is the start of the date three calendar months after removal; clamp the day to the last day of that month. November 30, 2026 expires February 28, 2027; November 30, 2023 expires February 29, 2024.
-- The app filters expired records on connection/refresh and persists pruning on a roster save. The PowerShell helper prunes during successful Add/Edit/Remove/Maintain operations; Verify is read-only. There is no unattended background deletion. Read-only Removed Patients display filters elapsed retention but does not itself save. Existing historical daily snapshots and Drive version history are not deleted.
-- Adding a returning patient with the same PHN and Ava reuses the retained ID and preserves unknown fields. Conflicting identifiers require correction before reactivation. After expiry, the old roster ID is intentionally unavailable; adding again creates a new roster ID, while the unchanged PHN still matches the separate billing app's saved identity. Do not infer an expired patient's prior ID from memory.
-- Retention expiry never reads, writes, deletes or rewrites the separate billing ledger. Coverage patients absent from both roster arrays remain eligible for physician-directed billing, without active panel membership or routine 14-day tracking. The separate billing app remains unchanged; it does not yet ingest the new `removedPatients` collection. Its saved patient identities remain independent of roster expiry.
+This checkout inherits the published Manager repository's history and incorporates the full local Billing/Notes source and newer roster helper. The old root page, duplicate `billing/` tree and superseded standalone-page tests are removed from active source; prior versions remain in Git history and verified local source archives. Old laptop shortcut names delegate to this launcher.
 
-## Saving and concurrency
-
-The single header Drive button connects and loads the latest roster. It shows `Connect to Drive` initially, `Drive connected` after verified access, `Reconnect Drive` when access needs attention, and `Checking Drive…` while loading. Clicking the connected button refreshes the list and accepts the verified revision. If local roster changes or an unfinished patient form would be replaced, a confirmation lets the user keep them or explicitly discard them. Saves in progress disable the button. The adjacent save-status message remains independent.
-
-Offline events and token expiry revoke the green state. Returning online, returning to the tab and minute checks verify access without authentication popups or replacing the roster. Remote changes lock editing until the user clicks the Drive button to reload. Connection/refresh performs no writes; daily snapshots are deferred until the next roster save, using the pre-edit loaded roster.
-
-The Manager uses the configured canonical roster file ID, a stable Drive v2 ETag read around content loading, conditional `If-Match` updates, serial saves and verified readback. It never creates a substitute roster on failed writes. A conflict locks editing until the user reloads with the Drive button. Cancelling the discard confirmation preserves local edits and the conflict lock; accepting it loads the current Drive version, after which discarded edits can be repeated. Reload old open Manager tabs before editing; older deployed JavaScript cannot enforce this new schema.
-
-The helper validates both collections and checks the initial content hash immediately before replacement and checks the exact saved text afterward. These checks detect competing local edits; they cannot lock remote writers across Drive Desktop synchronization. Stop and reconcile any Drive synchronization conflict rather than forcing an overwrite.
-
-## Helper and verification
-
-`scripts/update_trim_roster.ps1` is the versioned implementation. The operational installed helper and canonical Drive copy must match it. Workflow instructions live in the canonical TRIM workflow, not in this repository.
-
-Use `-Mode Remove -MatchPhn <PHN> -ConfirmRemove` only for an explicitly authorized target. `-ConfirmDelete` remains an alias with retention semantics. A repeated removal does not reset the date. `-Mode Maintain` only adds an empty retained collection to old schemas and expires elapsed retained entries; it never removes active patients. No removal-date override is offered.
-
-Run `node --test tests/retention.test.cjs` with Node and PowerShell 7 available. Tests create synthetic temporary JSON files outside Drive, exercise both implementations and mocked conditional Drive saves, and never load operational patient data. Run `node tests/browser.cjs` with Playwright available for the synthetic browser smoke test.
+The previously published website remains available for recovery of browser drafts on its own origin. Browser storage cannot move automatically between that website and the laptop origin. Do not clear it or overwrite that deployment merely to tidy files. Installing or launching TRIM does not submit billing or enter clinical notes. Future development belongs in this repository.

@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,writeFile,readFile,access,rm} from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import {LocalBackupStore} from '../backup-storage.mjs';
+import {snapshot} from '../public/backups.mjs';
+import {blankLedger} from '../public/core.mjs';
+async function fixture(t){const dir=await mkdtemp(path.join(os.tmpdir(),'trim-local-backup-'));t.after(async()=>{assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));await rm(dir,{recursive:true,force:true});});return {dir,store:new LocalBackupStore(dir),ledger:blankLedger('synthetic-local-backups')};}
+test('laptop backups verify, deduplicate, and read full initial and dated ledgers',async t=>{const {store,ledger}=await fixture(t),s=await snapshot(ledger);const file=await store.ensure(s);await store.ensure(s);assert.equal((await store.list(s.dataset)).length,1);assert.deepEqual(JSON.parse(await store.read(file.name,s.dataset)),ledger);ledger.updatedAt='2026-10-17T10:00:00.000Z';ledger.revision++;await store.ensure(await snapshot(ledger));assert.equal((await store.list(s.dataset)).length,2);});
+test('laptop backup tampering, wrong identity, and arbitrary file paths are refused',async t=>{const {store,dir,ledger}=await fixture(t),s=await snapshot(ledger);await assert.rejects(store.ensure({...s,sha:'0'.repeat(64)}),/contents/);await store.ensure(s);await assert.rejects(store.read('../file',s.dataset),/filename/);await assert.rejects(store.read(s.name,'0'.repeat(64)),/identity/);await writeFile(path.join(dir,s.name),'{}');await assert.rejects(store.ensure(s));});
+test('laptop backup retention requires a verified current copy and only removes matching old snapshots',async t=>{const {store,dir,ledger}=await fixture(t);ledger.updatedAt='2000-01-01T00:00:00.000Z';const old=await snapshot(ledger);await store.ensure(old);ledger.updatedAt=new Date().toISOString();ledger.revision++;const current=await snapshot(ledger);await store.ensure(current);await writeFile(path.join(dir,'unrelated.json'),'do not change');await assert.rejects(store.prune(current.dataset,'missing'),/current backup/);await store.prune(current.dataset,current.sha);await assert.rejects(access(path.join(dir,old.name)));assert.equal((await store.list(current.dataset)).length,1);assert.equal(await readFile(path.join(dir,'unrelated.json'),'utf8'),'do not change');});

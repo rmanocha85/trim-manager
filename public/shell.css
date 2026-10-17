@@ -1,0 +1,13 @@
+[hidden]{display:none!important}
+.app-sections{display:flex;gap:6px;padding:10px 20px;background:#fff;border-bottom:1px solid #dce4db;align-items:center}
+.app-sections button{font-size:16px;font-weight:650;padding:12px 22px;border:0;border-radius:8px;background:transparent;color:#34563c}
+.app-sections button[aria-pressed=true]{background:#dfece0;color:#183c27;box-shadow:inset 0 -3px #2d5b40}
+.app-sections .utility{margin-left:auto;font-size:14px}
+#session-status:not(:empty){padding:10px 24px;background:#fff3d4;border-bottom:1px solid #e6cf91;color:#584216}
+#patients-workspace{background:#f6f7f4;min-height:70vh}
+#patients-print-dialog{width:96vw;max-width:1300px;height:92vh;padding:0;border:1px solid #ccc;border-radius:10px}
+#patients-print-dialog .report-top{display:flex;align-items:center;gap:14px;padding:12px 20px}
+#patients-print-title{flex:1;margin:0;font-size:20px}
+#patients-print-frame{width:100%;height:calc(100% - 76px);border:0;background:white}
+@media(max-width:900px){.app-sections{padding:8px;gap:2px}.app-sections button{padding:10px;font-size:14px}#session-status{font-size:13px}header .header-actions{flex-wrap:wrap}}
+@media print{.app-sections,#session-status{display:none}}

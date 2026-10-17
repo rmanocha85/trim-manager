@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Add', 'Edit', 'Remove', 'Verify', 'Maintain')]
+    [ValidateSet('Add', 'Edit', 'Remove', 'Verify', 'Maintain', 'ImportOther')]
     [string]$Mode,
 
-    [string]$JsonPath = 'C:\Users\rmano\My Drive\01. Active List\02. TRIM\00. TRIM Management\06. TRIM Manager\trim-patients-data.json',
+    [string]$JsonPath = 'C:\Users\rmano\My Drive\02. TRIM\TRIM AI\Data\Roster\trim-patients-data.json',
 
     [string]$MatchName,
     [string]$MatchPhn,
@@ -16,6 +16,8 @@ param(
     [string]$Room,
     [string]$Codes,
     [string]$Ava,
+
+    [string]$ImportPath,
 
     [Alias('ConfirmDelete')]
     [switch]$ConfirmRemove
@@ -59,11 +61,11 @@ function Assert-RosterSchema {
     if ($null -eq $Roster.patients -or $null -eq $Roster.units -or $null -eq $Roster.billingDates) {
         throw 'JSON schema check failed: patients, units, and billingDates are required.'
     }
-    foreach ($key in @('patients', 'units', 'billingDates', 'removedPatients')) {
+    foreach ($key in @('patients', 'units', 'billingDates', 'removedPatients', 'otherPatients')) {
         if ($null -ne $Roster.PSObject.Properties[$key] -and $Roster.$key -isnot [array]) { throw "Invalid array: $key" }
     }
     $seenIds = @{}; $seenPhns = @{}; $seenAvas = @{}
-    foreach ($patientRecord in (@($Roster.patients) + @($Roster.removedPatients | Where-Object { $null -ne $_ }))) {
+    foreach ($patientRecord in (@($Roster.patients) + @($Roster.removedPatients | Where-Object { $null -ne $_ }) + @($Roster.otherPatients | Where-Object { $null -ne $_ }))) {
         foreach ($propertyName in @('id', 'name', 'phn', 'unit', 'room', 'codes', 'ava')) {
             if ($null -eq $patientRecord.PSObject.Properties[$propertyName]) {
                 throw "JSON schema check failed: patient property '$propertyName' is missing."
@@ -74,7 +76,7 @@ function Assert-RosterSchema {
             $value = if ($key -eq 'id') { [string]$patientRecord.id } else { Normalize-Digits ([string]$patientRecord.$key) }
             if (-not $value) { continue }
             $seen = switch ($key) { 'id' { $seenIds }; 'phn' { $seenPhns }; 'ava' { $seenAvas } }
-            if ($seen.ContainsKey($value)) { throw "Duplicate $key across active or removed patients." }
+            if ($seen.ContainsKey($value)) { throw "Duplicate $key across roster collections." }
             $seen[$value] = $true
         }
     }
@@ -83,6 +85,13 @@ function Assert-RosterSchema {
     }
     foreach ($patientRecord in @($Roster.patients)) {
         if ($null -ne $patientRecord.PSObject.Properties['removedDate']) { throw 'Active patient has a removal date.' }
+    }
+    foreach ($patientRecord in @($Roster.otherPatients | Where-Object { $null -ne $_ })) {
+        if ($patientRecord.phn -notmatch '^\d{10}$' -or $patientRecord.ava -notmatch '^\d{6,10}$') { throw 'Other patient has invalid PHN or Ava.' }
+        if ($null -ne $patientRecord.PSObject.Properties['removedDate']) { throw 'Other patient has a removal date.' }
+        if ($patientRecord.dob) {
+            $null = [datetime]::ParseExact([string]$patientRecord.dob, 'yyyy-MM-dd', [Globalization.CultureInfo]::InvariantCulture)
+        }
     }
 }
 
@@ -133,7 +142,7 @@ if ($null -eq $roster.PSObject.Properties['removedPatients']) {
 }
 $retainedBeforeExpiry = @($roster.removedPatients)
 # Verification is read-only. Every successful mutation/Maintain prunes on the expiry date.
-if ($Mode -ne 'Verify') {
+if ($Mode -notin @('Verify', 'ImportOther')) {
     $roster.removedPatients = @($roster.removedPatients | Where-Object { $today -lt (Get-ExpiryDate $_.removedDate) })
     if ($retainedBeforeExpiry.Count -ne $roster.removedPatients.Count) { $changed = $true }
 }
@@ -142,6 +151,38 @@ $verificationMatchPhn = $MatchPhn
 $verificationMatchAva = $MatchAva
 
 switch ($Mode) {
+    'ImportOther' {
+        if (-not $ImportPath) { throw 'ImportOther requires a reviewed JSON array in -ImportPath.' }
+        $incoming = [IO.File]::ReadAllText([IO.Path]::GetFullPath($ImportPath)) | ConvertFrom-Json -NoEnumerate
+        if ($incoming -isnot [array] -or $incoming.Count -eq 0) { throw 'Import must be a nonempty JSON array.' }
+        # Validate the entire incoming set before touching the live roster.
+        Assert-RosterSchema ([pscustomobject]@{patients=@(); units=$roster.units; billingDates=@(); removedPatients=@(); otherPatients=$incoming})
+        $originalOther = @($roster.otherPatients | Where-Object { $null -ne $_ })
+        $nextOther = @($originalOther)
+        $importAdded = 0
+        $importExisting = 0
+        foreach ($p in $incoming) {
+            $matches = @((@($roster.patients) + @($roster.removedPatients) + $nextOther) | Where-Object {
+                ([string]$_.id -eq [string]$p.id) -or
+                ((Normalize-Digits $_.phn) -eq $p.phn) -or
+                ((Normalize-Digits $_.ava) -eq $p.ava)
+            })
+            if ($matches.Count -gt 0) {
+                # An exact repeat is a no-op; any identity or content conflict stops the whole import.
+                if ($matches.Count -ne 1 -or $originalOther -notcontains $matches[0]) { throw 'Import conflicts with another roster record.' }
+                foreach ($field in $p.PSObject.Properties.Name) {
+                    if ([string]$matches[0].$field -cne [string]$p.$field) { throw "Import differs from an existing other patient: $field. Review explicitly." }
+                }
+                $importExisting++
+                continue
+            }
+            $nextOther += $p
+            $importAdded++
+        }
+        $roster | Add-Member -NotePropertyName otherPatients -NotePropertyValue $nextOther -Force
+        $changed = $changed -or ($importAdded -gt 0)
+    }
+
     'Add' {
         if ([string]::IsNullOrWhiteSpace($Name)) { throw 'Name is required for Add.' }
         if ([string]::IsNullOrWhiteSpace($Unit)) { throw 'Unit is required for Add.' }
@@ -186,11 +227,14 @@ switch ($Mode) {
             room  = if ($null -eq $Room) { '' } else { $Room.Trim() }
             codes = if ($null -eq $Codes) { '' } else { $Codes.Trim() }
             ava   = $normalizedNewAva
+            panelAddedDate = $today
+            newPanelPatient = $true
         }
         if ($returning.Count -eq 1) {
             $preserved = $returning[0]
             foreach ($key in @('name', 'phn', 'unit', 'room', 'codes', 'ava')) { $preserved.$key = $newPatient.$key }
             $preserved.PSObject.Properties.Remove('removedDate')
+            $preserved | Add-Member -NotePropertyName newPanelPatient -NotePropertyValue $false -Force
             $newPatient = $preserved
             $roster.removedPatients = @($roster.removedPatients | Where-Object { $_.id -ne $preserved.id })
         }
@@ -337,6 +381,22 @@ if ($Mode -eq 'Remove') {
         RemovedDate = $removedDate
         ExpiresOn = Get-ExpiryDate $removedDate
     }
+}
+elseif ($Mode -eq 'ImportOther') {
+    foreach ($p in $incoming) {
+        $matches = @($verifiedRoster.otherPatients | Where-Object { $_.id -eq $p.id })
+        if ($matches.Count -ne 1) { throw 'Import readback count mismatch.' }
+        foreach ($field in $p.PSObject.Properties.Name) {
+            if ([string]$matches[0].$field -cne [string]$p.$field) { throw "Import readback differs: $field." }
+        }
+    }
+    $beforeRoster = $initialText | ConvertFrom-Json
+    foreach ($field in $beforeRoster.PSObject.Properties.Name | Where-Object { $_ -ne 'otherPatients' }) {
+        if (($beforeRoster.$field | ConvertTo-Json -Depth 100 -Compress) -cne ($verifiedRoster.$field | ConvertTo-Json -Depth 100 -Compress)) {
+            throw "Import altered an unrelated roster field: $field."
+        }
+    }
+    $result = [ordered]@{Mode=$Mode; Changed=$changed; Added=$importAdded; AlreadyPresent=$importExisting; TotalPatients=@($verifiedRoster.patients).Count; RetainedPatients=@($verifiedRoster.removedPatients).Count; OtherPatients=@($verifiedRoster.otherPatients).Count}
 }
 elseif ($Mode -eq 'Maintain') {
     $result = [ordered]@{ Mode=$Mode; Changed=$changed; TotalPatients=@($verifiedRoster.patients).Count; RetainedPatients=@($verifiedRoster.removedPatients).Count }
