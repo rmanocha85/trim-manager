@@ -1,0 +1,9 @@
+On-device OCR assets, pinned October 6, 2026.
+
+Tesseract.js 7.0.0 (Apache-2.0): https://github.com/naptha/tesseract.js
+Tesseract.js-core 7.0.0 (Apache-2.0): https://github.com/naptha/tesseract.js-core
+English data @tesseract.js-data/eng 1.0.0, 4.0.0 distribution (Apache-2.0): https://github.com/naptha/tessdata
+
+See accompanying licenses. Assets obtained from the official npm registry distributions.
+Browser worker, engine and language URLs are all same-origin. No OCR service is used.
+Only static software is cached by HTTP. Screenshot pixels and recognized text are not persisted.
