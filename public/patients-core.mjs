@@ -36,6 +36,10 @@ export function validate(raw){
     return raw;
   }
 export function normalize(raw){return {...validate(raw),removedPatients:raw.removedPatients||[],otherPatients:raw.otherPatients||[],billingDates:raw.billingDates||[]};}
+export function sameRosterContent(a,b){
+  const stable=value=>value&&typeof value==='object'?(Array.isArray(value)?value.map(stable):Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]))):value;
+  return JSON.stringify(stable(normalize(a)))===JSON.stringify(stable(normalize(b)));
+}
 export function expire(raw,asOf=today()){
     dateParts(asOf);
     const roster=normalize(raw);

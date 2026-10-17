@@ -4,14 +4,18 @@ One maintained application for **TRIM Patients**, **TRIM Notes** and **TRIM Bill
 
 ## Run and verify
 
-Use `Start-TRIM.cmd` (or `Start-TRIM.ps1`). The app uses `http://127.0.0.1:4317/`, preserving the previous laptop origin and encrypted recovery keys. One laptop/profile edits the synced folder; other computers must use verified Google Drive access. Closing or locking does not discard local changes.
+Use `Start-TRIM.cmd` (or `Start-TRIM.ps1`). The app uses `http://127.0.0.1:4317/`, preserving the previous laptop origin and encrypted recovery keys. One laptop/profile edits the synced folder; other computers use verified Google Drive access. Closing or locking does not discard local changes.
+
+The static cloud entry is `https://rmanocha85.github.io/trim-manager/`. Patients and Billing connect directly to Google Drive; no hosted backend is required. Notes is available only through the laptop service, including when Patients and Billing use the direct Google connection. Its AI credentials and working files stay with that service. The cloud Notes tab opens `http://127.0.0.1:4317/?connection=cloud&section=notes` after the session is saved. Start the desktop shortcut first.
+
+Both Google origins must be registered on the existing OAuth client: `https://rmanocha85.github.io` and `http://127.0.0.1:4317`. No client secret belongs in browser code. Use the registered laptop address, including its port.
 
 - Install: `pnpm install --frozen-lockfile` (Node 22+).
 - Unit, storage, security, retention and billing rules: `pnpm test`.
 - Browser scenarios: `pnpm test:browser` (installed Chrome).
 - Syntax: `pnpm check`.
 
-Tests use synthetic temporary records and fake AI/Google responses. Their server fixture refuses production data paths. Browser logs and synthetic screenshots go to ignored `work/`. The handoff integration test also verifies the existing canonical TRIM routine-billing helper; it does not enter an EMR.
+Automated tests use synthetic temporary records and fake AI/Google responses. Their server fixture refuses production data paths. Browser logs and synthetic screenshots go to ignored `work/`. The handoff integration test also verifies the existing canonical TRIM routine-billing helper; it does not enter an EMR. The opt-in `tests/drive-live-check.*` acceptance page verifies the actual Drive APIs using a marked private folder containing synthetic records. The local server serves it only with `TRIM_VERIFICATION=1`; it refuses the production roster and billing IDs. Remove its staged preview after verification and move its synthetic folder to Trash.
 
 ## Application structure
 
@@ -26,6 +30,8 @@ Tests use synthetic temporary records and fake AI/Google responses. Their server
 
 Normal edits automatically save an encrypted recovery draft in the current browser; **Save to Drive** saves the whole dirty session. A patient form must first be completed with Add or the row's Save button. The header distinguishes local pending work, conflicts, and completed saves. Local Drive-folder writes cannot verify cloud synchronization; the UI says so. A failed section leaves itself and subsequent sections pending. Lost acknowledgments can be retried without duplication. Roster conflicts require review and explicit reload/discard; an encrypted discarded copy remains on the device.
 
+Use the header's cloud/laptop switch after saving. It blocks pending changes and requires a direct Google connection before leaving folder mode. Reconnecting from folder mode checks the complete roster and billing contents against Google Drive before adopting them; a mismatch preserves the existing session and asks for Drive sync to finish. Notes always saves to the designated laptop Drive folder and reports that desktop sync remains unverified. Browser drafts are specific to each origin and are never transferred by a link.
+
 The original roster, billing ledger and Notes documents remain separate at their existing identities and paths. Patients saves the complete roster, including unknown fields, `otherPatients`, doctor assignments, upload flags, `removedPatients`, units and print dates. Billing's reduced roster view is never written as the complete roster. Returning retained patients preserve their IDs. Three-calendar-month removal retention uses Pacific dates and clamps month ends. Expiry occurs on an explicit roster save; it never deletes billing history.
 
 Before-edit daily roster snapshots go to `TRIM AI/Backups/Roster`; older `TRIM Snapshots` remain readable. Every saved billing version enters a durable backup queue. Local-folder and direct Google connections support verified snapshots under `TRIM AI/Backups/Billing` (Google access can fall back to its existing private app-owned folder). Matching backups expire after three calendar months only after verifying the retained copy. Independent laptop backup remains optional. Full restore requires a reviewed selection, confirmation and verified safety copy. Clinical and billing history are not pruned by backup retention.
@@ -34,6 +40,6 @@ Before-edit daily roster snapshots go to `TRIM AI/Backups/Roster`; older `TRIM S
 
 ## Cutover and older code
 
-This checkout inherits the published Manager repository's history and incorporates the full local Billing/Notes source and newer roster helper. The old root page, duplicate `billing/` tree and superseded standalone-page tests are removed from active source; prior versions remain in Git history and verified local source archives. Old laptop shortcut names delegate to this launcher.
+This checkout inherits the published Manager repository's history and incorporates the full local Billing/Notes source and newer roster helper. The old standalone app implementations and superseded tests are removed from active source; prior versions remain in Git history and verified local source archives. Old laptop shortcut names delegate to this launcher. Root and `billing/` contain only compatibility redirects generated by `scripts/cloud-entry.mjs`; both load the single `public/` application while preserving URL parameters and the existing browser origin.
 
-The previously published website remains available for recovery of browser drafts on its own origin. Browser storage cannot move automatically between that website and the laptop origin. Do not clear it or overwrite that deployment merely to tidy files. Installing or launching TRIM does not submit billing or enter clinical notes. Future development belongs in this repository.
+The cloud release retains the published website's origin and billing recovery keys. Browser storage cannot move automatically between the cloud and laptop origins; do not clear either during cutover. Before replacing the published app, run the automated suite and the real Drive cloud-to-laptop-to-cloud acceptance check on isolated records. Installing or launching TRIM does not submit billing or enter clinical notes. Future development belongs in this repository.

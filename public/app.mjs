@@ -1,7 +1,7 @@
 import {billingUI} from './billing-ui.mjs';
-import {notesUI} from './notes-ui.mjs';
 import {patientsUI} from './patients-ui.mjs';
 import {Session} from './session.mjs';
+import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,section='billing';
@@ -15,8 +15,8 @@ function showSection(value){
     const group=['rounds','notes'].includes(b.dataset.tab)?'notes':b.dataset.tab==='settings'?'settings':'billing';
     b.hidden=group!==value;
   });
-  $('calendar').hidden=value==='settings';
-  $('header-billing-date').hidden=['patients','settings'].includes(value);
+  $('calendar').hidden=value==='settings'||value==='notes'&&!laptopRuntime();
+  $('header-billing-date').hidden=['patients','settings'].includes(value)||value==='notes'&&!laptopRuntime();
   $('header-billing-date').querySelector('small').textContent=value==='notes'?'Visit date':'Billing for';
   document.querySelector('.version').hidden=value!=='billing';
 }
@@ -53,13 +53,19 @@ function status(){
 async function saveSession(){try{await session.save();billing.notify('');}catch(e){billing.notify(e.message);}finally{status();}}
 async function start(){
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onRoster:raw=>billing?.setRoster(raw)});
-  notes=notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status});
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onConnected:()=>{showSection(section);status();},saveSession});
+  const laptop=laptopRuntime();
+  notes=laptop?(await import('./notes-ui.mjs')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onConnected:()=>{const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
   session=new Session([
     {name:'Patients',state:patients.state,save:patients.save},
-    {name:'Notes',state:notes.status,save:notes.save},
+    ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
+  if(!laptop)document.querySelector('[data-section="notes"]').textContent='TRIM Notes · laptop';
+  const switcher=document.createElement('button');switcher.id='switch-version';switcher.textContent=laptop?'Open cloud app':'Open laptop app';switcher.className='text-button';
+  const switching=document.createElement('dialog');switching.id='switch-version-dialog';switching.innerHTML='<div class="dialog-body"><h2>Switch TRIM versions</h2><p id="switch-version-message"></p><a id="switch-version-link" target="_blank" rel="noopener">'+(laptop?'Open cloud TRIM ↗':'Open laptop TRIM ↗')+'</a><button id="switch-version-connect" hidden>Connect through Google</button><button id="switch-version-close">Close</button></div>';document.body.append(switching);document.querySelector('.header-actions').append(switcher);
+  switcher.onclick=()=>{const dirty=session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft,folder=laptop&&billing.state().adapter?.mode==='local';$('switch-version-message').textContent=dirty?'Save your session to Drive before switching. Your local drafts stay here.':folder?'This connection saves to the laptop’s Drive folder. Connect through Google and verify the saved version before switching.':'Your session is saved. Connect through Google in the other version to load the latest Drive records. Local drafts stay in this browser.';const link=$('switch-version-link');link.hidden=dirty||folder;link.href=laptop?CLOUD_URL:LAPTOP_URL;$('switch-version-connect').hidden=dirty||!folder;switching.showModal();};$('switch-version-close').onclick=()=>switching.close();$('switch-version-connect').onclick=()=>{switching.close();billing.chooseConnection();};
+  if(!laptop)$('open-laptop-notes').onclick=e=>{if(session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft){e.preventDefault();switcher.click();}};
   document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{
     session.message='';
     if(b.dataset.section==='patients')showSection('patients');else billing.switchTab(lastTab[b.dataset.section]);

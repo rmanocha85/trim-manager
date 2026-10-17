@@ -2,16 +2,16 @@ import {escapeHTML as esc,clone} from './core.mjs?v=20261015-immediate1';
 import {formatDate} from './dates.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 import {contextRecord,dayRecord,validateRecord,startVisit,editVisit,touch,markReviewed,isReviewed,roundCandidates,orderedEntries,makeHandoff,generationInput,MODES,QUICK_STATEMENTS,visitStatements} from './notes-core.mjs?v=20261015-immediate1';
-import {LocalNotesRepository,DriveNotesRepository,CONTENT_PATH,dayPath,sourcePath,handoffPath} from './notes-storage.mjs';
+import {LocalNotesRepository,CONTENT_PATH,dayPath,sourcePath,handoffPath} from './notes-storage.mjs';
 const $=id=>document.getElementById(id),local=()=>['127.0.0.1','localhost'].includes(location.hostname);
 const unitsHTML=(units,value)=>'<option value="">All units</option>'+units.map(u=>`<option value="${esc(u.id)}" ${u.id===value?'selected':''}>${esc(u.name)}</option>`).join('');
 export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
   let repository,context,day,date,dataset,patientKey=null,unit='',showAll=false,ready=false,busy=false,dirty=false,contextTag='new',dayTag='new',pending=0,serial=Promise.resolve(),localError=false,csrf,ai={},models=[],model='',pollTimer,loadEpoch=0;
-  let sourceCache={},folderId='',noteMessage='',loading=false,aiConnection='checking',aiRefresh=null,aiConnectionError='',pendingHandoff=null,handoffTag='new';
+  let sourceCache={},noteMessage='',loading=false,aiConnection='checking',aiRefresh=null,aiConnectionError='',pendingHandoff=null,handoffTag='new';
   const nav=document.querySelector('.sidebar nav');for(const [id,label]of [['rounds','Rounds'],['notes','Output / Notes']]){const b=document.createElement('button');b.className='nav';b.dataset.tab=id;b.textContent=label;nav.insertBefore(b,nav.querySelector('[data-tab="reports"]'));}
   const content=document.querySelector('main.content');
   for(const id of ['rounds','notes']){const section=document.createElement('section');section.id=id;section.className='tab notes-module';section.hidden=true;content.append(section);}
-  const config=document.createElement('section');config.className='card notes-settings';config.innerHTML=`<h2>Rounds & Notes</h2><p>Patient summaries and visit notes are private working records. Meditech and Ava remain the clinical records.</p><label>Routine notes Drive folder ID <input id="notes-folder" autocomplete="off" placeholder="Auto-located from your billing file"></label><button id="notes-folder-save">Use folder / reconnect notes</button><button id="notes-drive-reconnect">Reconnect Google Drive</button><p id="notes-folder-status" class="hint"></p><hr><h2>AI connection</h2><p id="notes-ai-status" role="status">Open the laptop app to connect ChatGPT.</p><div class="actions"><button id="notes-ai-connect">Continue with ChatGPT</button><button id="notes-ai-refresh">Refresh connection</button><button id="notes-ai-disconnect">Disconnect</button><a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener">Manage usage ↗</a></div><p id="notes-plan-confirmation" hidden>Eligible AI requests use your ChatGPT plan. <button id="notes-plan-dismiss" class="text-button">Got it</button></p><label>AI model<select id="notes-model"><option value="">Connect ChatGPT first</option></select></label><p class="hint">The AI receives the selected patient's summary, prior reviewed note, today's input and selected source images. Generation does not enter Meditech or create billing.</p>`;$('settings').append(config);
+  const config=document.createElement('section');config.className='card notes-settings';config.innerHTML=`<h2>Rounds & Notes</h2><p>Patient summaries and visit notes are private working records. Meditech and Ava remain the clinical records.</p><p>Notes runs on this laptop. Save to Drive writes to the existing Routine notes folder in the laptop’s Google Drive folder. The Drive desktop app handles cloud sync.</p><button id="notes-folder-save">Reconnect Notes folder</button><p id="notes-folder-status" class="hint"></p><hr><h2>AI connection</h2><p id="notes-ai-status" role="status">Open the laptop app to connect ChatGPT.</p><div class="actions"><button id="notes-ai-connect">Continue with ChatGPT</button><button id="notes-ai-refresh">Refresh connection</button><button id="notes-ai-disconnect">Disconnect</button><a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener">Manage usage ↗</a></div><p id="notes-plan-confirmation" hidden>Eligible AI requests use your ChatGPT plan. <button id="notes-plan-dismiss" class="text-button">Got it</button></p><label>AI model<select id="notes-model"><option value="">Connect ChatGPT first</option></select></label><p class="hint">The AI receives the selected patient's summary, prior reviewed note, today's input and selected source images. Generation does not enter Meditech or create billing.</p>`;$('settings').append(config);
   const report=(message,error=false)=>{noteMessage=message;for(const el of document.querySelectorAll('.notes-message')){el.textContent=message;el.classList.toggle('error',error);} };
   const setup=document.createElement('button');setup.textContent='Set up ChatGPT for Notes';setup.id='notes-setup-open';setup.className='text-button';$('gate').querySelector('.gate-card').append(setup);
   const setupDialog=document.createElement('dialog');setupDialog.id='notes-setup-dialog';setupDialog.className='notes-setup-dialog';const closeSetup=document.createElement('button');closeSetup.textContent='Done';closeSetup.onclick=()=>setupDialog.close();document.body.append(setupDialog);
@@ -30,8 +30,8 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
   function updateStatus(){for(const el of document.querySelectorAll('.notes-save-state'))el.textContent=localError?'Local save needs attention':pending?'Saving locally…':dirty?'Saved on this device · not yet in Drive':ready?(repository.mode==='cloud'?'Notes match last Drive save':'Notes match Drive folder · cloud sync unverified'):'Notes not connected';onStatus();}
   async function connect(){
     const s=state();if(!s.ledger)return;const epoch=++loadEpoch;ready=false;
-    dataset=s.ledger.datasetId;folderId=localStorage.getItem('trim-notes:folder:'+dataset)||'';$('notes-folder').value=folderId;
-    repository=s.adapter.mode==='cloud'?new DriveNotesRepository(s.adapter,folderId):new LocalNotesRepository(api);
+    dataset=s.ledger.datasetId;
+    repository=new LocalNotesRepository(api);
     loading=true;try{await loadDay(s.date,epoch);}finally{loading=false;}if(local())void refreshAI().catch(e=>{$('notes-ai-status').textContent=e.message;});
   }
   async function loadDay(nextDate,epoch=++loadEpoch){
@@ -53,8 +53,7 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
       let handoffMessage='';
       if(pendingHandoff){await repository.save(handoffPath(date),pendingHandoff,handoffTag);handoffMessage=` Handoff ready: ${pendingHandoff.patients.length} reviewed notes for ${formatDate(date)}.`;pendingHandoff=null;}
       dirty=false;await persist();
-      if(repository.rootId){localStorage.setItem('trim-notes:folder:'+dataset,repository.rootId);$('notes-folder').value=repository.rootId;}
-      report((repository.mode==='cloud'?'Patient summaries and visit notes saved to Drive.':'Saved to the designated Drive folder. Cloud sync is not verified.')+handoffMessage);
+      report('Saved to the designated laptop Drive folder. Cloud sync is not verified.'+handoffMessage);
     }finally{busy=false;render();}
   }
   async function handoff(){
@@ -142,8 +141,7 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
   $('notes-ai-connect').onclick=safe(async()=>{const popup=window.open('about:blank','trim-chatgpt-signin');try{const r=await api('/api/ai/connect',{method:'POST'});if(popup)popup.location.href=r.url;else throw new Error('Allow the sign-in popup, then click Continue with ChatGPT again.');clearInterval(pollTimer);let attempts=0;pollTimer=setInterval(async()=>{try{await refreshAI();if(!ai.pending||++attempts>=120){clearInterval(pollTimer);render();}}catch(e){clearInterval(pollTimer);$('notes-ai-status').textContent=e.message;}},2000);}catch(e){popup?.close();throw e;}});
   $('notes-ai-refresh').onclick=safe(refreshAI);
   $('notes-ai-disconnect').onclick=safe(async()=>{const r=await api('/api/ai/disconnect',{method:'POST'});await refreshAI();$('notes-ai-status').textContent=r.message;});
-  $('notes-drive-reconnect').onclick=safe(async()=>{if(busy)throw new Error('Wait for the current operation.');const adapter=state().adapter;if(adapter?.mode!=='cloud')throw new Error('This connection uses the laptop Drive folder. Connect through Google from the app header to use direct cloud saves.');await adapter.connect();report('Google Drive reconnected. Your local notes are retained; retry Save to Drive.');});
-  $('notes-folder-save').onclick=safe(async()=>{if(!state().ledger)throw new Error('Connect your billing workspace first.');if(dirty)throw new Error('Save current notes before switching folders.');const id=$('notes-folder').value.trim();if(id&&!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('Paste only the Drive folder ID.');localStorage.setItem('trim-notes:folder:'+state().ledger.datasetId,id);await connect();});
+  $('notes-folder-save').onclick=safe(async()=>{if(!state().ledger)throw new Error('Connect your billing workspace first.');if(dirty||busy||loading||pending)throw new Error('Save current notes before reconnecting.');await connect();});
   window.addEventListener('beforeunload',e=>{if(dirty||pending||busy){e.preventDefault();e.returnValue='';}});
   void refreshAI().catch(()=>{});
   return {save,status:()=>({dirty,busy:busy||loading||pending>0,error:localError,ready,mode:repository?.mode}),connected:()=>connect().catch(e=>{ready=false;render();report(e.message,true);$('notes-folder-status').textContent=e.message;}),selectDate,render,hasChanges:()=>dirty||pending||busy||loading,beforeLock:async()=>{if(busy||loading)throw new Error('Wait for the current Notes operation before locking.');await serial;}};

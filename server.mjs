@@ -96,7 +96,10 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
       }
       if(!['GET','HEAD'].includes(req.method))return json(405,{error:'Method not allowed.'});
       const file=url.pathname==='/'?'index.html':url.pathname.slice(1);
-      if(!allowed.has(file)&&!['merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css'].includes(file))return json(404,{error:'Not found.'});
+      if(process.env.TRIM_VERIFICATION==='1'&&['drive-live-check.html','drive-live-check.mjs'].includes(file)){
+        res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});return res.end(await readFile(path.join(root,'tests',file)));
+      }
+      if(!allowed.has(file)&&!['merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs'].includes(file))return json(404,{error:'Not found.'});
       res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});
       res.end(req.method==='HEAD'?undefined:await readFile(path.join(root,'public',file)));
     } catch(e) {json(e.status||400,{error:e.code==='ENOENT'?'The source file is not available on this laptop. Check Drive sync.':e.message});}

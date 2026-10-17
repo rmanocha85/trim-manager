@@ -9,10 +9,13 @@ import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261007-dates1';
 import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261015-immediate1';
 import {mergeSession} from './merge.mjs?v=20261015-immediate1';
+import {laptopRuntime} from './runtime.mjs';
+import {sameRosterContent} from './patients-core.mjs';
+import {RosterRepository} from './roster-repository.mjs';
 
 export function billingUI({notes,patients,onStatus=()=>{},onNavigate=()=>{},onConnected=()=>{},saveSession}){
 const $=id=>document.getElementById(id);
-const laptopStartup=['127.0.0.1','localhost'].includes(location.hostname)&&['/','/index.html'].includes(location.pathname)&&new URLSearchParams(location.search).get('connection')!=='manual';
+const laptopStartup=['127.0.0.1','localhost'].includes(location.hostname)&&['/','/index.html'].includes(location.pathname)&&!['manual','cloud'].includes(new URLSearchParams(location.search).get('connection'));
 const laptopLockKey='trim-billing:laptop-locked';
 $('search-scope').textContent='All TRIM Patients residents · your panel, other residents and saved coverage patients';
 const headerDate=document.createElement('div');headerDate.id='header-billing-date';headerDate.setAttribute('aria-live','polite');headerDate.innerHTML='<small>Billing for</small><strong id="header-date-value"></strong>';document.querySelector('header .brand').after(headerDate);
@@ -104,8 +107,9 @@ function applyNewPatientPlans(){
   if(!sameBillingContent(next,ledger))commit(next);
 }
 async function connect(mode,create=false){
-  if(notes.hasChanges()||patients.hasChanges())return notice('Save or discard your local session before changing connections.');
+  if(dirty||notes.hasChanges()||patients.hasChanges())return notice('Save or discard your local session before changing connections.');
   if(connecting)return;connecting=true;
+  let replacedConnection=false;
   $('create-cloud').hidden=true;$('setup-note').hidden=true;
   $('setup-import').hidden=true;setupCandidate=create?setupCandidate:null;
   $('connection-error').textContent='Connecting…';$('connection-error').dataset.state='connecting';
@@ -116,6 +120,11 @@ async function connect(mode,create=false){
     const r=await candidate.roster();let s;
     try{s=create?await candidate.createEmpty():await candidate.load();if(mode==='local'&&s.etag==='new')throw new Error('The billing file is not available in this laptop’s Drive folder. Check Drive sync, then retry.');}
     catch(e){if(e.code==='MISSING_BILLING'){setupCandidate=candidate;$('create-cloud').hidden=false;$('setup-import').hidden=false;$('setup-note').hidden=false;}throw e;}
+    if(adapter?.mode==='local'&&mode==='cloud'){
+      const cloudRoster=await new RosterRepository(candidate).load();
+      if(!sameBillingContent(savedBase,s.ledger)||!sameRosterContent(patients.roster(),cloudRoster.roster))throw new Error('The laptop Drive folder and Google Drive do not match yet. Your laptop session is unchanged. Wait for Drive sync, reload the laptop app, then reconnect through Google.');
+    }
+    replacedConnection=true;
     if(releaseLock){releaseLock();releaseLock=null;}
     await takeTabLock(s.ledger.datasetId);
     adapter=candidate;roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;
@@ -130,7 +139,7 @@ async function connect(mode,create=false){
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();
     onConnected();
     return true;
-  }catch(e){if(releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;$('connection-error').dataset.state='error';}
+  }catch(e){if(replacedConnection&&releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;$('connection-error').dataset.state='error';}
   finally{connecting=false;}
 }
 function commit(next){guardWrite();ledger=next;ledger.units=clone(roster.units);seq++;dirty=true;printedSignature=null;status('Saving on this device…',true);persistRecovery().then(()=>{if(!blocked&&!saving&&!writeUnavailable())status('Saved on this device — not yet in Drive',true);}).catch(()=>{});renderStats();renderRoster();updateWriteLock();}
@@ -355,7 +364,7 @@ $('history-date-clear').onclick=()=>{historyDate='';$('history-date-filter').val
 $('history-date-calendar').onclick=()=>{historyDate=date();$('history-date-filter').value=historyDate;enhanceDateInputs(historyFilters);renderHistory();};
 $('baseline-show-all').onchange=()=>renderSettings();
 $('connect').onclick=()=>{$('connection-error').textContent='';$('connection-dialog').showModal();};
-$('local-option').hidden=!['127.0.0.1','localhost'].includes(location.hostname);
+$('local-option').hidden=!laptopRuntime();
 $('local-connect').onclick=()=>connect('local');$('cloud-connect').onclick=()=>connect('cloud');
 $('create-cloud').onclick=()=>{if(confirm('Create a new empty private billing file in My Drive? Only continue if you have no existing billing data to import. The original roster will not change.'))connect('cloud',true);};
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());
@@ -574,7 +583,7 @@ async function openLaptopWorkspace(){
     state:()=>({adapter,ledger,roster,date:date(),people:ledger?people():[]}),
     save:async()=>{await syncSession(true);if(dirty||blocked)throw new Error('Resolve the TRIM Billing conflict before finishing this save.');},
     status:()=>({dirty,busy:saving||checking||recoveryPending>0,error:localRecoveryFailed||blocked,ready:!!ledger,mode:adapter?.mode}),
-    switchTab,recordRoutine,notify:notice,
+    switchTab,recordRoutine,notify:notice,chooseConnection:()=>{$('connection-error').textContent='';$('connection-dialog').showModal();},
     setRoster:raw=>{roster=normalizeRoster(raw);if(ledger){renderAll();applyNewPatientPlans();}},
     localChanges,
   };

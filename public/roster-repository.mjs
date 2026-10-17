@@ -3,14 +3,14 @@ const ROSTER = '1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 const V2 = 'https://www.googleapis.com/drive/v2/files';
 const V3 = 'https://www.googleapis.com/drive/v3/files';
 export class RosterRepository {
-  constructor(adapter) { this.adapter=adapter; this.mode=adapter.mode; }
+  constructor(adapter) { this.adapter=adapter; this.mode=adapter.mode; this.fileId=adapter.rosterId||ROSTER; }
   request(url, options) { return this.adapter.request(url, options); }
   async load() {
     if(this.mode==='local') return this.request('/api/roster/document');
     for(let attempt=0;attempt<3;attempt++) {
-      const before=await this.request(`${V2}/${ROSTER}?fields=id,etag`);
-      const roster=await this.request(`${V2}/${ROSTER}?alt=media`);
-      const after=await this.request(`${V2}/${ROSTER}?fields=id,etag`);
+      const before=await this.request(`${V2}/${this.fileId}?fields=id,etag`);
+      const roster=await this.request(`${V2}/${this.fileId}?alt=media`);
+      const after=await this.request(`${V2}/${this.fileId}?fields=id,etag`);
       if(before.etag && before.etag===after.etag) { normalize(roster); return {roster,etag:after.etag}; }
     }
     throw new Error('Roster changed while loading. Retry.');
@@ -23,7 +23,7 @@ export class RosterRepository {
     if(JSON.stringify(normalize(current.roster))===JSON.stringify(next))return current;
     if(current.etag!==etag) throw Object.assign(new Error('Roster changed elsewhere. Your local changes are retained.'),{status:409});
     await this.saveSnapshot(current.roster);
-    await this.request(`https://www.googleapis.com/upload/drive/v2/files/${ROSTER}?uploadType=media`,{method:'PUT',headers:{'Content-Type':'application/json','If-Match':etag},body:JSON.stringify(next)});
+    await this.request(`https://www.googleapis.com/upload/drive/v2/files/${this.fileId}?uploadType=media`,{method:'PUT',headers:{'Content-Type':'application/json','If-Match':etag},body:JSON.stringify(next)});
     const result=await this.load();
     if(JSON.stringify(result.roster)!==JSON.stringify(next)) throw Object.assign(new Error('Roster save could not be verified. Your local copy is retained.'),{status:409});
     return result;
