@@ -39,7 +39,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
     try {
       if(!origins.some(o=>o.slice(7)===req.headers.host))return json(403,{error:'Invalid host.'});
       const url=new URL(req.url,origins[0]);
-      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261017-unified1'});
+      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261019-fixes1'});
       if(url.pathname==='/auth/callback'&&req.method==='GET'){
         let message='ChatGPT connected. Return to TRIM Billing and Notes.',ok=true;
         try{await chatgpt.callback(url.searchParams);}catch(e){ok=false;message=e.message;}
@@ -99,7 +99,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
       if(process.env.TRIM_VERIFICATION==='1'&&['drive-live-check.html','drive-live-check.mjs'].includes(file)){
         res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});return res.end(await readFile(path.join(root,'tests',file)));
       }
-      if(!allowed.has(file)&&!['merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs'].includes(file))return json(404,{error:'Not found.'});
+      if(!allowed.has(file)&&!['merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','patient-links.mjs','roster-print.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs'].includes(file))return json(404,{error:'Not found.'});
       res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});
       res.end(req.method==='HEAD'?undefined:await readFile(path.join(root,'public',file)));
     } catch(e) {json(e.status||400,{error:e.code==='ENOENT'?'The source file is not available on this laptop. Check Drive sync.':e.message});}

@@ -1,5 +1,5 @@
-import {billingUI} from './billing-ui.mjs';
-import {patientsUI} from './patients-ui.mjs';
+import {billingUI} from './billing-ui.mjs?v=20261019-fixes1';
+import {patientsUI} from './patients-ui.mjs?v=20261019-fixes1';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
@@ -61,7 +61,7 @@ async function start(){
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
-  if(!laptop)document.querySelector('[data-section="notes"]').textContent='TRIM Notes · laptop';
+  if(!laptop)document.querySelector('[data-section="notes"]').title='Notes runs on your laptop';
   const switcher=document.createElement('button');switcher.id='switch-version';switcher.textContent=laptop?'Open cloud app':'Open laptop app';switcher.className='text-button';
   const switching=document.createElement('dialog');switching.id='switch-version-dialog';switching.innerHTML='<div class="dialog-body"><h2>Switch TRIM versions</h2><p id="switch-version-message"></p><a id="switch-version-link" target="_blank" rel="noopener">'+(laptop?'Open cloud TRIM ↗':'Open laptop TRIM ↗')+'</a><button id="switch-version-connect" hidden>Connect through Google</button><button id="switch-version-close">Close</button></div>';document.body.append(switching);document.querySelector('.header-actions').append(switcher);
   switcher.onclick=()=>{const dirty=session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft,folder=laptop&&billing.state().adapter?.mode==='local';$('switch-version-message').textContent=dirty?'Save your session to Drive before switching. Your local drafts stay here.':folder?'This connection saves to the laptop’s Drive folder. Connect through Google and verify the saved version before switching.':'Your session is saved. Connect through Google in the other version to load the latest Drive records. Local drafts stay in this browser.';const link=$('switch-version-link');link.hidden=dirty||folder;link.href=laptop?CLOUD_URL:LAPTOP_URL;$('switch-version-connect').hidden=dirty||!folder;switching.showModal();};$('switch-version-close').onclick=()=>switching.close();$('switch-version-connect').onclick=()=>{switching.close();billing.chooseConnection();};

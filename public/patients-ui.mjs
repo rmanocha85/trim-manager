@@ -1,9 +1,11 @@
 import * as TrimRoster from './patients-core.mjs';
+import {avaChartUrl} from './patient-links.mjs';
+import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 export async function patientsUI({host,onChange=()=>{},onRoster=()=>{}}){
 
-const MAX_P=110,MAX_D=17;
+const MAX_D=17;
 const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
 
 
@@ -194,7 +196,7 @@ function addPatient(){
   const ava=g('in-ava').value.trim();
   const pFlag=g('in-pflag').checked;
   if(!name||!unit){alert('Please enter a name and unit.');return}
-  if(state.patients.length>=MAX_P){alert('Patient limit reached.');return}
+
   try{applyRoster(TrimRoster.add(currentRoster(),{name,phn,unit,room,codes,ava,pFlag}));}
   catch(e){alert(e.message);return;}
   ['in-name','in-phn','in-room','in-codes','in-ava'].forEach(i=>g(i).value='');
@@ -341,15 +343,11 @@ root.addEventListener('keydown',function(e){
 function render(){renderStats();renderUList();populateUSel();renderDates();renderRemoved();renderOtherPatients()}
 
 function renderStats(){
-  const t=state.patients.length,pct=Math.round(t/MAX_P*100);
-  const vc=t>=MAX_P?'err':t>=95?'warn':'';
+  const t=state.patients.length;
   g('stats').innerHTML=`
-    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value ${vc}">${t}</div></div>
-    <div class="stat-card"><div class="stat-label">Capacity</div><div class="stat-value">${MAX_P}</div></div>
-    <div class="stat-card"><div class="stat-label">Used</div><div class="stat-value ${vc}">${pct}%</div></div>
+    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value">${t}</div></div>
     <div class="stat-card"><div class="stat-label">Date Slots</div><div class="stat-value">${state.billingDates.length}/${MAX_D}</div></div>`;
-  g('lbanner').innerHTML=t>=MAX_P?`<div class="banner b-err">⚠ Patient limit of ${MAX_P} reached.</div>`:
-    t>=95?`<div class="banner b-warn">⚠ Approaching limit (${t}/${MAX_P}).</div>`:'';
+  g('lbanner').textContent='';
 }
 
 function populateUSel(){
@@ -397,7 +395,7 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${notesUploadControl(p,'patients')}${p.ava?`<a href="https://www.avaemr.ca/patients/${esc(p.ava)}" target="_blank" rel="noopener">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
+                  <div class="pnm">${notesUploadControl(p,'patients')}${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
                   <div class="pphn">${phnWithCopy(p.phn,'')}</div>
                 </td>
                 <td><span class="pphn">${phnWithCopy(p.phn)}</span></td>
@@ -485,7 +483,7 @@ function renderOtherPatients(){
     if(!rows.length)return '';
     const key='other-'+index;
     return `<div class="usec"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name</th><th style="width:160px">PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
-      const ava=String(p.ava||'');const url=/^\d{6,10}$/.test(ava)?'https://www.avaemr.ca/patients/'+ava:'';
+      const ava=String(p.ava||'');const url=avaChartUrl(p);
       return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${notesUploadControl(p,'otherPatients')}${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
     }).join('')}</tbody></table></div></div>`;
   }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
@@ -532,21 +530,20 @@ function renderDates(){
 
 // ── BUILD TRIM LIST ──
 function buildTrimList(){
-  const total=state.patients.length;
-  const perPage=Math.ceil(total/2);
-  const fp=Math.max(5.5,Math.min(8,Math.floor(760/Math.max(perPage,1))));
-  const rp=Math.max(10,Math.min(16,Math.floor(960/Math.max(perPage,1))));
-  const nmW=Math.max(148,fp*19);
-
+  // Preserve the familiar unit grouping, adding pages for larger rosters.
+  const groups=[...LIST_PAGES,state.units.filter(u=>!LIST_PAGES.flat().includes(u.id)).map(u=>u.id)];
+  const known=new Set(groups.flat());
+  groups.push([...new Set(state.patients.filter(p=>!known.has(p.unit)).map(p=>p.unit))]);
+  const pages=groups.flatMap(ids=>rosterPrintPages(
+    ids.map(id=>state.units.find(u=>u.id===id)||{id,name:id||'OTHER'}),
+    state.patients.filter(p=>ids.includes(p.unit)),55));
   let html='';
-  LIST_PAGES.forEach(uids=>{
+  pages.forEach(groups=>{
+    const fp=8,rp=16,nmW=152;
     let rows='';
-    uids.forEach(uid=>{
-      const unit=state.units.find(u=>u.id===uid);if(!unit)return;
-      const pts=state.patients.filter(p=>p.unit===uid).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
-      if(pts.length===0)return;
+    groups.forEach(({unit,patients:pts,continued})=>{
       // Unit header with unit name + room indicator
-      rows+=`<div class="t-uhdr" style="font-size:${fp+0.5}px"><span>${esc(unit.name)}</span></div>`;
+      rows+=`<div class="t-uhdr" style="font-size:${fp+0.5}px"><span>${esc(unit.name)}${continued?' (continued)':''}</span></div>`;
       pts.forEach(p=>{
         // Single line: LastName, FirstName  PHN  RoomNumber
         const parts=[esc(p.name),p.phn?esc(p.phn):'',p.room?esc(p.room):''].filter(Boolean);
@@ -574,39 +571,17 @@ function buildTrimList(){
 }
 
 // ── BUILD TRIM BILLING ──
-function computeBalancedBillingPages(){
-  // Target rows-per-page so units look full but don't overflow. Tuned for
-  // MIN_ROW/MAX_ROW readability — aim for the row count that lands near MAX_ROW.
-  const TARGET_ROWS=38; // tuned so current units balance into ~3 even pages
-  const unitsInOrder=state.units.filter(u=>state.patients.some(p=>p.unit===u.id));
-
-  const pages=[];
-  let current=[], currentRows=0;
-  unitsInOrder.forEach(u=>{
-    const count=state.patients.filter(p=>p.unit===u.id).length;
-    const rows=1+count; // header row + patient rows
-    if(current.length>0 && currentRows+rows>TARGET_ROWS){
-      pages.push(current);
-      current=[];currentRows=0;
-    }
-    current.push(u.id);
-    currentRows+=rows;
-  });
-  if(current.length>0) pages.push(current);
-  return pages.length>0?pages:[[]];
-}
-
 function buildTrimBilling(){
   const sorted=[...state.billingDates].sort((a,b)=>a.sortKey-b.sortKey);
   const cols=Array.from({length:MAX_D},(_,i)=>sorted[i]||null);
-  const pages=computeBalancedBillingPages();
+  const pages=rosterPrintPages(state.units,state.patients,38);
 
   // Usable page height ~9.7in at 96dpi = ~931px, minus header row (~36px)
   const PAGE_USABLE_PX=895;
   const MIN_ROW=16, MAX_ROW=34;
 
   let html='';
-  pages.forEach(uids=>{
+  pages.forEach(groups=>{
     const hdr=cols.map(d=>{
       if(!d)return`<th class="bdh empty"></th>`;
       return`<th class="bdh">
@@ -617,21 +592,13 @@ function buildTrimBilling(){
     }).join('');
 
     // Count rows on this page first (patient rows + unit header rows)
-    let rowCount=0;
-    uids.forEach(uid=>{
-      const pts=state.patients.filter(p=>p.unit===uid);
-      if(pts.length===0)return;
-      rowCount+=1+pts.length; // unit header row + patient rows
-    });
+    const rowCount=groups.reduce((n,g)=>n+1+g.patients.length,0);
     const rowPx=rowCount>0?Math.max(MIN_ROW,Math.min(MAX_ROW,Math.floor(PAGE_USABLE_PX/rowCount))):MIN_ROW;
     const fontPx=Math.max(6.5,Math.min(10,Math.floor(rowPx*0.42)));
 
     let body='';
-    uids.forEach(uid=>{
-      const unit=state.units.find(u=>u.id===uid);if(!unit)return;
-      const pts=state.patients.filter(p=>p.unit===uid).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
-      if(pts.length===0)return;
-      body+=`<tr class="buh" style="height:${rowPx}px"><td colspan="${MAX_D+1}" style="font-size:${fontPx}px">${esc(unit.name)}</td></tr>`;
+    groups.forEach(({unit,patients:pts,continued})=>{
+      body+=`<tr class="buh" style="height:${rowPx}px"><td colspan="${MAX_D+1}" style="font-size:${fontPx}px">${esc(unit.name)}${continued?' (continued)':''}</td></tr>`;
       pts.forEach(p=>{
         // Billing: name + room only (no PHN)
         const nameWithFlag=`${esc(p.name)}${p.pFlag?'<span class="b-pflag">P</span>':''}`;

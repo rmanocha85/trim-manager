@@ -2,6 +2,8 @@
 
 One maintained application for **TRIM Patients**, **TRIM Notes** and **TRIM Billing**, owned by Dr. Rahul Manocha. Local development: `C:\Users\rmano\Documents\Codex\trim-app`. Records and reusable workflows remain in the existing TRIM AI folders in Drive. Never commit patient data, auth material, browser profiles or backups.
 
+The header order is **Patient → Billing → Notes**, with Settings alongside. The patient roster has no count cap; both roster print layouts add continuation pages for larger units and include custom units. Billing uses a Sunday-first calendar. Concern and Routine Billing show independent Ava chart links for valid stored chart IDs. Code 14077 offers an optional multiline note, retained in recovery, Drive, history and print reports through its existing `reason` field.
+
 ## Run and verify
 
 Use `Start-TRIM.cmd` (or `Start-TRIM.ps1`). The app uses `http://127.0.0.1:4317/`, preserving the previous laptop origin and encrypted recovery keys. One laptop/profile edits the synced folder; other computers use verified Google Drive access. Closing or locking does not discard local changes.
@@ -9,6 +11,8 @@ Use `Start-TRIM.cmd` (or `Start-TRIM.ps1`). The app uses `http://127.0.0.1:4317/
 The static cloud entry is `https://rmanocha85.github.io/trim-manager/`. Patients and Billing connect directly to Google Drive; no hosted backend is required. Notes is available only through the laptop service, including when Patients and Billing use the direct Google connection. Its AI credentials and working files stay with that service. The cloud Notes tab opens `http://127.0.0.1:4317/?connection=cloud&section=notes` after the session is saved. Start the desktop shortcut first.
 
 Both Google origins must be registered on the existing OAuth client: `https://rmanocha85.github.io` and `http://127.0.0.1:4317`. No client secret belongs in browser code. Use the registered laptop address, including its port.
+
+After a successful Google workspace connection, the browser remembers the account email locally. Subsequent connections supply Google's `login_hint` without forcing account selection; **Use another account** opens the chooser explicitly. Google can still require sign-in or consent. Account metadata uses the existing Drive scope, and a token renewal must match the current account before pending changes can be saved. Tokens are never stored with this preference.
 
 - Install: `pnpm install --frozen-lockfile` (Node 22+).
 - Unit, storage, security, retention and billing rules: `pnpm test`.
@@ -45,3 +49,5 @@ This checkout inherits the published Manager repository's history and incorporat
 The cloud release retains the published website's origin and billing recovery keys. Browser storage cannot move automatically between the cloud and laptop origins; do not clear either during cutover. Before replacing the published app, run the automated suite and the real Drive cloud-to-laptop-to-cloud acceptance check on isolated records. Installing or launching TRIM does not submit billing or enter clinical notes. Future development belongs in this repository.
 
 October 17, 2026 verification: 165 automated checks, all 17 browser scenarios and 76 JavaScript syntax checks passed. The staged cloud build and the laptop origin both saved isolated synthetic roster/billing records through the actual Google APIs, read them back, and rejected stale revisions. The final cloud read confirmed the laptop save. Production roster and billing file hashes remained unchanged. Temporary verification assets are removed from the released site.
+
+October 19, 2026 verification: 170 automated checks, 18 browser scenarios and 80 JavaScript syntax checks passed, including a 151-patient save/reload/search/print check, optional-note recovery, responsive Ava links and simulated Google first/repeat/alternate-account connections. Live Google chooser behavior was not reverified for this update. The billing-mode fixture now uses relative visit dates so its recent patient does not become due as time passes.

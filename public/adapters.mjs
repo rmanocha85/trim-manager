@@ -1,6 +1,10 @@
 import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261015-immediate1';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
+const ACCOUNT_KEY='trim:drive-account';
+export function preferredDriveAccount(){
+  try{return globalThis.localStorage?.getItem(ACCOUNT_KEY)||'';}catch{return '';}
+}
 export class LocalAdapter {
   mode='local';label='Laptop Drive folder';
   async connect(){const r=await fetch('/api/connect',{method:'POST',headers:{'X-Trim-Local':'1'}});const j=await r.json();if(!r.ok)throw new Error(j.error);this.csrf=j.csrf;}
@@ -14,9 +18,34 @@ export class LocalAdapter {
 export class DriveAdapter {
   mode='cloud';label='Google Drive';
   constructor(fileId,{rosterId=ROSTER}={}){this.fileId=fileId?.trim();this.rosterId=rosterId;if(this.fileId===ROSTER||this.fileId===rosterId)throw new Error('The original roster can never be used as the billing file.');}
-  async connect(){
+  async connect({selectAccount=false}={}){
     if(!globalThis.google?.accounts?.oauth2) await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(new Error('Google sign-in could not load.'));document.head.append(s);});
-    return new Promise((resolve,reject)=>google.accounts.oauth2.initTokenClient({client_id:CLIENT,scope:'https://www.googleapis.com/auth/drive.file',callback:r=>{if(r.error)return reject(new Error(r.error));this.token=r.access_token;resolve();},error_callback:()=>reject(new Error('Google sign-in was cancelled or blocked. If this origin is not approved, configure it in Google Cloud before hosting.'))}).requestAccessToken());
+    const previous=this.accountEmail;
+    const hint=selectAccount?'':previous||preferredDriveAccount();
+    const token=await new Promise((resolve,reject)=>google.accounts.oauth2.initTokenClient({
+      client_id:CLIENT,scope:'https://www.googleapis.com/auth/drive.file',
+      prompt:hint?'':'select_account',...(hint?{login_hint:hint}:{}),
+      callback:r=>{if(r.error||!r.access_token)return reject(new Error(r.error||'Google did not return a connection.'));resolve(r.access_token);},
+      error_callback:()=>reject(new Error('Google sign-in was cancelled or blocked. Try again, or choose “Use another account”.'))
+    }).requestAccessToken());
+    this.token=token;
+    let email='';
+    try{
+      const about=await this.request('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)');
+      email=String(about.user?.emailAddress||'').trim();
+    }catch{
+      // Account metadata is optional on a first connection. On renewal, verify
+      // the account before allowing any pending workspace writes.
+    }
+    if(previous&&previous.toLowerCase()!==email.toLowerCase()){
+      this.token=null;
+      throw new Error(email?'Google opened a different account. Reconnect with the account already used by this workspace. Your local changes are retained.':'Could not verify your Google account. Reconnect before saving; your local changes are retained.');
+    }
+    this.accountEmail=email;
+  }
+  rememberAccount(){
+    // Call only after the roster and billing workspace have connected successfully.
+    try{if(this.accountEmail)globalThis.localStorage?.setItem(ACCOUNT_KEY,this.accountEmail);else globalThis.localStorage?.removeItem(ACCOUNT_KEY);}catch{}
   }
   async request(url,options={}) {const r=await fetch(url,{...options,cache:'no-store',headers:{...options.headers,Authorization:`Bearer ${this.token}`}});if(!r.ok){const e=new Error(r.status===412?'Billing changed elsewhere. Reload and reconcile your saved draft.':r.status===401?'Google connection expired. Your draft stays on this device. Reconnect to save.':`Google Drive request failed (${r.status}).`);e.status=r.status===412?409:r.status;throw e;}return r.json();}
   async roster(){return normalizeRoster(await this.request(`https://www.googleapis.com/drive/v3/files/${this.rosterId}?alt=media`));}

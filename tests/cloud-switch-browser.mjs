@@ -22,10 +22,11 @@ const files=new Map([['1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3',{id:'1AaGORl08dctBiZiL
 let n=0,failNextBilling=false;const writes=[],errors=[];
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
-await context.route('https://accounts.google.com/gsi/client',r=>r.fulfill({contentType:'text/javascript',body:'globalThis.google={accounts:{oauth2:{initTokenClient:({callback})=>({requestAccessToken:()=>callback({access_token:"synthetic"})})}}};'}));
+await context.route('https://accounts.google.com/gsi/client',r=>r.fulfill({contentType:'text/javascript',body:'globalThis.google={accounts:{oauth2:{initTokenClient:config=>({requestAccessToken:()=>{globalThis.oauthRequest={prompt:config.prompt,login_hint:config.login_hint};config.callback({access_token:"synthetic"});}})}}};'}));
 await context.route('https://www.googleapis.com/**',async route=>{
  const req=route.request(),u=new URL(req.url()),method=req.method(),id=u.pathname.split('/').at(-1);let data={},status=200;
- if(u.pathname.includes('/upload/drive/v2/files/')){const file=files.get(id);if(id==='ledger'&&failNextBilling){failNextBilling=false;status=503;}else if(req.headers()['if-match']!==`"v${file.version}"`)status=412;else{file.data=JSON.parse(req.postData());file.version++;writes.push(id);data={id};}}
+ if(u.pathname==='/drive/v3/about')data={user:{emailAddress:'synthetic@example.test'}};
+ else if(u.pathname.includes('/upload/drive/v2/files/')){const file=files.get(id);if(id==='ledger'&&failNextBilling){failNextBilling=false;status=503;}else if(req.headers()['if-match']!==`"v${file.version}"`)status=412;else{file.data=JSON.parse(req.postData());file.version++;writes.push(id);data={id};}}
  else if(u.pathname.includes('/upload/drive/v3/files')){const chunks=req.postData().split('\r\n\r\n'),meta=JSON.parse(chunks[1].split('\r\n--')[0]),body=chunks[2].split('\r\n--')[0];data={id:'generated'+(++n),...meta,version:0,data:JSON.parse(body)};files.set(data.id,data);}
  else if(u.pathname==='/drive/v2/files')data={items:[{id:'ledger'}]};
  else if(u.pathname==='/drive/v3/files'&&method==='POST'){data={id:'folder'+(++n),...JSON.parse(req.postData()),permissions:[{role:'owner',type:'user'}]};files.set(data.id,data);}
@@ -39,7 +40,13 @@ const saved=p=>p.locator('#local-changes').filter({hasText:'No local changes'}).
 const patients=p=>p.locator('#patients-workspace');
 const editRoom=async(p,value)=>{await p.locator('[data-section=patients]').click();await patients(p).locator('[data-click="startEdit(\'own\')"]').click();await patients(p).locator('#er-own').fill(value);await patients(p).locator('[data-click="saveEdit(\'own\')"]').click();await p.waitForFunction(()=>!document.querySelector('#sync').disabled);};
 try{
- await connect(page,cloudURL);await saved(page);assert.equal(writes.length,0);assert.equal(await page.locator('#local-option').isVisible(),false);
+ await connect(page,cloudURL);await saved(page);
+ assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'select_account',login_hint:undefined});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('trim:drive-account')),'synthetic@example.test');
+ await page.reload();await page.locator('#connect').click();assert.match(await page.locator('#cloud-account').innerText(),/synthetic@example.test/);await page.locator('#cloud-connect').click();await saved(page);
+ assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'',login_hint:'synthetic@example.test'});
+ await page.reload();await page.locator('#connect').click();await page.locator('#cloud-switch-account').click();await saved(page);
+ assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'select_account',login_hint:undefined});assert.equal(writes.length,0);assert.equal(await page.locator('#local-option').isVisible(),false);
  await page.locator('[data-section=notes]').click();await page.getByRole('heading',{name:'TRIM Notes runs on your laptop'}).waitFor();assert.equal(await page.locator('#notes-input').count(),0);assert.equal(staticRequests.some(s=>/notes-ui|notes-storage|\/api\//.test(s)),false);
  await editRoom(page,'102');assert.equal(files.get('1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3').data.patients[0].room,'101');
  await page.locator('[data-section=notes]').click();await page.locator('#open-laptop-notes').click();await page.locator('#switch-version-dialog').waitFor();assert.equal(await page.locator('#switch-version-link').isVisible(),false);await page.locator('#switch-version-close').click();

@@ -258,7 +258,7 @@ export function upsertInteractiveEntry(ledger,patient,date,items,comment='',id=n
 }
 export function calendarDays(month){
   if(!/^\d{4}-\d{2}$/.test(month)||!validDate(month+'-01'))throw new Error('Invalid calendar month.');
-  const first=new Date(month+'-01T12:00:00Z'),offset=(first.getUTCDay()+6)%7,last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
+  const first=new Date(month+'-01T12:00:00Z'),offset=first.getUTCDay(),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();
   return [...Array(offset).fill(null),...Array.from({length:last},(_,i)=>`${month}-${String(i+1).padStart(2,'0')}`)];
 }
 export function validDiagnosis(value){return /^(?:C19|\d{3}(?:\.\d{1,2})?|\d{4,5}|V\d{2}(?:\.\d{1,2})?|V\d{3,4}|E\d{3}(?:\.\d)?|E\d{4})$/i.test(String(value||'').trim());}

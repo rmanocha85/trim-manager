@@ -25,3 +25,13 @@
 @media(max-width:760px){#workspace>header{grid-template-areas:"brand sections" "date date" "actions actions";grid-template-columns:auto 1fr;height:auto;position:static;gap:7px}#workspace>header .app-sections{flex-wrap:wrap;justify-content:flex-end}.app-sections button{font-size:12px;padding:8px}#workspace>header #header-billing-date{border:0;padding:0}#workspace>header .header-actions{flex-wrap:wrap;justify-content:flex-end}#workspace>header .header-actions .save-control,#workspace>header .header-actions .session-save{width:calc((100vw - 36px)/3);min-width:0;flex-basis:calc((100vw - 36px)/3)}#session-status{font-size:13px}}
 @media(max-width:480px){#workspace>header{grid-template-areas:"sections" "date" "actions";grid-template-columns:1fr}#workspace>header .brand{display:none}#workspace>header .app-sections{justify-content:space-between;gap:0}.app-sections button{padding:8px 5px}}
 @media print{.app-sections,#session-status{display:none}}
+/* Ava is a separate link so opening a chart cannot select or bill a patient. */
+.patient-row{position:relative}
+.patient-row .patient{width:100%}
+.patient-row.has-chart-link .patient{padding-right:62px}
+.ava-chart-link{display:inline-flex;align-items:center;min-height:28px;padding:3px 5px;border-radius:5px;color:#235b46;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.ava-chart-link:hover{background:#e7f2e9;text-decoration:underline}
+.ava-chart-link:focus-visible{outline:2px solid #235b46;outline-offset:2px}
+.patient-chart-link{position:absolute;right:7px;top:5px}
+.patient-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.patient-title h2{margin:0}

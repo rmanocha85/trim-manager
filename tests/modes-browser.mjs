@@ -2,10 +2,10 @@
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 import {createServer} from './server-fixture.mjs';
-import {blankLedger} from '../public/core.mjs';
+import {blankLedger,today,addDays} from '../public/core.mjs';
 const {chromium}=createRequire(import.meta.url)('playwright');
 const patients=[1,2,3].map(n=>({id:`synthetic-${n}`,phn:String(n).padStart(10,'0'),name:`SYNTHETIC, Patient ${n}`,unit:'test',room:String(n),codes:'401'}));
-let cloud=blankLedger('modes-synthetic'),revision=1,writes=0;cloud.baselines={'phn:0000000001':{date:'2026-09-01'},'phn:0000000002':{date:'2026-10-05'}};
+let cloud=blankLedger('modes-synthetic'),revision=1,writes=0;cloud.baselines={'phn:0000000001':{date:addDays(today(),-30)},'phn:0000000002':{date:addDays(today(),-7)}};
 const server=createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true});const context=await browser.newContext({viewport:{width:1366,height:850}});const page=await context.newPage();const errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push({url:r.url(),method:r.method()}));page.on('dialog',d=>d.accept());
 page.setDefaultTimeout(12000);page.on('console',m=>{if(m.type()==='error')console.log('BROWSER',m.text());});

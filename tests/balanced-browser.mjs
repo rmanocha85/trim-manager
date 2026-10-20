@@ -45,7 +45,7 @@ try{
  for(const [index,code,start,end] of [[2,'14077','14:30','14:40'],[3,'13121','15:00','15:10']]){
   await page.locator('.patient').nth(index).click();await page.locator(`[data-code="${code}"]`).click();
   assert.match(await page.locator('[data-field=start]').inputValue(),/^\d{2}:[0-5]0$/);
-  assert.equal(await page.locator('[data-field=reason]').count(),0);assert.equal(await page.locator('[data-field=participants]').count(),0);
+  assert.equal(await page.locator('[data-field=reason]').count(),code==='14077'?1:0);assert.equal(await page.locator('[data-field=participants]').count(),0);
   await enterTime('start',start);assert.equal(await page.locator('[data-field=end]').inputValue(),end);
   await enterTime('end',code==='14077'?'14:50':'15:20');
   await enterTime('start',code==='14077'?'1437':'1507',true);assert.equal(await page.locator('[data-field=end]').inputValue(),code==='14077'?'14:50':'15:20');
