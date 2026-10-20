@@ -1,5 +1,5 @@
-import {billingUI} from './billing-ui.mjs?v=20261019-fixes1';
-import {patientsUI} from './patients-ui.mjs?v=20261019-fixes1';
+import {billingUI} from './billing-ui.mjs?v=20261020-layout1';
+import {patientsUI} from './patients-ui.mjs?v=20261020-layout1';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
@@ -10,6 +10,7 @@ function showSection(value){
   section=value;
   $('patients-workspace').hidden=value!=='patients';
   document.querySelector('.shell').hidden=value==='patients';
+  document.querySelector('.shell').dataset.activeSection=value;
   document.querySelectorAll('[data-section]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.section===value)));
   document.querySelectorAll('.sidebar .nav').forEach(b=>{
     const group=['rounds','notes'].includes(b.dataset.tab)?'notes':b.dataset.tab==='settings'?'settings':'billing';
@@ -48,6 +49,7 @@ function status(){
   document.querySelector('.shell').inert=session.saving;
   $('patients-workspace').inert=session.saving;
   document.querySelector('.app-sections').inert=session.saving;
+  document.querySelector('.app-utility').inert=session.saving;
   $('lock').disabled=busy;
 }
 async function saveSession(){try{await session.save();billing.notify('');}catch(e){billing.notify(e.message);}finally{status();}}

@@ -31,7 +31,7 @@
   <div class="connect-hint">🔒 Editing is disabled until the roster is loaded.</div>
   <div class="card needs-connect">
     <h3>+ Add New Patient</h3>
-    <div style="display:grid;grid-template-columns:1.6fr 1fr 0.6fr 0.6fr 1fr 1fr auto auto;gap:8px;align-items:end">
+    <div class="add-patient-grid">
       <div class="fgrp"><label class="flbl">Last, First Name</label><input class="inp" id="in-name" placeholder="e.g. Last, First"/></div>
       <div class="fgrp"><label class="flbl">PHN</label><input class="inp" id="in-phn" placeholder="e.g. 1234567890"/></div>
       <div class="fgrp"><label class="flbl">Unit</label><select class="sel" id="in-unit"></select></div>
@@ -42,7 +42,7 @@
       <button class="btn btn-green" data-click="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
     </div>
   </div>
-  <p class="notes-upload-help"><strong id="notes-upload-count"></strong> Tick the box beside a name after adding their TRIM Notes documents to Incoming.</p>
+  <p class="notes-upload-help"><strong id="notes-upload-count"></strong> Use the Notes status beside the PHN after adding documents to Incoming. An amber dot means the status change is waiting for Save to Drive.</p>
   <div id="ulist"></div>
 </div>
 
@@ -57,7 +57,7 @@
       <div class="fgrp" style="flex:1;min-width:220px"><label class="flbl" for="other-doctor-filter">Doctor</label><select class="sel" id="other-doctor-filter" data-change="renderOtherPatients()"><option value="">All doctors</option><option value="__unassigned">Unassigned</option></select></div>
     </div>
   </div>
-  <p class="notes-upload-help"><strong id="other-notes-upload-count"></strong> Tick the box beside a name after adding their TRIM Notes documents to Incoming.</p>
+  <p class="notes-upload-help"><strong id="other-notes-upload-count"></strong> Use the Notes status beside the PHN after adding documents to Incoming. An amber dot means the status change is waiting for Save to Drive.</p>
   <div id="other-list"></div>
 </div>
 

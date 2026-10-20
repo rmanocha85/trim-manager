@@ -26,7 +26,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file);if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261020-layout1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   root.append(style);const content=document.createElement('div');content.innerHTML=html;root.append(content);
@@ -395,8 +395,8 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${notesUploadControl(p,'patients')}${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
-                  <div class="pphn">${phnWithCopy(p.phn,'')}</div>
+                  <div class="pnm">${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
+                  <div class="patient-meta"><span class="pphn">${phnWithCopy(p.phn,'')}</span>${notesUploadControl(p,'patients')}</div>
                 </td>
                 <td><span class="pphn">${phnWithCopy(p.phn)}</span></td>
                 <td><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(p.ava||'—')}</span></td>
@@ -414,7 +414,7 @@ function renderUList(){
 
 // Manual document-upload sign-off only; clinical summaries are maintained by TRIM Notes.
 function notesUploadControl(p,collection){
-  return `<label class="notes-upload"><input type="checkbox" data-notes-upload="${esc(p.id)}" data-collection="${collection}" aria-label="TRIM Notes data uploaded for ${esc(p.name)}"${p.notesDataUploaded===true?' checked':''}${canAssignOtherDoctor()?'':' disabled'}/><span aria-live="polite"></span></label>`;
+  return `<button type="button" class="notes-upload" data-notes-upload="${esc(p.id)}" data-collection="${collection}" aria-label="Notes uploaded for ${esc(p.name)}" aria-pressed="${p.notesDataUploaded===true}"${canAssignOtherDoctor()?'':' disabled'}><span class="notes-upload-icon" aria-hidden="true"></span><span class="notes-upload-text"></span><span class="notes-upload-dot" aria-hidden="true"></span><span class="notes-upload-save sr-only"></span></button>`;
 }
 function refreshNotesUploadControls(){
   const saved=loadedRosterJSON?JSON.parse(loadedRosterJSON):{};
@@ -424,11 +424,16 @@ function refreshNotesUploadControls(){
     if(!p)return;
     const previous=(saved[collection]||[]).find(x=>String(x.id)===String(p.id));
     const changed=!inHistoryView&&((p.notesDataUploaded===true)!==(previous?.notesDataUploaded===true)||(p.notesDataUploadedAt||null)!==(previous?.notesDataUploadedAt||null));
-    el.checked=p.notesDataUploaded===true;
+    const uploaded=p.notesDataUploaded===true;
+    el.setAttribute('aria-pressed',String(uploaded));
+    el.setAttribute('aria-description','Manual document-upload sign-off.'+(changed?' Status change not yet saved to Drive.':''));
+    el.dataset.dirty=String(changed);
     el.disabled=!canAssignOtherDoctor();
-    el.parentElement.querySelector('span').textContent=changed?(pendingSaves?'Saving locally…':'Local change'):(el.checked?'Uploaded':'');
-    el.parentElement.title=changed?'Upload sign-off has not been verified as saved.':el.checked?'TRIM Notes data marked uploaded'+(p.notesDataUploadedAt?' on '+new Date(p.notesDataUploadedAt).toLocaleString():'')+'. Untick to clear.':'Mark after adding this patient’s documents to Incoming.';
-    el.onchange=()=>setNotesUploaded(collection,el.dataset.notesUpload,el.checked);
+    el.querySelector('.notes-upload-text').textContent=uploaded?'Notes uploaded':'Notes pending';
+    el.querySelector('.notes-upload-icon').innerHTML=uploaded?'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 10 4 4 8-9"/></svg>':'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 2h7l4 4v12H5Z"/><path d="M12 2v5h4M8 11h5M8 14h4"/></svg>';
+    el.querySelector('.notes-upload-save').textContent=changed?'Status change not yet saved to Drive.':'';
+    el.title=(uploaded?'TRIM Notes documents marked uploaded'+(p.notesDataUploadedAt?' on '+new Date(p.notesDataUploadedAt).toLocaleString():'')+'. Click to clear.':'Click to mark uploaded after adding this patient’s documents to Incoming.')+(changed?' Status change not yet saved to Drive.':'');
+    el.onclick=()=>setNotesUploaded(collection,el.dataset.notesUpload,!uploaded);
   });
   for(const [id,patients] of [['notes-upload-count',state.patients],['other-notes-upload-count',otherPatients()]]){
     const el=g(id);if(el)el.textContent=`TRIM Notes: ${patients.filter(p=>p.notesDataUploaded===true).length} of ${patients.length} uploaded.`;
@@ -484,7 +489,7 @@ function renderOtherPatients(){
     const key='other-'+index;
     return `<div class="usec"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name</th><th style="width:160px">PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
       const ava=String(p.ava||'');const url=avaChartUrl(p);
-      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${notesUploadControl(p,'otherPatients')}${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
+      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div><div class="patient-meta"><span class="pphn">${phnWithCopy(p.phn,'')}</span>${notesUploadControl(p,'otherPatients')}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
     }).join('')}</tbody></table></div></div>`;
   }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
   list.querySelectorAll('[data-other-doctor]').forEach(el=>el.addEventListener('change',()=>setOtherDoctor(el.dataset.otherDoctor,el.value)));

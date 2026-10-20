@@ -27,16 +27,16 @@ try{
  await section('patients');assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),1);await p('#ulist a[href="https://www.avaemr.ca/patients/123456"]').first().waitFor();
  await p('[data-click="printTrim()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();assert.equal(await page.frameLocator('#patients-print-frame').getByText('SYNTHETIC, Retained',{exact:true}).count(),0);await page.locator('#patients-print-close').click();
  await p('[data-click="printBilling()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();await page.locator('#patients-print-close').click();
- await editRoom('102');await p('[data-notes-upload="own"]').check();await localReady();
+ await editRoom('102');await p('[data-notes-upload="own"]').click();await localReady();
  await p('[data-click="showTab(\'other-patients\',this)"]').click();await p('[data-other-doctor="other"]').selectOption('Dr. Celine Laferriere');await localReady();
- await p('[data-notes-upload="other"]').check();await localReady();assert.equal(await readFile(rosterPath,'utf8'),originalRoster);
+ await p('[data-notes-upload="other"]').click();await localReady();assert.equal(await readFile(rosterPath,'utf8'),originalRoster);
  await section('notes');await page.locator('#notes-input').fill('Synthetic local note.');await page.locator('#notes-confirm').click();await page.locator('[data-tab="notes"]').click();await page.locator('[data-assessment]').fill('Synthetic physician-reviewed assessment.');await page.locator('[data-reviewed]').click();await page.locator('#notes-handoff').click();await page.locator('#notes-handoff-result').filter({hasText:'prepared locally'}).waitFor();
  await section('billing');await page.locator('.patient').filter({hasText:person.name}).click();await page.locator('[data-code="00114"]').click();await page.locator('[data-reason-preset="0"]').click();await localReady();
  await assert.rejects(access(path.join(notesPath,'patient-context.json')));assert.equal(await readFile(billingPath,'utf8'),originalBilling);
  // Patient selection is independent: opening Patients does not replace Billing's selection.
  await section('patients');await page.screenshot({path:'work/unified-patients-synthetic.png',fullPage:true});await section('billing');assert.match(await page.locator('#editor h2').innerText(),/Panel/);
  await page.reload();await page.locator('.patient').first().waitFor();await localReady();assert.match(await page.locator('#local-changes').innerText(),/Patients, Notes, Billing pending/);
- await section('patients');assert.match(await p('#ulist').innerText(),/102/);assert.equal(await p('[data-notes-upload="own"]').isChecked(),true);
+ await section('patients');assert.match(await p('#ulist').innerText(),/102/);assert.equal(await p('[data-notes-upload="own"]').getAttribute('aria-pressed'),'true');
  await p('[data-click="showTab(\'other-patients\',this)"]').click();assert.equal(await p('[data-other-doctor="other"]').inputValue(),'Dr. Celine Laferriere');
  // Roster succeeds, Notes fails, Billing remains local. The failure must say exactly that.
  let fail=true;await page.route('**/api/notes/document?*',async route=>{if(fail&&route.request().method()==='PUT')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic notes save unavailable'})});return route.continue();});
