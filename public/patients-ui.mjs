@@ -3,7 +3,7 @@ import {avaChartUrl} from './patient-links.mjs';
 import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
-export async function patientsUI({host,onChange=()=>{},onRoster=()=>{}}){
+export async function patientsUI({host,onChange=()=>{},onRoster=()=>{},onSaved=async()=>{}}){
 
 const MAX_D=17;
 const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
@@ -66,7 +66,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   async function save(){
     if(!ready)throw new Error('TRIM Patients is not loaded.');await serial;if(localError)throw new Error('TRIM Patients local recovery needs attention.');if(writeBlocked)throw new Error('TRIM Patients changed elsewhere. Reload after reconciling your local changes.');
     if(!dirty)return;saving=true;updateStatus();
-    try{const result=await repository.save(liveRoster(),etag);etag=result.etag;loadedRosterJSON=JSON.stringify(result.roster);dirty=false;
+    try{const result=await repository.save(liveRoster(),etag);await onSaved(result.roster);etag=result.etag;loadedRosterJSON=JSON.stringify(result.roster);dirty=false;
       if(inHistoryView){liveStateBackup={patients:result.roster.patients,units:result.roster.units,billingDates:result.roster.billingDates};rosterDocument=result.roster;state.removedPatients=result.roster.removedPatients||[];}
       else applyRoster(result.roster);
       await persist();onRoster(result.roster);

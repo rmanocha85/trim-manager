@@ -61,6 +61,17 @@ try{
  const choices=await page.locator('#backup-choice option').count();await page.locator('#backup-choice').selectOption(String(choices-2));await page.locator('#backup-preview').click();
  await page.locator('#backup-preview-info').filter({hasText:'0 patient/date entries'}).waitFor();await page.locator('#backup-restore').click();await page.locator('#backup-preview-info').filter({hasText:''}).waitFor();
  await page.waitForFunction(()=>document.querySelector('#backup-restore').disabled);assert.equal(JSON.parse(await readFile(billingPath,'utf8')).entries.length,0);assert.equal((await readRoster()).patients[0].room,'105');
+ // New intake creates its empty Notes file in the same shared save, without changing existing history.
+ const existingContext=await readFile(path.join(notesPath,'patients',person.phn+'.json'),'utf8');
+ await section('patients');
+ for(const [id,value]of Object.entries({'in-name':'SYNTHETIC, New intake','in-phn':'0000000004','in-room':'106','in-codes':'290 V15','in-ava':'123459'}))await p('#'+id).fill(value);
+ await p('#in-unit').selectOption('cedar');await p('[data-click="addPatient()"]').click();await localReady();
+ await assert.rejects(access(path.join(notesPath,'patients','0000000004.json')));
+ await page.locator('#sync').click();await saved();
+ const initialized=JSON.parse(await readFile(path.join(notesPath,'patients','0000000004.json'),'utf8'));
+ assert.equal(initialized.context.patient.name,'SYNTHETIC, New intake');assert.equal(initialized.context.summaryMarkdown,'');assert.equal(initialized.context.importStatus,undefined);
+ assert.equal(await readFile(path.join(notesPath,'patients',person.phn+'.json'),'utf8'),existingContext);
+ assert.equal(JSON.parse(await readFile(path.join(notesPath,'index.json'),'utf8')).patients['phn:0000000004'].path,'patients/0000000004.json');
  assert.deepEqual(errors,[]);assert.equal(dialogs.some(d=>d.includes('Invalid patient action')||d.includes('Unknown patient')),false);
  console.log('PASS unified navigation, independent selections, both print previews, complete roster preservation, local recovery across all three sections, single save, partial failure and retry, lost acknowledgment, conflict rejection, removal/reactivation, historical read-only view, collapsed historical dates; synthetic data only.');
 }catch(e){console.log('Browser errors:',errors,'alerts:',dialogs);await page.screenshot({path:'work/unified-failure.png',fullPage:true});throw e;}finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));await rm(dir,{recursive:true,force:true});}

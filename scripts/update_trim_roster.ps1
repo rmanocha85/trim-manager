@@ -19,6 +19,9 @@ param(
 
     [string]$ImportPath,
 
+    [string]$NotesRoot,
+    [string]$BillingPath,
+
     [Alias('ConfirmDelete')]
     [switch]$ConfirmRemove
 )
@@ -122,6 +125,16 @@ function Find-Patients {
 }
 
 $resolvedJsonPath = [System.IO.Path]::GetFullPath($JsonPath)
+$trimEnsureNotes = $Mode -eq 'Add' -and ($NotesRoot -or $resolvedJsonPath -eq (Join-Path $env:USERPROFILE 'My Drive\02. TRIM\TRIM AI\Data\Roster\trim-patients-data.json'))
+if ($trimEnsureNotes) {
+    if (-not $NotesRoot) { $NotesRoot = Join-Path $env:USERPROFILE 'My Drive\02. TRIM\TRIM AI\Working records\Routine notes' }
+    if (-not $BillingPath) { $BillingPath = Join-Path $env:USERPROFILE 'My Drive\02. TRIM\TRIM AI\Data\Billing\trim-billing-data-v1.json' }
+    $trimContextScript = Join-Path $PSScriptRoot 'ensure-roster-context.mjs'
+    if (-not (Test-Path -LiteralPath $trimContextScript)) { $trimContextScript = Join-Path $env:USERPROFILE 'Documents\Codex\trim-app\scripts\ensure-roster-context.mjs' }
+    $trimNode = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
+    if (-not (Test-Path -LiteralPath $trimNode)) { $trimNode = (Get-Command node -ErrorAction Stop).Source }
+    if (-not (Test-Path -LiteralPath $trimContextScript) -or -not (Test-Path -LiteralPath $BillingPath)) { throw 'Notes initializer or billing dataset is unavailable; intake has not been saved.' }
+}
 if (-not [System.IO.File]::Exists($resolvedJsonPath)) {
     throw "Roster JSON not found: $resolvedJsonPath"
 }
@@ -416,4 +429,9 @@ else {
     }
 }
 
+if ($trimEnsureNotes) {
+    $trimContextResult = & $trimNode $trimContextScript $resolvedJsonPath $BillingPath $NotesRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Roster saved, but Notes initialization failed. Do not repeat Add: run ensure-roster-context.mjs with the roster, billing and Notes paths to finish safely.' }
+    $result['NotesContext'] = ($trimContextResult | ConvertFrom-Json)
+}
 $result | ConvertTo-Json -Compress
