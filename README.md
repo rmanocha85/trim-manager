@@ -2,7 +2,7 @@
 
 One maintained application for **TRIM Patients**, **TRIM Notes** and **TRIM Billing**, owned by Dr. Rahul Manocha. Local development: `C:\Users\rmano\Documents\Codex\trim-app`. Records and reusable workflows remain in the existing TRIM AI folders in Drive. Never commit patient data, auth material, browser profiles or backups.
 
-The header order is **Patient → Billing → Notes**, with Settings alongside. The patient roster has no count cap; both roster print layouts add continuation pages for larger units and include custom units. Billing uses a Sunday-first calendar. Concern and Routine Billing show independent Ava chart links for valid stored chart IDs. Code 14077 offers an optional multiline note, retained in recovery, Drive, history and print reports through its existing `reason` field.
+The header order is **Patient → Billing → Notes**, with Settings in a persistent bottom-left utility bar. The patient roster has no count cap; both roster print layouts add continuation pages for larger units and include custom units. Billing uses a Sunday-first calendar. Concern and Routine Billing show independent Ava chart links for valid stored chart IDs. New code 127 selections default to editable ICD-9 `V66.7`; existing saved diagnoses are preserved. Code 14077 offers an optional multiline note, retained in recovery, Drive, history and print reports through its existing `reason` field.
 
 ## Run and verify
 
@@ -25,7 +25,7 @@ Automated tests use synthetic temporary records and fake AI/Google responses. Th
 
 `public/app.mjs` owns navigation and common save controls. `session.mjs` coordinates explicit saves in Patients, Notes, Billing order, stopping and reporting partial success on error. Each section retains its own selection and work; selecting a patient does not move another section's selection.
 
-- Patients: `patients-ui.mjs`, `patients-core.mjs`, `patients.html`, `patients.css`, `roster-repository.mjs`. The familiar tables, Ava links, doctor assignments, document-upload checkboxes, removal/reactivation and both print layouts are retained. Print dates affect the legacy printable sheet only.
+- Patients: `patients-ui.mjs`, `patients-core.mjs`, `patients.html`, `patients.css`, `roster-repository.mjs`. The familiar tables, Ava links, doctor assignments, document-upload status buttons beside the PHN copy control, removal/reactivation and both print layouts are retained. Grey “Notes pending” and green “Notes uploaded” show manual document-upload sign-off; an amber dot marks an unsaved status change. Print dates affect the legacy printable sheet only.
 - Notes: `notes-ui.mjs`, `notes-core.mjs`, `notes-storage.mjs`. Review is local. Prepare dated Meditech handoff stages the exact reviewed text; **Save to Drive** writes it. Later edits invalidate a staged handoff. Generation and handoffs do not bill or enter an EMR.
 - Billing: `billing-ui.mjs` with existing pure billing, report, merge, date, OCR and backup modules. Imports and marking a printed batch handed over remain local until **Save to Drive**. Historical starting dates are collapsed under Settings. First-time empty-file creation and confirmed full backup restoration are explicit recovery/setup operations.
 - Local service: `server.mjs`, `storage.mjs`, `roster-storage.mjs`, `notes-local.mjs`, `backup-storage.mjs`, `notes-auth.mjs`. Loopback only, same-origin and session checks, restricted static files, conditional writes and verified readback. No patient data is served before local connection.
