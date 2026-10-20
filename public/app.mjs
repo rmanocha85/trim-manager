@@ -10,7 +10,6 @@ function showSection(value){
   section=value;
   $('patients-workspace').hidden=value!=='patients';
   document.querySelector('.shell').hidden=value==='patients';
-  document.querySelector('.shell').dataset.activeSection=value;
   document.querySelectorAll('[data-section]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.section===value)));
   document.querySelectorAll('.sidebar .nav').forEach(b=>{
     const group=['rounds','notes'].includes(b.dataset.tab)?'notes':b.dataset.tab==='settings'?'settings':'billing';

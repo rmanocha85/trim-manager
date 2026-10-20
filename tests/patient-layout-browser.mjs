@@ -34,7 +34,7 @@ try{
  assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Patient','Billing','Notes']);
  for(const name of ['patients','billing','notes']){
    await section(name);const footer=await page.locator('.app-utility').boundingBox();assert.equal(footer.y+footer.height,1000);
-   await section('settings');assert.equal(await page.locator('#settings').isVisible(),true);assert.equal(await page.locator('.sidebar').isVisible(),false);assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),0);
+   await section('settings');assert.equal(await page.locator('#settings').isVisible(),true);assert.equal(await page.locator('#calendar').isVisible(),false);assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),0);
  }
  await section('patients');
  assert.equal(await upload.getAttribute('aria-pressed'),'false');assert.equal(await upload.locator('.notes-upload-text').innerText(),'Notes pending');
