@@ -42,3 +42,12 @@
 .patient-chart-link{position:absolute;right:7px;top:5px}
 .patient-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .patient-title h2{margin:0}
+/* Keep the service date beside the controls used to enter each charge. */
+#editor .editor-date{display:flex;flex-direction:column;align-items:flex-end;gap:4px;color:var(--green,#28563e);background:#eaf3e9;padding:10px 14px;border:1px solid #b9d2be;border-radius:8px;font-size:17px;white-space:normal;text-align:right;flex-shrink:0}
+#editor .editor-date small{font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+#editor .editor-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+#editor .patient-title{flex-wrap:wrap}
+#billing-conflict-preview{padding:12px;margin:12px 0;background:#fff7e1;border:1px solid #e7c981;border-radius:8px}
+.saved-drive-history{margin-top:12px;padding:12px;background:#fff;border:1px solid #cbd8cd;border-radius:6px}
+.saved-drive-history article{padding:8px 0;border-bottom:1px solid #ddd}
+@media(max-width:600px){#editor .editor-date{margin-left:auto;font-size:15px}}

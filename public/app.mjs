@@ -1,5 +1,5 @@
-import {billingUI} from './billing-ui.mjs?v=20261020-layout1';
-import {patientsUI} from './patients-ui.mjs?v=20261020-layout1';
+import {billingUI} from './billing-ui.mjs?v=20261022-fixes1';
+import {patientsUI} from './patients-ui.mjs?v=20261022-fixes1';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
@@ -50,18 +50,24 @@ function status(){
   document.querySelector('.app-sections').inert=session.saving;
   document.querySelector('.app-utility').inert=session.saving;
   $('lock').disabled=busy;
+  if($('load-latest'))$('load-latest').disabled=busy||!billing.state().adapter||!navigator.onLine;
 }
-async function saveSession(){try{await session.save();billing.notify('');}catch(e){billing.notify(e.message);}finally{status();}}
+async function saveSession(){try{await session.save();billing.notify('');}catch(e){if(patients.state().error)showSection('patients');billing.notify(e.message);}finally{status();}}
 async function start(){
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onRoster:raw=>billing?.setRoster(raw)});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onConnected:()=>{const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
+  notes=laptop?(await import('./notes-ui.mjs?v=20261022-fixes1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
   session=new Session([
     {name:'Patients',state:patients.state,save:patients.save},
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
+  const latest=document.createElement('button');latest.id='load-latest';latest.textContent='Load latest changes';$('drive-connection').after(latest);
+  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();}catch(e){billing.notify(e.message);}finally{status();}};
+  const patientReview=document.createElement('div');patientReview.className='actions';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
+  $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};
+  $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();}catch(e){billing.notify(e.message);}status();};
   if(!laptop)document.querySelector('[data-section="notes"]').title='Notes runs on your laptop';
   const switcher=document.createElement('button');switcher.id='switch-version';switcher.textContent=laptop?'Open cloud app':'Open laptop app';switcher.className='text-button';
   const switching=document.createElement('dialog');switching.id='switch-version-dialog';switching.innerHTML='<div class="dialog-body"><h2>Switch TRIM versions</h2><p id="switch-version-message"></p><a id="switch-version-link" target="_blank" rel="noopener">'+(laptop?'Open cloud TRIM ↗':'Open laptop TRIM ↗')+'</a><button id="switch-version-connect" hidden>Connect through Google</button><button id="switch-version-close">Close</button></div>';document.body.append(switching);document.querySelector('.header-actions').append(switcher);

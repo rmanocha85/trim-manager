@@ -129,13 +129,17 @@ header h1{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:
 .ptbl{width:100%;border-collapse:collapse}
 .ptbl th:first-child,.ptbl td:first-child{width:86px;min-width:86px}
 .ptbl th{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-family:var(--mono);padding:7px 10px;text-align:left;background:#faf9f7;border-bottom:1px solid var(--border-light);font-weight:500}
-.ptbl td{padding:7px 10px;border-bottom:1px solid var(--border-light);font-size:13px;vertical-align:middle}
+.ptbl td{padding:7px 10px;border-bottom:1px solid var(--border-light);font-size:13px;vertical-align:top}
+.ptbl .pnm,.ptbl .prm{line-height:20px}
+.ptbl .prm{padding-top:0;padding-bottom:0}
+.ptbl th:nth-child(2),.ptbl td:nth-child(2){min-width:240px}
 .ptbl tr:last-child td{border-bottom:none}
 .ptbl tr:hover td{background:#faf9f7}
 .pnm{font-weight:500;display:flex;align-items:center;gap:5px}.pnm a{color:var(--text);text-decoration:none;font-weight:500}.pnm a:hover{color:var(--accent);text-decoration:underline}
 .patient-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
 .notes-upload{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:0 0 144px;width:144px;min-height:30px;padding:5px 12px;border:1px solid #e1e5de;border-radius:6px;background:#f5f6f2;color:#626e5c;font:11px var(--sans);white-space:nowrap;cursor:pointer}
 .notes-upload[aria-pressed=true]{background:#eaf3e9;color:var(--accent);border-color:#c9ddc7}
+.notes-upload[aria-pressed=false]{width:30px;flex-basis:30px;padding:5px;background:transparent;border-color:transparent}
 .notes-upload:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .notes-upload:hover:not(:disabled){border-color:var(--accent)}
 .notes-upload-icon{display:flex}.notes-upload-icon svg{width:13px;height:13px}
@@ -339,3 +343,9 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
 }
 .b-pflag{display:inline-flex;align-items:center;justify-content:center;width:1.35em;height:1.35em;border:.8px solid #000;border-radius:50%;font-size:.78em;font-weight:bold;line-height:1;margin-left:2px;vertical-align:middle;background:#fff !important}
 .bc{width:29px;background:#fff !important}
+/* Review remains available while editing is locked by a real conflict. */
+#roster-conflict-dialog{max-width:min(850px,90vw);max-height:85vh;overflow:auto;border:1px solid #b9cbbd;border-radius:10px;padding:20px}
+#roster-conflict-dialog article{padding:12px 0;border-bottom:1px solid #ddd}
+.roster-versions{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.roster-versions pre{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:600px){.roster-versions{grid-template-columns:1fr}}

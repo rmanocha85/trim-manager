@@ -39,7 +39,7 @@ try{
  await page.locator('#lock').click();await page.locator('#connect').filter({hasText:'Open local workspace'}).waitFor();await second.locator('#connect').click();await opened(second);
  // Existing recovery must still stop at a changed file revision, without uploads.
  const changed={...structuredClone(ledger),revision:ledger.revision+1,settings:{...ledger.settings,parallel:false}};
- await writeFile(billingPath,JSON.stringify(changed));await second.reload();await second.locator('#billing-lock').filter({hasText:'Drive changed'}).waitFor();
+ await writeFile(billingPath,JSON.stringify(changed));await second.reload();await second.locator('#billing-lock').filter({hasText:'Changes saved on another computer'}).waitFor();
  assert.equal(await second.locator('#workspace').isVisible(),true);assert.equal(writes,0);assert.deepEqual(JSON.parse(await readFile(billingPath,'utf8')),changed);
  await page.close();await second.close();
  // Missing file shows a local retry, without Google login or a blank replacement.

@@ -2,6 +2,7 @@ import * as TrimRoster from './patients-core.mjs';
 import {avaChartUrl} from './patient-links.mjs';
 import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
+import {mergeRoster} from './roster-merge.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 export async function patientsUI({host,onChange=()=>{},onRoster=()=>{}}){
 
@@ -26,7 +27,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261020-layout1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261022-fixes1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   root.append(style);const content=document.createElement('div');content.innerHTML=html;root.append(content);
@@ -34,9 +35,33 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
   let rosterDocument=null,loadedRosterJSON=null,repository,etag,key,ready=false,dirty=false,writeBlocked=false,pendingSaves=0,saving=false,localError='',message='',serial=Promise.resolve();
   const newPatientFields=['in-name','in-phn','in-room','in-codes','in-ava'];
+  let rosterChoices={},rosterConflicts=[],refreshing=false;
+  const review=document.createElement('dialog');review.id='roster-conflict-dialog';root.append(review);
+  function showRosterConflicts(){
+    const detail=value=>value===undefined?'Removed / not present':typeof value==='object'?JSON.stringify(value,null,2):String(value);
+    review.innerHTML='<h2>Review patient changes</h2><p>These details changed differently on both computers. Other changes will be combined.</p>'+rosterConflicts.map((c,n)=>`<article><strong>${esc(c.label)}</strong><div class="roster-versions"><section><h3>Saved in Drive</h3><pre>${esc(detail(c.drive))}</pre></section><section><h3>Pending on this computer</h3><pre>${esc(detail(c.local))}</pre></section></div><label><input type="radio" name="roster-${n}" data-choice="${n}" value="drive"> Keep Drive</label> <label><input type="radio" name="roster-${n}" data-choice="${n}" value="local"> Keep local</label></article>`).join('')+'<button id="roster-apply" disabled>Apply choices locally</button> <button id="roster-close">Close</button><p>Use Save to Drive when finished. Reload saved roster keeps a recovery copy before discarding local edits.</p>';
+    review.querySelectorAll('[data-choice]').forEach(el=>el.onchange=()=>{const c=rosterConflicts[Number(el.dataset.choice)];rosterChoices[c.id]={token:c.token,side:el.value};review.querySelector('#roster-apply').disabled=!rosterConflicts.every(c=>rosterChoices[c.id]?.token===c.token);});
+    review.querySelector('#roster-close').onclick=()=>review.close();
+    review.querySelector('#roster-apply').onclick=async()=>{try{await refresh(true);}catch(e){setSS(e.message,false);}};
+    if(!review.open)review.showModal();
+  }
+  async function refresh(showConflicts=false){
+    if(!ready||saving||refreshing||hasForm()||inHistoryView)return false;
+    refreshing=true;updateStatus();
+    try{
+      await serial;const saved=await repository.load();if(hasForm())return false;
+      if(saved.etag===etag&&!writeBlocked)return false;
+      const merged=dirty?mergeRoster(loadedRosterJSON?JSON.parse(loadedRosterJSON):null,liveRoster(),saved.roster,rosterChoices):{roster:saved.roster,conflicts:[]};
+      rosterConflicts=merged.conflicts;
+      if(rosterConflicts.length){writeBlocked=true;if(showConflicts)showRosterConflicts();return true;}
+      applyRoster(merged.roster);etag=saved.etag;loadedRosterJSON=JSON.stringify(saved.roster);
+      dirty=!TrimRoster.sameRosterContent(merged.roster,saved.roster);writeBlocked=false;rosterChoices={};
+      if(review.open)review.close();await persist();render();onRoster(liveRoster());return true;
+    }finally{refreshing=false;updateStatus();}
+  }
   function currentRoster(){return {...rosterDocument,patients:state.patients,removedPatients:state.removedPatients,units:state.units,billingDates:state.billingDates};}
   function applyRoster(raw){rosterDocument=TrimRoster.normalize(raw);for(const name of ['patients','removedPatients','units','billingDates'])state[name]=rosterDocument[name];}
-  function canEdit(){if(!ready||inHistoryView||writeBlocked||saving||localError){alert('Finish or resolve the current roster operation before editing.');return false;}return true;}
+  function canEdit(){if(!ready||inHistoryView||writeBlocked||saving||refreshing||localError){alert('Finish or resolve the current roster operation before editing.');return false;}return true;}
   function setSS(text,ok){message=text;g('ss').textContent=text;g('ss').style.color=ok?'rgba(255,255,255,.9)':'#ffe0a5';}
   function updateStatus(){
     setSS(localError?'Local recovery failed — keep this tab open':writeBlocked?'Conflict — local changes retained':pendingSaves?'Saving locally…':dirty?'Saved locally · not yet in Drive':ready?(repository.mode==='local'?'Saved in Drive folder · sync unverified':'Saved in Drive'):'Open the workspace to load patients',!dirty&&!writeBlocked&&!localError);
@@ -64,7 +89,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     updateStatus();onRoster(liveRoster());
   }
   async function save(){
-    if(!ready)throw new Error('TRIM Patients is not loaded.');await serial;if(localError)throw new Error('TRIM Patients local recovery needs attention.');if(writeBlocked)throw new Error('TRIM Patients changed elsewhere. Reload after reconciling your local changes.');
+    if(!ready)throw new Error('TRIM Patients is not loaded.');await serial;if(localError)throw new Error('TRIM Patients local recovery needs attention.');await refresh(true);if(writeBlocked)throw new Error('Review the patient details changed on both computers, then save again.');
     if(!dirty)return;saving=true;updateStatus();
     try{const result=await repository.save(liveRoster(),etag);etag=result.etag;loadedRosterJSON=JSON.stringify(result.roster);dirty=false;
       if(inHistoryView){liveStateBackup={patients:result.roster.patients,units:result.roster.units,billingDates:result.roster.billingDates};rosterDocument=result.roster;state.removedPatients=result.roster.removedPatients||[];}
@@ -73,13 +98,13 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     }catch(e){if(e.status===409)writeBlocked=true;throw e;}finally{saving=false;render();updateStatus();}
   }
   async function gConnect(){
-    if(!ready||saving)return;
+    if(!ready||saving||refreshing)return;
     if((dirty||hasForm())&&!confirm('Discard local roster edits and reload the saved roster? A recovery copy will remain on this device.'))return;
     await serial;const saved=await repository.load();
-    if(dirty)await saveRecovery(key+':discarded',{roster:liveRoster(),etag,dirty:true,base:loadedRosterJSON});
+    if(dirty||hasForm())await saveRecovery(key+':discarded',{roster:liveRoster(),etag,dirty:true,base:loadedRosterJSON,editId,form:formValues()});
     inHistoryView=false;liveStateBackup=null;host.classList.remove('history-mode');g('history-banner').style.display='none';editId=null;
     applyRoster(saved.roster);etag=saved.etag;loadedRosterJSON=JSON.stringify(saved.roster);dirty=false;writeBlocked=false;newPatientFields.forEach(id=>g(id).value='');g('in-pflag').checked=false;
-    render();renderCal();await persist();onRoster(saved.roster);updateStatus();
+    rosterChoices={};rosterConflicts=[];if(review.open)review.close();render();renderCal();await persist();onRoster(saved.roster);updateStatus();
   }
   function listSnapshots(){return repository.snapshots();}
   function loadSnapshot(id){return repository.snapshot(id);}
@@ -102,7 +127,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
       if(type!=='click'&&ready&&!inHistoryView&&isForm(event.target))void persist().catch(()=>{});
     }catch(e){setSS(e.message,false);alert(e.message);}
   });
-  const api={connect,save,state:()=>({dirty,busy:saving||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
+  const api={connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
 
 // ── TABS ──
 function showTab(name,btn){
@@ -345,8 +370,7 @@ function render(){renderStats();renderUList();populateUSel();renderDates();rende
 function renderStats(){
   const t=state.patients.length;
   g('stats').innerHTML=`
-    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value">${t}</div></div>
-    <div class="stat-card"><div class="stat-label">Date Slots</div><div class="stat-value">${state.billingDates.length}/${MAX_D}</div></div>`;
+    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value">${t}</div></div>`;
   g('lbanner').textContent='';
 }
 
@@ -429,8 +453,8 @@ function refreshNotesUploadControls(){
     el.setAttribute('aria-description','Manual document-upload sign-off.'+(changed?' Status change not yet saved to Drive.':''));
     el.dataset.dirty=String(changed);
     el.disabled=!canAssignOtherDoctor();
-    el.querySelector('.notes-upload-text').textContent=uploaded?'Notes uploaded':'Notes pending';
-    el.querySelector('.notes-upload-icon').innerHTML=uploaded?'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 10 4 4 8-9"/></svg>':'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5 2h7l4 4v12H5Z"/><path d="M12 2v5h4M8 11h5M8 14h4"/></svg>';
+    el.querySelector('.notes-upload-text').textContent=uploaded?'Notes uploaded':'';
+    el.querySelector('.notes-upload-icon').innerHTML=uploaded?'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 10 4 4 8-9"/></svg>':'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="2"/></svg>';
     el.querySelector('.notes-upload-save').textContent=changed?'Status change not yet saved to Drive.':'';
     el.title=(uploaded?'TRIM Notes documents marked uploaded'+(p.notesDataUploadedAt?' on '+new Date(p.notesDataUploadedAt).toLocaleString():'')+'. Click to clear.':'Click to mark uploaded after adding this patient’s documents to Incoming.')+(changed?' Status change not yet saved to Drive.':'');
     el.onclick=()=>setNotesUploaded(collection,el.dataset.notesUpload,!uploaded);
@@ -454,7 +478,7 @@ function toggleU(id){
 }
 
 function otherPatients(){return Array.isArray(rosterDocument?.otherPatients)?rosterDocument.otherPatients:[];}
-function canAssignOtherDoctor(){return ready&&!inHistoryView&&!writeBlocked&&!pendingSaves&&!saving;}
+function canAssignOtherDoctor(){return ready&&!inHistoryView&&!writeBlocked&&!pendingSaves&&!saving&&!refreshing;}
 function doctorOptions(selected='',filter=false){
   const saved=[...new Set(otherPatients().map(p=>p.doctor).filter(Boolean))];
   const known=OTHER_DOCTORS.map(d=>d.name);

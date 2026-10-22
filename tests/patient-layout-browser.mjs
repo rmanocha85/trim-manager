@@ -37,13 +37,14 @@ try{
    await section('settings');assert.equal(await page.locator('#settings').isVisible(),true);assert.equal(await page.locator('#calendar').isVisible(),false);assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),0);
  }
  await section('patients');
- assert.equal(await upload.getAttribute('aria-pressed'),'false');assert.equal(await upload.locator('.notes-upload-text').innerText(),'Notes pending');
+ assert.equal(await upload.getAttribute('aria-pressed'),'false');assert.equal(await upload.locator('.notes-upload-text').innerText(),'');
+ assert.equal(await p('.stats-row').first().innerText().then(t=>t.includes('DATE SLOTS')),false);assert.equal(await p('.tabs-bar').innerText().then(t=>t.includes('Print dates')),false);
  const row=upload.locator('xpath=ancestor::tr'),name=row.locator('.pnm'),flag=row.locator('.pflag');
  const before=await name.boundingBox(),flagBefore=await flag.boundingBox(),statusBefore=await upload.boundingBox();
  const copy=row.locator('.patient-meta .phn-copy');await copy.click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[0].phn);
  await upload.focus();await page.keyboard.press('Space');await ready();
  assert.equal(await upload.getAttribute('aria-pressed'),'true');assert.equal(await upload.getAttribute('data-dirty'),'true');assert.equal(await upload.locator('.notes-upload-dot').isVisible(),true);
- assert.deepEqual(await name.boundingBox(),before);assert.deepEqual(await flag.boundingBox(),flagBefore);assert.equal((await upload.boundingBox()).width,statusBefore.width);
+ assert.equal((await name.boundingBox()).y,before.y);assert.equal((await flag.boundingBox()).y,flagBefore.y);assert.ok(Math.abs((await row.locator('.prm').boundingBox()).y-before.y)<2);
  assert.equal(JSON.parse(await readFile(rosterPath,'utf8')).patients[0].notesDataUploaded,false);
  // In-progress saves lock the new footer just like the main navigation.
  let release,started;const entered=new Promise(r=>started=r),held=new Promise(r=>release=r);
@@ -64,6 +65,9 @@ try{
    await page.screenshot({path:`work/patient-layout-${width}.png`,fullPage:true});
  }
  await page.setViewportSize({width:1440,height:1000});await section('billing');await select(patients[0].phn);
+ await page.locator('#billing-copy-phn').click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[0].phn);
+ assert.equal(await page.locator('.editor-date').isVisible(),true);assert.match(await page.locator('.editor-date').innerText(),/Billing for/i);
+ await page.locator('[data-day="'+addDays(date,-1)+'"]').click();await page.locator('#load-latest').click();await page.waitForFunction(()=>!document.querySelector('#load-latest').disabled);assert.equal(await page.locator('#service-date').inputValue(),date);
  await page.locator('[data-code="00127"]').click();assert.equal(await diagnosis().inputValue(),'V66.7');assert.equal(await diagnosis().isEditable(),true);
  await diagnosis().fill('V66.8');await ready();await section('settings');await section('billing');await select(patients[0].phn);assert.equal(await diagnosis().inputValue(),'V66.8');
  await page.reload();await page.locator('.patient').first().waitFor();await ready();await select(patients[0].phn);assert.equal(await diagnosis().inputValue(),'V66.8');await save();

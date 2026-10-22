@@ -42,7 +42,7 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
     if(recovery?.dirty){validateRecord(recovery.context,ds,'context');validateRecord(recovery.day,ds,'visits',date);context=recovery.context;day=recovery.day;contextTag=recovery.contextTag;dayTag=recovery.dayTag;sourceCache=recovery.sourceCache||{};pendingHandoff=recovery.pendingHandoff||null;handoffTag=recovery.handoffTag||'new';dirty=true;noteMessage='Recovered your unsaved notes on this device.';}
     ready=true;render();$('notes-folder-status').textContent=repo.rootId?'Connected to your private Routine notes folder.':repo.mode==='local'?'Using the designated laptop Drive folder. Cloud sync is not verified.':'';
   }
-  async function selectDate(value){if(!repository)return;loading=true;try{await persist();await loadDay(value);}catch(e){ready=false;render();report(e.message,true);}finally{loading=false;}}
+  async function selectDate(value){if(!repository)return;loading=true;try{await persist();await loadDay(value);}catch(e){ready=false;render();report(e.message,true);}finally{loading=false;updateStatus();}}
   async function save(){
     if(!ready||busy)throw new Error('Wait for the current Notes operation.');await serial;if(localError)throw new Error('Resolve local recovery before uploading.');busy=true;render();
     try{

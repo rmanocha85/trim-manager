@@ -14,7 +14,7 @@ import {laptopRuntime} from './runtime.mjs';
 import {sameRosterContent} from './patients-core.mjs';
 import {RosterRepository} from './roster-repository.mjs';
 
-export function billingUI({notes,patients,onStatus=()=>{},onNavigate=()=>{},onConnected=()=>{},saveSession}){
+export function billingUI({notes,patients,onStatus=()=>{},onNavigate=()=>{},onConnected=()=>{},onPatientConflict=()=>{},saveSession}){
 const $=id=>document.getElementById(id);
 const laptopStartup=['127.0.0.1','localhost'].includes(location.hostname)&&['/','/index.html'].includes(location.pathname)&&!['manual','cloud'].includes(new URLSearchParams(location.search).get('connection'));
 const laptopLockKey='trim-billing:laptop-locked';
@@ -32,8 +32,8 @@ const localChanges=()=>dirty&&ledger&&savedBase?sessionChanges(savedBase,ledger)
 function checkedDrive(){driveReachable=true;lastChecked=new Date();}
 function connectionError(e){driveReachable=e?.status===409;if(driveReachable)lastChecked=new Date();}
 let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,timer,releaseLock,printedSignature=null,recoveryQueue=Promise.resolve(),recoveryPending=0;
-let setupCandidate,connecting=false;
-let mergeChoices={},mergeConflicts=[];
+let setupCandidate,connecting=false,loadingLatest=false;
+let mergeChoices={},mergeConflicts=[],remoteBilling=null;
 let stagedImport=null,importing=false,importRead=0;
 let connectionVerified=false,syncFailed=false,checking=false,calendarMonth=today().slice(0,7),saveFocus=null;
 const backups=backupUI({state:()=>({adapter,saved:savedBase,dirty,busy:saving||checking}),showSettings:()=>switchTab('settings'),restore:async(next,preserve)=>{
@@ -48,17 +48,22 @@ const backups=backupUI({state:()=>({adapter,saved:savedBase,dirty,busy:saving||c
   }finally{saving=false;updateWriteLock();}
 }});
 const date=()=>$('service-date').value||today();
+async function resetBillingDate(){
+  if(notes.hasChanges())return false;
+  $('service-date').value=today();calendarMonth=today().slice(0,7);editingId=null;routineExcluded.clear();await notes.selectDate(today());
+  return true;
+}
 const people=()=>rosterView(roster,ledger);
 const person=k=>people().find(p=>p.key===k);
 
 function notice(text){$('notice').textContent=text;$('notice').hidden=!text;}
 function status(text,warn=false){$('save-status').textContent=text;$('save-status').classList.toggle('dirty',warn);updateWriteLock();}
 function safe(fn){return async(...args)=>{try{await fn(...args);}catch(e){notice(e.message);}};}
-const writeUnavailable=()=>!connectionVerified||syncFailed||blocked||checking||!navigator.onLine;
+const writeUnavailable=()=>!connectionVerified||syncFailed||blocked||checking||loadingLatest||!navigator.onLine;
 function guardWrite(){if(writeUnavailable())throw new Error('Billing is locked until the Google Drive connection and saved revision are verified. Use Save to Drive / retry.');if(saving)throw new Error('Wait for the current save to finish.');}
 function updateWriteLock(){
   renderSaveControls();
-  if(!ledger)return;const unavailable=writeUnavailable(),busy=saving||checking;
+  if(!ledger)return;const unavailable=writeUnavailable(),busy=saving||checking||loadingLatest;
   const e=selected?currentEntry():null,historical=selected&&(ledger.historicalBillings||[]).some(h=>h.patientKey===selected&&h.date===date());
   $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset],[data-time-open]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON');});
   $('history-content').querySelectorAll('[data-history-remove],[data-history-undo]').forEach(el=>el.disabled=unavailable||busy);
@@ -70,7 +75,7 @@ function updateWriteLock(){
   for(const id of ['confirm-patient','baseline-save','parallel','finalize','generate'])$(id).disabled=unavailable||busy||(id==='baseline-save'&&!$('baseline-patient').value)||(id==='confirm-patient'&&(ocrBusy||!identityReady))||(id==='finalize'&&ledger.settings.parallel);
   $('baseline-date').disabled=unavailable||busy||!$('baseline-patient').value;
   $('baseline-patient').disabled=unavailable||busy||!$('baseline-patient').value;
-  $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Drive changed on another computer. Save my changes to Drive, or discard local changes below.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Save to Drive / retry to verify Google Drive before making changes.';
+  $('billing-lock').hidden=!unavailable;$('billing-lock').textContent=blocked?'Changes saved on another computer. Load latest changes to combine your pending work, or review it below.':!navigator.onLine?'Offline — billing is locked. Existing work is retained; reconnect to continue.':'Billing locked — use Load latest changes to reconnect.';
   $('conflict-actions').hidden=!blocked;
   for(const id of ['conflict-save','conflict-discard','changes-discard','reload-data'])$(id).disabled=busy||!navigator.onLine;
   if($('merge-dialog').open){$('merge-save').disabled=busy||!navigator.onLine||!mergeConflicts.every(c=>mergeChoices[c.id]?.token===c.token);$('merge-list').querySelectorAll('input').forEach(el=>el.disabled=busy);}
@@ -92,7 +97,7 @@ async function recover(){
   if(saved?.dirty){
     validateLedger(saved.ledger);
     if(sameBillingContent(saved.ledger,ledger)){dirty=false;blocked=false;await persistRecovery();notice('Your previous changes are already saved to Google Drive. Recovery status repaired.');return;}
-    const loadedBase=clone(ledger);ledger=saved.ledger;dirty=true;
+    const loadedBase=clone(ledger);remoteBilling=clone(ledger);ledger=saved.ledger;dirty=true;
     if(saved.baseLedger?.datasetId===ledger.datasetId){validateLedger(saved.baseLedger);savedBase=saved.baseLedger;}else savedBase=saved.etag===etag?loadedBase:null;
     if(saved.etag!==etag){blocked=true;notice('Drive has newer billing. Click Save my changes to Drive to add your local work, or discard local changes.');}
     else notice('Recovered your unfinished session on this device. Choose Save to Drive when ready.');
@@ -134,13 +139,14 @@ async function connect(mode,create=false,selectAccount=false){
     if(releaseLock){releaseLock();releaseLock=null;}
     await takeTabLock(s.ledger.datasetId);
     adapter=candidate;roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;
-    await recover();
+    await recover();await resetBillingDate();
     if(!blocked)applyNewPatientPlans();
     document.title='TRIM';
     $('storage-note').textContent=mode==='local'?'Laptop connection · saves to this laptop’s Drive folder. Cloud sync is not verified. Roster edits use Save to Drive.':'Google Drive connected · Roster edits use Save to Drive.';
     renderAll();setBillingMode(billingMode);document.querySelector('.version').textContent=ledger.settings.parallel?'PAPER COMPARISON':'BILLING';status(blocked?'Draft conflict — action needed':dirty?'Saved on this device — not yet in Drive':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
     void backups.connected(adapter,s.ledger);
     await patients.connect(adapter,ledger.datasetId);
+    await patients.refresh();
     await notes.connected();
     candidate.rememberAccount?.();
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();
@@ -156,7 +162,7 @@ async function flush(){
   saveFocus=document.activeElement?.matches('#editor input,#editor textarea')?{el:document.activeElement,start:document.activeElement.selectionStart,end:document.activeElement.selectionEnd}:null;
   saving=true;updateWriteLock();const currentSeq=seq;const snapshot=clone(ledger);
   try{
-    await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;savedBase=clone(saved.ledger);checkedDrive();
+    await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;savedBase=clone(saved.ledger);remoteBilling=clone(saved.ledger);checkedDrive();
     if(seq===currentSeq){ledger=saved.ledger;dirty=false;}else{ledger.revision=saved.ledger.revision;ledger.updatedAt=saved.ledger.updatedAt;ledger.localWriter=saved.ledger.localWriter;}
     syncFailed=false;connectionVerified=true;await persistRecovery();status(dirty?'More changes waiting to save':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);
     await backups.capture(saved.ledger);
@@ -192,7 +198,19 @@ function renderEditor(){
   if(!selected){$('editor').innerHTML='<div class="empty-editor"><h2>Choose a patient</h2><p>Select a name to choose billing codes.</p><small>No charge is added until you select a code.</small></div>';return;}const p=person(selected);if(!p)return;const e=currentEntry(),items=e?.items||[],locked=Boolean(e?.batchId);
   const historical=(ledger.historicalBillings||[]).filter(h=>h.patientKey===p.key).sort((a,b)=>b.date.localeCompare(a.date));
   $('editor').innerHTML=`<div class="editor-head"><div><div class="patient-title"><h2>${esc(p.name)}</h2>${chartLink(p)}</div><p>${esc(roster.units.find(u=>u.id===p.unit)?.name||p.unit||'Location not recorded')} · Room ${esc(p.room||'—')} · ${p.panel?'My patient':'Coverage / former patient'}</p></div><span class="editor-date">${esc(formatDate(date()))}</span></div>${locked?'<div class="issue-box">Given to Suzy. This entry is read-only.</div>':''}<div class="codes-grid" aria-label="Common billing codes">${(billingMode==='routine'?['00114',...COMMON_CODES.filter(c=>c!=='00114')]:COMMON_CODES).map(code=>{const c=codeInfo(code);return `<button class="code-chip ${billingMode==='routine'&&code==='00114'?'routine-primary ':''}${items.some(i=>i.code===code)?'on':''}" data-code="${code}" aria-pressed="${items.some(i=>i.code===code)}" ${locked?'disabled':''}>${code.replace(/^0+/,'')}<small>${esc({'00114':billingMode==='routine'?'Routine':'Visit','00127':'Palliative','14077':'Provider','13121':'Family'}[code]||c.label)}</small></button>`;}).join('')}</div><details class="other-codes"><summary>Other billing codes</summary><label>Additional code<select id="other-code" ${locked?'disabled':''}><option value="">Choose a code…</option>${CODES.filter(c=>!COMMON_CODES.includes(c.code)).map(c=>`<option value="${c.code}">${c.code} · ${esc(c.label)}</option>`).join('')}</select></label><div class="fields"><label>Custom five-digit code<input id="custom-code" maxlength="5" inputmode="numeric"></label><button id="add-code" ${locked?'disabled':''}>Add</button></div></details>${items.some(i=>i.code==='13334')?`<div class="bonus-banner">✓ 13334 · First-visit bonus${items.find(i=>i.code==='13334').autoAdded?' · Auto':''}</div>`:''}<div id="item-details">${items.map((i,index)=>itemHTML(i,index,locked)).join('')}</div><div id="editor-issues"></div>${e?.comment||items.some(i=>i.code!=='00114'&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code))?`<section class="comment-details"><label>Additional billing comment<textarea id="entry-comment" maxlength="3000" ${locked?'disabled':''} placeholder="Only information needed for billing">${esc(e?.comment||'')}</textarea></label></section>`:''}${e&&!locked?'<button id="remove-entry" class="text-button danger">Remove this billing date</button>':''}<details class="billing-history"><summary>Previous billing dates & patient details</summary><p class="hint">PHN ${esc(p.phn||'—')} · Usual ICD ${esc(p.codes||'—')}</p>${ledger.entries.filter(x=>x.patientKey===p.key).sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<div class="history-row"><span>${esc(formatDate(x.date))}<small> · ${x.items.map(i=>i.code).join(', ')}${x.batchId?' · Given to Suzy':''}</small></span><button data-edit="${x.id}">View</button></div>`).join('')||'<p class="hint">No billing recorded yet.</p>'}${ledger.baselines[p.key]?`<p class="hint">Starting qualifying billing: ${esc(formatDate(ledger.baselines[p.key].date))}</p>`:''}${historical.length?`<h3>Already billed · imported</h3>${historical.map(h=>`<div class="history-row"><span>${esc(formatDate(h.date))} · ${h.codes.map(esc).join(', ')}<small>${esc(h.reason||'')} · ${sourceLabel(h.sources)}</small></span></div>`).join('')}`:''}</details>`;
-  if(historical.some(h=>h.date===date())){$('editor').insertAdjacentHTML('afterbegin','<div class="issue-box">Already billed on this date. No new charge can be added.</div>');$('editor').querySelectorAll('button,input,textarea').forEach(x=>x.disabled=true);}
+  const dateLabel=$('editor').querySelector('.editor-date');dateLabel.setAttribute('aria-live','polite');dateLabel.innerHTML='<small>Billing for</small><strong>'+esc(formatDate(date()))+'</strong>';
+  const phn=String(p.phn||'').replace(/\D/g,'');
+  if(/^\d{10}$/.test(phn)){
+    const copy=document.createElement('button');copy.id='billing-copy-phn';copy.className='text-button';copy.textContent='Copy PHN';copy.title='Copy '+phn;copy.setAttribute('aria-label','Copy PHN for '+p.name);
+    copy.onclick=safe(async()=>{await navigator.clipboard.writeText(phn);copy.textContent='Copied';setTimeout(()=>{copy.textContent='Copy PHN';},1600);});
+    $('editor').querySelector('.patient-title').append(copy);
+  }
+  if(blocked){
+    const comparison=document.createElement('section');comparison.id='billing-conflict-preview';comparison.innerHTML='<h3>Pending on this computer</h3>'+(e?billingRows(e):'<p>No pending billing for this date.</p>')+savedPatientHistory(p.key,remoteBilling);
+    $('editor').querySelector('.editor-head').after(comparison);
+    $('editor').querySelector('.billing-history').open=true;
+  }
+  if(historical.some(h=>h.date===date())){$('editor').insertAdjacentHTML('afterbegin','<div class="issue-box">Already billed on this date. No new charge can be added.</div>');$('editor').querySelectorAll('[data-code],#add-code,[data-remove-code],input,textarea,select').forEach(x=>x.disabled=true);}
   const latestRemoval=(ledger.cancellations||[]).filter(c=>c.before.patientKey===p.key&&c.before.date===date()&&!c.undoneAt&&!savedBase?.cancellations?.some(b=>b.id===c.id)).at(-1);
   if(latestRemoval){const undo=document.createElement('button');undo.className='undo-removal';undo.textContent='Undo last code removal';undo.disabled=locked||writeUnavailable()||saving;undo.onclick=safe(()=>undoCancellation(latestRemoval.id));$('editor').append(undo);}
   const newItem=code=>({code,units:1,...timeDefaults(code),...(code==='00127'?{diagnosis:'V66.7'}:{}),...(CONFERENCE_CODES.includes(code)?{diagnosisSource:'primary114'}:{}),...(code==='00114'?{diagnosisMode:'per-charge',...(billingMode==='concern'?{concernBilling:true}:{})}:{})});
@@ -389,10 +407,10 @@ $('calendar-today').onclick=()=>selectDate(today());
 for(const id of ['search','unit-filter','panel-filter','due-filter'])$(id).addEventListener('input',()=>renderRoster());
 for(const id of ['batch-from','batch-to','report-layout'])$(id).onchange=()=>{printedSignature=null;renderReports();};
 async function verifyConnection(){
-  if(!adapter||!ledger||checking||saving||blocked||document.hidden)return;
+  if(!adapter||!ledger||checking||saving||loadingLatest||blocked||document.hidden)return;
   checking=true;updateWriteLock();
-  try{if(!navigator.onLine)throw new Error('No internet connection.');await adapter.verify(etag);checkedDrive();connectionVerified=true;syncFailed=false;status(dirty?'Saved on this device — not yet in Drive':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);}
-  catch(e){connectionError(e);connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);notice(e.message);}
+  try{if(!navigator.onLine)throw new Error('No internet connection.');await patients.refresh();await adapter.verify(etag);checkedDrive();connectionVerified=true;syncFailed=false;status(dirty?'Saved on this device — not yet in Drive':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);}
+  catch(e){connectionError(e);connectionVerified=false;syncFailed=true;if(e.status===409){blocked=true;try{remoteBilling=(await adapter.load()).ledger;}catch{}renderEditor();notice('Changes saved on another computer. Choose Load latest changes.');}else notice(e.message);status(e.status===409?'New Drive changes available':'Connection needs attention',true);}
   finally{checking=false;applyNewPatientPlans();updateWriteLock();}
 }
 async function syncSession(save=true){
@@ -401,16 +419,11 @@ async function syncSession(save=true){
     if(!navigator.onLine)throw new Error('Reconnect to the internet. Your local work is retained.');
     if(!driveReachable)await adapter.connect();
     await recoveryQueue;
-    const current=await adapter.load();checkedDrive();roster=patients.state().ready?normalizeRoster(patients.roster()):await adapter.roster();
+    const current=await adapter.load();remoteBilling=clone(current.ledger);checkedDrive();roster=patients.state().ready?normalizeRoster(patients.roster()):await adapter.roster();
     if(!dirty||sameBillingContent(ledger,current.ledger)){await adoptSaved(current);checking=false;applyNewPatientPlans();if(save&&dirty)await flush();renderAll();return;}
-    if(!save){
-      blocked=current.etag!==etag;connectionVerified=!blocked;syncFailed=false;
-      notice(blocked?'Drive has newer billing. Click Save my changes to Drive to add your local work.':'');
-      status(blocked?'Draft conflict — action needed':'Saved on this device — not yet in Drive',true);return;
-    }
     const merged=mergeSession(savedBase,ledger,current.ledger,mergeChoices);
     if(merged.conflicts.length){
-      blocked=true;mergeConflicts=merged.conflicts;renderMergeChoices();status('Conflict — save stopped',true);
+      blocked=true;mergeConflicts=merged.conflicts;renderEditor();renderMergeChoices();status('Review overlapping billing changes',true);
       notice('Choose which version to keep for the billing changed on both computers.');return;
     }
     // Rebase the local recovery before the one conditional upload. If the upload
@@ -420,7 +433,7 @@ async function syncSession(save=true){
     printedSignature=null;mergeChoices={};mergeConflicts=[];await persistRecovery();
     if($('merge-dialog').open)$('merge-dialog').close();
     checking=false;
-    if(dirty)await flush();else await adoptSaved(current);
+    if(dirty&&save)await flush();else if(!dirty)await adoptSaved(current);
     if(!dirty)notice('');
     renderAll();
   }catch(e){connectionError(e);connectionVerified=false;syncFailed=true;if(e.status===409)blocked=true;status(e.status===409?'Conflict — save stopped':'Connection needs attention',true);throw e;}
@@ -428,7 +441,7 @@ async function syncSession(save=true){
 }
 async function adoptSaved(s){
   validateLedger(s.ledger);
-  ledger=s.ledger;savedBase=clone(s.ledger);etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;printedSignature=null;mergeChoices={};mergeConflicts=[];seq++;
+  ledger=s.ledger;savedBase=clone(s.ledger);remoteBilling=clone(s.ledger);etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;printedSignature=null;mergeChoices={};mergeConflicts=[];seq++;
   checkedDrive();await persistRecovery();notice('');renderAll();
   if($('merge-dialog').open)$('merge-dialog').close();
   status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
@@ -452,6 +465,7 @@ async function discardLocal(){
 }
 function renderMergeChoices(){
   $('merge-list').innerHTML=mergeConflicts.map((c,n)=>`<article class="change-row"><strong>${esc(c.entry?c.label.replace((c.local||c.drive).date,formatDate((c.local||c.drive).date)):c.label)}</strong>${c.locked?'<p>Already handed over or imported in Drive. Keep the saved record.</p>':''}<div class="merge-versions"><section><h4>Drive version</h4>${mergeDetail(c,c.drive)}</section><section><h4>My local version</h4>${mergeDetail(c,c.local)}</section></div><label><input type="radio" name="merge-${n}" data-merge="${n}" value="drive"> Keep Drive version</label>${c.locked?'':`<label><input type="radio" name="merge-${n}" data-merge="${n}" value="local"> Use my local version</label>`}</article>`).join('');
+  for(const [n,c] of mergeConflicts.entries())if(c.entry){const key=(c.local||c.drive)?.patientKey;if(key)$('merge-list').children[n].insertAdjacentHTML('beforeend',savedPatientHistory(key,remoteBilling));}
   $('merge-save').disabled=true;
   $('merge-list').querySelectorAll('[data-merge]').forEach(el=>el.onchange=()=>{
     const c=mergeConflicts[Number(el.dataset.merge)];mergeChoices[c.id]={token:c.token,side:el.value};
@@ -461,12 +475,29 @@ function renderMergeChoices(){
   if(!$('merge-dialog').open)$('merge-dialog').showModal();
 }
 function mergeDetail(c,value){return value===undefined?'<p>No entry / removed</p>':c.entry?billingRows(value):'<pre>'+esc(JSON.stringify(value,null,2))+'</pre>';}
+function savedPatientHistory(key,data){
+  if(!data)return '<p>Saved history could not be loaded. Use Load latest changes to retry.</p>';
+  const entries=data.entries.filter(e=>e.patientKey===key).sort((a,b)=>b.date.localeCompare(a.date));
+  const imported=(data.historicalBillings||[]).filter(e=>e.patientKey===key).sort((a,b)=>b.date.localeCompare(a.date));
+  return '<details class="saved-drive-history" open><summary>Saved billing history in Drive</summary>'+entries.map(e=>'<article><strong>'+esc(formatDate(e.date))+(e.batchId?' · Handed over':' · Saved')+'</strong>'+billingRows(e)+'</article>').join('')+imported.map(e=>'<p>'+esc(formatDate(e.date))+' · '+e.codes.map(esc).join(', ')+' · Already billed (imported)</p>').join('')+(!entries.length&&!imported.length?'<p>No saved billing history.</p>':'')+'</details>';
+}
+async function loadLatest(){
+  if(saving||checking||loadingLatest)return;
+  loadingLatest=true;updateWriteLock();
+  try{
+    if(!driveReachable)await adapter.connect();
+    await patients.refresh(true);
+    if(patients.state().error){onPatientConflict();return;}
+    checkedDrive();await syncSession(false);const dateReset=await resetBillingDate();renderAll();
+    if(!blocked)notice('Latest Drive changes loaded. '+(dirty||patients.hasChanges()?'Your pending changes are retained; use Save to Drive when ready. ':'')+(!dateReset?'Save pending notes before resetting the date to today.':''));
+  }finally{loadingLatest=false;updateWriteLock();}
+}
 $('merge-save').onclick=safe(()=>syncSession(true));
 $('conflict-save').onclick=safe(()=>syncSession(true));
 $('conflict-discard').onclick=safe(discardLocal);
 $('changes-discard').onclick=safe(discardLocal);
 $('sync').onclick=safe(saveSession);
-$('drive-connection').onclick=safe(()=>syncSession(false));
+$('drive-connection').onclick=safe(loadLatest);
 $('lock').onclick=safe(async()=>{await notes.beforeLock();await patients.beforeLock();await persistRecovery();if((dirty||notes.hasChanges()||patients.hasChanges())&&!confirm('Changes remain on this device. Lock anyway? Reconnect on this browser to recover them.'))return;if(laptopStartup)sessionStorage.setItem(laptopLockKey,'yes');releaseLock?.();releaseLock=null;location.reload();});
 $('other-form').onsubmit=async ev=>{ev.preventDefault();try{guardWrite();if(ocrBusy)throw new Error('Wait for screenshot reading to finish.');const p=coveragePatient(Object.fromEntries(new FormData(ev.target)),people(),crypto.randomUUID());const next=clone(ledger);next.nonPanel.push(p);next.patients[p.key]=p;commit(next);resetPatientForm();$('search').value='';$('unit-filter').value='';$('panel-filter').value='all';$('due-filter').checked=false;selected=p.key;editingId=null;renderRoster();renderEditor();}catch(e){$('other-error').textContent=e.message;}};
 $('parallel').onchange=safe(()=>{const off=!$('parallel').checked;if(off&&!confirm('End paper-comparison mode? Only do this when you are ready to use digital reports as the single MOA billing source.')){$('parallel').checked=true;return;}const n=clone(ledger);n.settings.parallel=!off;commit(n);document.querySelector('.version').textContent=off?'BILLING WORKSPACE':'PAPER COMPARISON';});
@@ -495,7 +526,7 @@ function renderSaveControls(){
   $('drive-connection').dataset.state=checking?'busy':connected?'ok':'error';
   $('drive-connection').textContent=checking?'◌ Checking Drive…':connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):'● Reconnect Drive';
   $('drive-connection').title=lastChecked?'Last checked '+formatTimestamp(lastChecked):'Check your connection without saving billing';
-  $('drive-connection').disabled=saving||checking||!adapter;
+  $('drive-connection').disabled=saving||checking||loadingLatest||!adapter;
   const changes=localChanges(),count=changedBillCount(changes);
   $('local-changes').dataset.state=blocked||localRecoveryFailed?'error':dirty?'pending':'ok';
   $('local-changes').textContent=localRecoveryFailed?'! Local save needs attention':recoveryPending?'◌ Saving locally…':dirty?(count?'● '+count+' bill'+(count===1?'':'s')+' pending':'● Other local changes'):'✓ No local changes';
@@ -527,6 +558,7 @@ function renderChanges(){
   $('changes-summary').textContent=localRecoveryFailed?'Local recovery failed. Keep this tab open and download a private backup in Settings.':recoveryPending?'Saving the latest changes on this device…':dirty?'Saved on this device, not yet in Drive. Includes earlier sessions and backdated billing. Save before switching computers.':'No local changes waiting for Drive.';
   const removals=(ledger?.cancellations||[]).filter(c=>!c.undoneAt&&!savedBase?.cancellations?.some(b=>b.id===c.id));
 $('changes-list').innerHTML=changes.map(r=>'<article class="change-row"><div><strong>'+esc(r.name)+'</strong><span>'+esc(formatDate(r.date))+'</span></div><b>'+esc(!r.after&&r.before?'Will be removed from Drive':r.kind)+'</b>'+(r.before?'<h4>Before local changes</h4>'+billingRows(r.before):'')+(r.after?'<h4>After this session save</h4>'+billingRows(r.after,!r.after.batchId)+'<button class="text-button danger" data-cancel-entry="'+esc(r.after.id)+'">Remove all billing for this date</button>':'')+(r.detail?'<p>'+esc(r.detail)+'</p>':'')+'</article>').join('')+removals.map(c=>'<article class="change-row removal-record"><strong>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+'</strong><p>'+esc(formatDate(c.before.date))+' · Removed '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</p><button data-undo-cancel="'+esc(c.id)+'" '+(writeUnavailable()||saving?'disabled':'')+'>Undo removal</button></article>').join('')||(dirty?'<p>A recovered session is waiting to save. No patient changes compared with the saved snapshot.</p>':'<p>✓ All changes saved.</p>');
+  for(const [n,change]of changes.entries()){const key=(change.after||change.before)?.patientKey;if(key)$('changes-list').children[n]?.insertAdjacentHTML('beforeend',savedPatientHistory(key,remoteBilling||savedBase));}
   $('changes-list').querySelectorAll('[data-cancel-entry]').forEach(b=>{b.disabled=writeUnavailable()||saving||Boolean(ledger.entries.find(e=>e.id===b.dataset.cancelEntry)?.batchId);b.onclick=safe(()=>cancelCode(b.dataset.cancelEntry,b.dataset.cancelCode||null));});
   $('changes-list').querySelectorAll('[data-undo-cancel]').forEach(b=>b.onclick=safe(()=>undoCancellation(b.dataset.undoCancel)));
   $('changes-conflict').hidden=!blocked;$('changes-conflict').textContent='Drive has newer billing. Save my changes to Drive combines your local work with it. Or discard local changes to use Drive only.';
@@ -594,8 +626,8 @@ async function openLaptopWorkspace(){
     start:()=>{if(laptopStartup)void openLaptopWorkspace();},
     state:()=>({adapter,ledger,roster,date:date(),people:ledger?people():[]}),
     save:async()=>{await syncSession(true);if(dirty||blocked)throw new Error('Resolve the TRIM Billing conflict before finishing this save.');},
-    status:()=>({dirty,busy:saving||checking||recoveryPending>0,error:localRecoveryFailed||blocked,ready:!!ledger,mode:adapter?.mode}),
-    switchTab,recordRoutine,notify:notice,chooseConnection:openConnectionDialog,
+    status:()=>({dirty,busy:saving||checking||loadingLatest||recoveryPending>0,error:localRecoveryFailed||mergeConflicts.length>0,ready:!!ledger,mode:adapter?.mode}),
+    switchTab,recordRoutine,notify:notice,chooseConnection:openConnectionDialog,loadLatest,
     setRoster:raw=>{roster=normalizeRoster(raw);if(ledger){renderAll();applyNewPatientPlans();}},
     localChanges,
   };
