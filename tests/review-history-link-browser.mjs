@@ -27,6 +27,8 @@ await context.route('https://www.googleapis.com/**',async route=>{
 try{
  await page.goto('http://127.0.0.1:'+server.address().port+'/?connection=manual');
  await page.locator('#connect').click();await page.locator('#cloud-connect').click();await page.locator('.patient').first().waitFor();
+ assert.equal(await page.locator('#billing-review-badge').innerText(),'★ 1');
+ assert.match(await page.locator('[data-tab=review]').getAttribute('aria-label'),/1 item needs attention/);
  await page.locator('[data-section="billing"]').click();await page.locator('[data-tab=history]').click();await page.locator('#history-by-patient').click();
  await page.locator('#history-search').fill('EXAMPLE');assert.equal(await page.locator('#history-patient-results button').count(),1);
  await page.locator('#history-patient-results button').click();assert.equal(await page.locator('#history-content tbody tr').count(),4);
@@ -40,6 +42,11 @@ try{
  assert.doesNotMatch(await page.locator('#review-issues').innerText(),/portal|reason required/);
  await page.screenshot({path:'work/billing-review-preview.png',fullPage:true});
  await page.locator('[data-review-entry]').click();assert.match(await page.locator('#header-date-value').innerText(),/Sep 22, 2026/);
+ await page.locator('[data-field=start]').fill('13:00');await page.locator('[data-field=end]').fill('13:10');
+ await page.locator('#billing-review-badge').waitFor({state:'hidden'});
+ assert.equal(await page.locator('[data-tab=review]').getAttribute('aria-label'),'Billing review');
+ await page.locator('[data-field=end]').fill('');await page.locator('#billing-review-badge').waitFor({state:'visible'});
+ assert.equal(await page.locator('#billing-review-badge').innerText(),'★ 1');
  await page.locator('[data-section="settings"]').click();assert.equal(await page.locator('#portal-confirm').count(),0);
  await page.locator('[data-section="billing"]').click();await page.locator('[data-tab=review]').click();await page.setViewportSize({width:390,height:844});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

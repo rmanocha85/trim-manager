@@ -1,5 +1,7 @@
 # TRIM
 
+Billing review displays an amber star/count in the sidebar whenever its all-date, not-yet-handed-over review list contains issues. It updates on local edits and refresh, disappears at zero, and does not change billing records. The October 22 `20261022-review1` UI update passed the review/history, balanced-layout and patient-layout browser scenarios, including resolving/reintroducing an issue without opening the review tab, mobile layout and zero Drive writes in the review test; all 83 syntax checks passed.
+
 One maintained application for **TRIM Patients**, **TRIM Notes** and **TRIM Billing**, owned by Dr. Rahul Manocha. Local development: `C:\Users\rmano\Documents\Codex\trim-app`. Records and reusable workflows remain in the existing TRIM AI folders in Drive. Never commit patient data, auth material, browser profiles or backups.
 
 The header order is **Patient → Billing → Notes**, with Settings in a persistent bottom-left utility bar. The patient roster has no count cap; both roster print layouts add continuation pages for larger units and include custom units. Billing uses a Sunday-first calendar. Concern and Routine Billing show independent Ava chart links for valid stored chart IDs. New code 127 selections default to editable ICD-9 `V66.7`; existing saved diagnoses are preserved. Code 14077 offers an optional multiline note, retained in recovery, Drive, history and print reports through its existing `reason` field.

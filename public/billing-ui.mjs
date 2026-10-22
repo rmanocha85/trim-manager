@@ -241,8 +241,18 @@ function chosen(){return batchEntries(ledger,$('batch-from').value,$('batch-to')
 function issuesFor(entries){return entries.flatMap(e=>entryIssues(e,ledger,person(e.patientKey)).map(issue=>({id:e.id,text:`${person(e.patientKey)?.name||'Patient'} · ${formatDate(e.date)} · ${issue}`})));}
 function signature(){return JSON.stringify({entries:chosen(),layout:$('report-layout').value,revision:ledger.revision,parallel:ledger.settings.parallel});}
 function renderReports(){const entries=chosen(),issues=issuesFor(entries);$('batch-summary').innerHTML=`<p><strong>${entries.length}</strong> patient-date entries · <strong>${new Set(entries.map(e=>e.date)).size}</strong> dates · <strong>${new Set(entries.map(e=>e.patientKey)).size}</strong> patients</p>`;$('batch-issues').innerHTML=issues.length?'<div class="card"><p>'+issues.length+' items need attention in this print selection.</p><button id="open-billing-review">Open Billing review</button></div>':'';if($('open-billing-review'))$('open-billing-review').onclick=()=>switchTab('review');$('finalize').disabled=ledger.settings.parallel;}
+function pendingReviewIssues(){return ledger?issuesFor(ledger.entries.filter(e=>!e.batchId)):[];}
+function renderReviewBadge(){
+  const button=document.querySelector('.nav[data-tab="review"]'),count=pendingReviewIssues().length;
+  let badge=$('billing-review-badge');
+  if(!badge){badge=document.createElement('span');badge.id='billing-review-badge';badge.setAttribute('aria-hidden','true');button.append(badge);}
+  badge.hidden=!count;
+  const text=count?'★ '+count:'';if(badge.textContent!==text)badge.textContent=text;
+  button.setAttribute('aria-label',count?`Billing review, ${count} ${count===1?'item needs':'items need'} attention`:'Billing review');
+  button.title=count?`${count} ${count===1?'item needs':'items need'} attention across all billing not yet handed over`:'No billing items need attention';
+}
 function renderReview(){
-  const issues=issuesFor(ledger.entries.filter(e=>!e.batchId));
+  const issues=pendingReviewIssues();
   $('review-issues').innerHTML='<div class="card"><h2>'+issues.length+' item'+(issues.length===1?'':'s')+' need attention</h2>'+(issues.length?issues.map(x=>'<div class="history-row"><span>'+esc(x.text)+'</span><button data-review-entry="'+esc(x.id)+'">Review</button></div>').join(''):'<p>No missing billing information found in the current batch.</p>')+'</div>';
   $('review-issues').querySelectorAll('[data-review-entry]').forEach(b=>b.onclick=()=>openEntry(b.dataset.reviewEntry));
 }
@@ -522,6 +532,7 @@ setInterval(verifyConnection,45000);
 
 function renderSaveControls(){
   if(!$('drive-connection'))return;
+  renderReviewBadge();
   const offline=!navigator.onLine,connected=driveReachable&&!offline;
   $('drive-connection').dataset.state=checking?'busy':connected?'ok':'error';
   $('drive-connection').textContent=checking?'◌ Checking Drive…':connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):'● Reconnect Drive';

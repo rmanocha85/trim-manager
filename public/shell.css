@@ -50,4 +50,6 @@
 #billing-conflict-preview{padding:12px;margin:12px 0;background:#fff7e1;border:1px solid #e7c981;border-radius:8px}
 .saved-drive-history{margin-top:12px;padding:12px;background:#fff;border:1px solid #cbd8cd;border-radius:6px}
 .saved-drive-history article{padding:8px 0;border-bottom:1px solid #ddd}
+.sidebar .nav[data-tab="review"]{display:flex;align-items:center;justify-content:space-between;gap:6px}
+#billing-review-badge{display:inline-flex;align-items:center;flex-shrink:0;white-space:nowrap;border-radius:12px;padding:2px 7px;background:#fff0bb;color:#754a00;border:1px solid #d7aa39;font-size:12px;font-weight:750;line-height:18px}
 @media(max-width:600px){#editor .editor-date{margin-left:auto;font-size:15px}}
