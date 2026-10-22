@@ -65,7 +65,7 @@ try{
    await page.screenshot({path:`work/patient-layout-${width}.png`,fullPage:true});
  }
  await page.setViewportSize({width:1440,height:1000});await section('billing');await select(patients[0].phn);
- await page.locator('#billing-copy-phn').click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[0].phn);
+ await page.locator('#roster .billing-phn-copy').click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[0].phn);
  assert.equal(await page.locator('.editor-date').isVisible(),true);assert.match(await page.locator('.editor-date').innerText(),/Billing for/i);
  await page.locator('[data-day="'+addDays(date,-1)+'"]').click();await page.locator('#load-latest').click();await page.waitForFunction(()=>!document.querySelector('#load-latest').disabled);assert.equal(await page.locator('#service-date').inputValue(),date);
  await page.locator('[data-code="00127"]').click();assert.equal(await diagnosis().inputValue(),'V66.7');assert.equal(await diagnosis().isEditable(),true);

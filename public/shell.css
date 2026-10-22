@@ -33,13 +33,14 @@
 @media(max-width:480px){#workspace>header{grid-template-areas:"sections" "date" "actions";grid-template-columns:1fr}#workspace>header .brand{display:none}#workspace>header .app-sections{justify-content:space-between;gap:0}.app-sections button{padding:8px 5px}}
 @media print{.app-sections,.app-utility,#session-status{display:none}#workspace{padding-bottom:0}}
 /* Ava is a separate link so opening a chart cannot select or bill a patient. */
-.patient-row{position:relative}
-.patient-row .patient{width:100%}
-.patient-row.has-chart-link .patient{padding-right:62px}
+.patient-row{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;border-bottom:1px solid #e9e9e1}
+.patient-row .patient{width:100%;min-width:0;border-bottom:0}
+.patient-row-actions{display:flex;flex-direction:column;align-items:flex-end;justify-content:center;gap:2px;padding:5px 7px}
+.billing-phn-copy{min-height:28px;padding:3px 5px;font-size:11px;white-space:nowrap}
 .ava-chart-link{display:inline-flex;align-items:center;min-height:28px;padding:3px 5px;border-radius:5px;color:#235b46;font-size:12px;font-weight:600;text-decoration:none;white-space:nowrap}
 .ava-chart-link:hover{background:#e7f2e9;text-decoration:underline}
 .ava-chart-link:focus-visible{outline:2px solid #235b46;outline-offset:2px}
-.patient-chart-link{position:absolute;right:7px;top:5px}
+.patient-chart-link{position:static}
 .patient-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .patient-title h2{margin:0}
 /* Keep the service date beside the controls used to enter each charge. */

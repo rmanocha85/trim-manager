@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $taskNode = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 if (-not (Test-Path -LiteralPath $taskNode)) { $taskNode = (Get-Command node -ErrorAction Stop).Source }
 $taskUrl = 'http://127.0.0.1:4317/'
-try { $taskResponse = Invoke-RestMethod -Uri ($taskUrl + 'health') -TimeoutSec 2; $taskRunning = $taskResponse.app -eq 'trim-app' -and $taskResponse.version -eq '20261022-fixes1' } catch { $taskRunning = $false }
+try { $taskResponse = Invoke-RestMethod -Uri ($taskUrl + 'health') -TimeoutSec 2; $taskRunning = $taskResponse.app -eq 'trim-app' -and $taskResponse.version -eq '20261022-fixes2' } catch { $taskRunning = $false }
 if (-not $taskRunning) {
     $taskExisting = Get-NetTCPConnection -LocalPort 4317 -State Listen -ErrorAction SilentlyContinue
     if ($taskExisting) { throw 'An older TRIM service or another program is using port 4317. Close that service before starting this version. Your saved work has not been changed.' }

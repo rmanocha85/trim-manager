@@ -7,7 +7,7 @@ export const CODES = [
   {code:'00127', label:'Palliative facility visit', note:'Verify palliative criteria and any additional same-day claim requirements.'},
   {code:'13115', label:'LTC admission', reason:true, admission:true, note:'Initial in-person admission, once per patient per physician. Confirm reconciliation, care plan and MOST; not a return from hospital or physician transfer.'},
   {code:'13334', label:'First visit bonus', note:'Once per physician/day; requires qualifying visit. Not with urgent assessment.'},
-  {code:'14077', label:'Provider conference', timed:true, portal:true, annual:18, note:'Two-way clinical conference, not routine-round communication. Start/end in claim and chart. Reason and participant documentation stays in the clinical note. Annual units shown are recorded here only.'},
+  {code:'14077', label:'Provider conference', timed:true, portal:true, note:'Two-way clinical conference, not routine-round communication. Start/end in claim and chart. Reason and participant documentation stays in the clinical note.'},
   {code:'13121', label:'Family conference', timed:true, annual:100, physicianLimit:true, note:'Care planning/consent criteria, not routine updates. Separate time from other services. Reason and participant documentation stays in the clinical note.'},
   {code:'14067', label:'Brief provider conference', participants:true, reason:true, portal:true, annual:150, physicianLimit:true, note:'Clinical conferencing criteria; not an administrative or family conversation.'},
   {code:'13005', label:'Allied-worker advice', request:true, reason:true, note:'Document caller, request time and advice; same-day service restrictions apply.'},
@@ -262,6 +262,10 @@ export function calendarDays(month){
   return [...Array(offset).fill(null),...Array.from({length:last},(_,i)=>`${month}-${String(i+1).padStart(2,'0')}`)];
 }
 export function validDiagnosis(value){return /^(?:C19|\d{3}(?:\.\d{1,2})?|\d{4,5}|V\d{2}(?:\.\d{1,2})?|V\d{3,4}|E\d{3}(?:\.\d)?|E\d{4})$/i.test(String(value||'').trim());}
+export function validDiagnoses(value){
+  const codes=String(value||'').trim().split(/[,;\s]+/).filter(Boolean);
+  return codes.length>=1&&codes.length<=3&&codes.every(validDiagnosis);
+}
 export function batchEntries(ledger,from,to) {return ledger.entries.filter(e=>!e.batchId&&e.date>=from&&e.date<=to).sort((a,b)=>a.date.localeCompare(b.date)||a.patientKey.localeCompare(b.patientKey));}
 export function entryIssues(entry,ledger,patient) {
   const errors=[]; const required=(ok,msg)=>{if(!ok)errors.push(msg);};
@@ -272,7 +276,7 @@ export function entryIssues(entry,ledger,patient) {
     const info=codeInfo(i.code); const prefix=`${i.code}: `;
     if(!info) {required(i.customVerified===true&&Boolean(i.customLabel?.trim()),prefix+'custom code needs a description and physician rule confirmation.');if(i.customTimed){required(minutes(i.start)!==null&&minutes(i.end)!==null&&minutes(i.end)>minutes(i.start),prefix+'custom timed code needs valid start/end times.');}}
     if(i.code!=='00127'&&(info?.reason||i.concernBilling===true||((entry.panelAtBilling??patient?.panel)===false&&i.code!=='13334'&&!CONFERENCE_CODES.includes(i.code)))) required(Boolean(i.reason?.trim()),prefix+'reason required.');
-    if(i.diagnosis?.trim())required(validDiagnosis(i.diagnosis),prefix+'enter a valid ICD-9 diagnosis code.');
+    if(i.diagnosis?.trim())required(validDiagnoses(i.diagnosis),prefix+'enter up to 3 valid ICD-9 codes, separated by spaces or commas.');
     if(i.code==='00114'&&i.diagnosisMode==='per-charge'&&i.reason?.trim())required(Boolean(i.diagnosis?.trim()),prefix+'enter the ICD-9 for this billing reason.');
     if(info?.participants) required(Boolean(i.participants?.trim()),prefix+'participants / roles required.');
     if(info?.request) required(Boolean(i.requester?.trim())&&Boolean(i.requestAt)&&!Number.isNaN(Date.parse(i.requestAt)),prefix+'requesting person and request date/time required.');
