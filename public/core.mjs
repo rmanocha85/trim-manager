@@ -1,4 +1,4 @@
-import {validateHospitalStays,hospitalAt,latestHospitalReturn,assertHospital114} from './hospital.mjs?v=20261024-hospital1';
+import {validateHospitalStays,hospitalAt,hospitalBlocks114,latestHospitalReturn,assertHospital114} from './hospital.mjs?v=20261024-hospital2';
 export const SCHEMA = 1;
 export const APP = 'trim-billing';
 export const RESET_CODES = ['00114','00115','00127'];
@@ -170,7 +170,7 @@ export function isPostHospitalReview(ledger,patient,date){
 }
 export function dueState(ledger,patient,date=today()) {
   const hospital=hospitalAt(patient,date);
-  if(hospital)return {label:'In hospital · 114 blocked',kind:'hospital',last:lastBilling(ledger,patient.key,date,true),hospital};
+  if(hospital)return {label:hospitalBlocks114(patient,date)?'In hospital · 114 blocked':'Admitted today · routine rounds excluded',kind:'hospital',last:lastBilling(ledger,patient.key,date,true),hospital};
   if(!patient.panel) return {label:'Ad hoc only',kind:'adhoc',last:lastBilling(ledger,patient.key,date)};
   const last=lastBilling(ledger,patient.key,date,true);
   const returned=latestHospitalReturn(patient,date);
@@ -281,7 +281,7 @@ export function batchEntries(ledger,from,to) {return ledger.entries.filter(e=>!e
 export function entryIssues(entry,ledger,patient) {
   const errors=[]; const required=(ok,msg)=>{if(!ok)errors.push(msg);};
   const codes=entry.items.map(i=>i.code); const all=ledger.entries;
-  if(codes.includes('00114')&&hospitalAt(patient,entry.date))errors.push('00114: patient was in hospital on this date. Correct the dates or remove this charge; 14077 is still allowed.');
+  if(codes.includes('00114')&&hospitalBlocks114(patient,entry.date))errors.push('00114: patient was in hospital on this date. Correct the dates or remove this charge; 14077 is still allowed.');
   if(entry.date>today()) errors.push('Future service date.');
   if(new Set(codes).size!==codes.length) errors.push('Duplicate code on the same entry.');
   for(const i of entry.items) {

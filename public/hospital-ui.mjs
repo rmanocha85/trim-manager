@@ -1,4 +1,4 @@
-import {hospitalAt,latestHospitalStay} from './hospital.mjs?v=20261024-hospital1';
+import {hospitalAt,latestHospitalStay} from './hospital.mjs?v=20261024-hospital2';
 import {formatDate} from './dates.mjs';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function hospitalFlag(patient,date){

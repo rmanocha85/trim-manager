@@ -1,22 +1,22 @@
 import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=20261007-dates1';
-import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261024-hospital1';
-import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261024-hospital1';
+import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261024-hospital2';
+import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261024-hospital2';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261007-cancel1';
 import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261019-fixes1';
 import {avaChartUrl} from './patient-links.mjs';
-import {planNewPatients} from './core.mjs?v=20261024-hospital1';
+import {planNewPatients} from './core.mjs?v=20261024-hospital2';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
 import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261019-fixes1';
-import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261024-hospital1';
+import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261024-hospital2';
 import {mergeSession} from './merge.mjs?v=20261015-immediate1';
 import {laptopRuntime} from './runtime.mjs';
-import {sameRosterContent} from './patients-core.mjs?v=20261024-hospital1';
+import {sameRosterContent} from './patients-core.mjs?v=20261024-hospital2';
 import {RosterRepository} from './roster-repository.mjs';
 
-import {hospitalAt,assertHospital114} from './hospital.mjs?v=20261024-hospital1';
-import {hospitalFlag} from './hospital-ui.mjs?v=20261024-hospital1';
-import {hospitalEditor} from './hospital-entry.mjs?v=20261024-hospital1';
+import {hospitalBlocks114,assertHospital114} from './hospital.mjs?v=20261024-hospital2';
+import {hospitalFlag} from './hospital-ui.mjs?v=20261024-hospital2';
+import {hospitalEditor} from './hospital-entry.mjs?v=20261024-hospital2';
 
 export function billingUI({notes,patients,onStatus=()=>{},onNavigate=()=>{},onConnected=()=>{},onPatientConflict=()=>{},saveSession}){
 const $=id=>document.getElementById(id);
@@ -70,7 +70,7 @@ function updateWriteLock(){
   renderSaveControls();
   if(!ledger)return;const unavailable=writeUnavailable(),busy=saving||checking||loadingLatest;
   const e=selected?currentEntry():null,historical=selected&&(ledger.historicalBillings||[]).some(h=>h.patientKey===selected&&h.date===date());
-  $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset],[data-time-open]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON')||(el.dataset.code==='00114'&&hospitalAt(person(selected),date())&&!e?.items.some(i=>i.code==='00114'));});
+  $('editor').querySelectorAll('input,textarea,select,[data-code],#add-code,#remove-entry,[data-remove-code],[data-reason-preset],[data-time-open]').forEach(el=>{el.disabled=unavailable||saving||Boolean(e?.batchId)||historical||(busy&&el.tagName==='BUTTON')||(el.dataset.code==='00114'&&hospitalBlocks114(person(selected),date())&&!e?.items.some(i=>i.code==='00114'));});
   $('history-content').querySelectorAll('[data-history-remove],[data-history-undo]').forEach(el=>el.disabled=unavailable||busy);
   $('routine-batch-panel').querySelectorAll('input,button').forEach(el=>el.disabled=unavailable||busy);
   $('routine-add').disabled=unavailable||busy||!selectedRoutineCandidates().length;
@@ -391,7 +391,7 @@ function renderRoutineBatch(){
   const inUnits=candidates.filter(c=>routineUnits.has(c.patient.unit)),due=inUnits.filter(c=>c.status==='due'),review=inUnits.filter(c=>c.status==='review');
   $('routine-review').innerHTML='<p><strong>'+esc(formatDate(date()))+'</strong> · '+due.length+' due across selected units</p>'+(!routineUnits.size?'<p class="empty">Choose units to review their patients.</p>':due.length?'<div class="batch-patient-list">'+due.map(c=>'<label class="batch-patient"><input type="checkbox" data-routine-patient="'+esc(c.patient.key)+'" '+(!routineExcluded.has(c.patient.key)?'checked':'')+'><span><strong>'+esc(c.patient.name)+'</strong><small>'+esc(units.find(u=>u.id===c.patient.unit)?.name||c.patient.unit)+' · Room '+esc(c.patient.room||'—')+' · Last billing '+esc(formatDate(c.last))+'</small><small>Usual ICD-9: '+esc(c.usualCodes)+'</small></span></label>').join('')+'</div>':'<p class="empty">No patients are due in these units for this date.</p>')+
     (review.length?'<section class="batch-needs-review"><h3>Needs review · '+review.length+'</h3><p class="hint">Not included in this batch.</p>'+review.map(c=>'<p><strong>'+esc(c.patient.name)+'</strong> — '+esc(c.reason)+'</p>').join('')+'</section>':'')+
-    (routineUnits.size?'<p class="hint">Excluded: '+inUnits.filter(c=>c.status==='billed').length+' already billed for this date · '+inUnits.filter(c=>c.status==='later').length+' not yet due · '+inUnits.filter(c=>c.status==='hospital').length+' in hospital (114 blocked).</p>':'');
+    (routineUnits.size?'<p class="hint">Excluded: '+inUnits.filter(c=>c.status==='billed').length+' already billed for this date · '+inUnits.filter(c=>c.status==='later').length+' not yet due · '+inUnits.filter(c=>c.status==='hospital').length+' in hospital (excluded from routine rounds).</p>':'');
   $('routine-units').querySelectorAll('[data-routine-unit]').forEach(el=>el.onchange=()=>{if(el.checked)routineUnits.add(el.dataset.routineUnit);else routineUnits.delete(el.dataset.routineUnit);renderRoutineBatch();});
   $('routine-review').querySelectorAll('[data-routine-patient]').forEach(el=>el.onchange=()=>{if(el.checked)routineExcluded.delete(el.dataset.routinePatient);else routineExcluded.add(el.dataset.routinePatient);updateRoutineAction();});
   const canUndo=routineReceipt&&routineReceipt.entries.some(e=>ledger.entries.some(x=>x.id===e.id))&&!routineReceipt.entries.some(e=>savedBase?.entries.some(x=>x.id===e.id));

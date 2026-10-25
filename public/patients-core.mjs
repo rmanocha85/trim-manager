@@ -1,5 +1,5 @@
 
-import {validateHospitalStays} from './hospital.mjs?v=20261024-hospital1';
+import {validateHospitalStays} from './hospital.mjs?v=20261024-hospital2';
   const digits=value=>String(value??'').replace(/\D/g,'');
 export function today(now=new Date()){
     const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);

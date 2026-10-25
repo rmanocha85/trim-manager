@@ -17,7 +17,8 @@ export function validateHospitalStays(patient){
 export function hospitalAt(patient,date){return validateHospitalStays(patient).find(s=>s.admittedDate<=date&&(!s.returnedDate||date<s.returnedDate))||null;}
 export function latestHospitalStay(patient,date='9999-12-31'){return validateHospitalStays(patient).filter(s=>s.admittedDate<=date).sort((a,b)=>a.admittedDate.localeCompare(b.admittedDate)).at(-1)||null;}
 export function latestHospitalReturn(patient,date){return validateHospitalStays(patient).filter(s=>s.returnedDate&&s.returnedDate<=date).map(s=>s.returnedDate).sort().at(-1)||null;}
-export function assertHospital114(patient,date,items){if(items.some(i=>i.code==='00114')&&hospitalAt(patient,date))throw new Error('114 is blocked while this patient is in hospital. Record the return date or correct the hospital dates. 14077 remains available.');}
+export function hospitalBlocks114(patient,date){const stay=hospitalAt(patient,date);return Boolean(stay&&stay.admittedDate<date);}
+export function assertHospital114(patient,date,items){if(items.some(i=>i.code==='00114')&&hospitalBlocks114(patient,date))throw new Error('114 is blocked after admission day while this patient is in hospital. Record the return date or correct the hospital dates. 14077 remains available.');}
 export function updateHospitalStay(raw,key,{id=null,admittedDate,returnedDate=null},asOf){
   if(!validDate(asOf)||!validDate(admittedDate)||admittedDate>asOf||(returnedDate&&(!validDate(returnedDate)||returnedDate>asOf)))throw new Error('Enter actual hospital dates, not future dates.');
   const next=structuredClone(raw),matches=['patients','otherPatients','removedPatients'].flatMap(c=>(next[c]||[]).filter(p=>('phn:'+String(p.phn||'').replace(/\D/g,''))===key));

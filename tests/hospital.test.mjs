@@ -28,7 +28,18 @@ test('hospital status follows service date with inclusive admission and exclusiv
   assert.equal(hospitalAt(returned,prior),null);assert.ok(hospitalAt(returned,admitted));assert.ok(hospitalAt(returned,addDays(date,-1)));assert.equal(hospitalAt(returned,date),null);
   const sameDay={...p(),hospitalStays:[{id:'day',admittedDate:date,returnedDate:date}]};assert.equal(hospitalAt(sameDay,date),null);
 });
-test('114 is hard blocked while 14077 remains valid and its duration checks remain',()=>{
+test('admission day allows manual 114 but stays flagged and excluded from routine rounds',()=>{
+  const patient=normalizeRoster(admittedRoster()).patients[0],l=bill();
+  for(const fn of [upsertEntry,upsertInteractiveEntry]){
+    const next=fn(l,patient,admitted,[{code:'00114',units:1,reason:'Seen before transfer',diagnosis:'401'}]);
+    assert.doesNotMatch(entryIssues(next.entries[0],next,patient).join(' '),/in hospital/);
+  }
+  assert.ok(hospitalAt(patient,admitted));
+  assert.equal(routineCandidates(l,[patient],admitted)[0].status,'hospital');
+  assert.throws(()=>addRoutineBatch(l,[patient],admitted,[key]),/not eligible/);
+  assert.throws(()=>upsertEntry(l,patient,addDays(admitted,1),[{code:'00114',units:1,reason:'Review'}]),/114 is blocked/);
+});
+test('114 is hard blocked after admission day while 14077 remains valid and its duration checks remain',()=>{
   const patient=normalizeRoster(admittedRoster()).patients[0],l=bill();
   for(const fn of [upsertEntry,upsertInteractiveEntry])assert.throws(()=>fn(l,patient,date,[{code:'00114',units:1,reason:'Early visit reason'}]),/114 is blocked/);
   const next=upsertInteractiveEntry(l,patient,date,[{code:'14077',units:1,start:'10:00',end:'10:10',diagnosis:'401'}]);

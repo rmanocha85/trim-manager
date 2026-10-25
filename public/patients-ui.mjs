@@ -1,6 +1,6 @@
-import {updateHospitalStay} from './hospital.mjs?v=20261024-hospital1';
-import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital1';
-import * as TrimRoster from './patients-core.mjs?v=20261024-hospital1';
+import {updateHospitalStay} from './hospital.mjs?v=20261024-hospital2';
+import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
+import * as TrimRoster from './patients-core.mjs?v=20261024-hospital2';
 import {avaChartUrl} from './patient-links.mjs';
 import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
@@ -29,7 +29,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261024-hospital1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261024-hospital2');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   root.append(style);const content=document.createElement('div');content.innerHTML=html;root.append(content);

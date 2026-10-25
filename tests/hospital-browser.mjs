@@ -17,7 +17,9 @@ const save=async()=>{await page.waitForFunction(()=>!document.querySelector('#sy
 try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('.patient').waitFor();await saved();await page.locator('.patient').click();
   assert.equal(await page.locator('#hospital-dialog').isVisible(),false);assert.equal(await page.locator('#editor .hospital-banner').count(),0);
-  await page.locator('.hospital-menu summary').click();await page.locator('[data-hospital-new]').click();await page.locator('#hospital-admitted').fill(addDays(date,-2));await page.locator('#hospital-form [type=submit]').click();
+  await page.locator('.hospital-menu summary').click();await page.locator('[data-hospital-new]').click();await page.locator('#hospital-admitted').fill(date);await page.locator('#hospital-form [type=submit]').click();
+  await page.locator('#editor .hospital-flag').waitFor();assert.equal(await page.locator('[data-code="00114"]').isEnabled(),true);assert.match(await page.locator('.hospital-banner').innerText(),/Admission day: manual 114 available/);await save();
+  await page.locator('.hospital-menu summary').click();await page.locator('[data-hospital-edit]').click();await page.locator('#hospital-admitted').fill(addDays(date,-2));await page.locator('#hospital-form [type=submit]').click();
   await page.locator('#editor .hospital-flag').waitFor();assert.equal(await page.locator('[data-code="00114"]').isDisabled(),true);assert.equal(await page.locator('[data-code="14077"]').isEnabled(),true);
   assert.equal(JSON.parse(await readFile(billingPath,'utf8')).entries.length,0);await save();
   let stored=JSON.parse(await readFile(rosterPath,'utf8'));assert.equal(stored.patients[0].hospitalStays[0].admittedDate,addDays(date,-2));assert.equal(stored.patients[0].hospitalStays[0].returnedDate,null);
