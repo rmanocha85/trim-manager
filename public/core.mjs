@@ -1,3 +1,4 @@
+import {validateHospitalStays,hospitalAt,latestHospitalReturn,assertHospital114} from './hospital.mjs?v=20261024-hospital1';
 export const SCHEMA = 1;
 export const APP = 'trim-billing';
 export const RESET_CODES = ['00114','00115','00127'];
@@ -91,8 +92,9 @@ export function normalizeRoster(raw) {
    const seen=new Set();
    return records.map(p=>{
     if(!p.id||!p.name) throw new Error('Roster contains an incomplete identity.');
+    validateHospitalStays(p);
     const key=patientKey(p); if(seen.has(key)) throw new Error('Duplicate patient identity in roster; source must be reviewed.');seen.add(key);
-    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel,...(validDate(p.panelAddedDate)?{panelAddedDate:p.panelAddedDate,newPanelPatient:p.newPanelPatient===true}:{})};
+    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel,...(p.hospitalStays?{hospitalStays:clone(p.hospitalStays)}:{}),...(validDate(p.panelAddedDate)?{panelAddedDate:p.panelAddedDate,newPanelPatient:p.newPanelPatient===true}:{})};
    });
   };
   return {patients:normalizePatients(raw.patients,true),otherPatients:normalizePatients(raw.otherPatients||[],false),units:raw.units.map(u=>({id:String(u.id),name:String(u.name),floor:u.floor??''}))};
@@ -162,9 +164,17 @@ export function lastBilling(ledger,key,asOf='9999-12-31',resetOnly=false,exclude
   const base=ledger.baselines[key];if(base?.date<=asOf) dates.push(base.date);
   return dates.sort().at(-1)||null;
 }
+export function isPostHospitalReview(ledger,patient,date){
+  const returned=latestHospitalReturn(patient,date),prior=lastBilling(ledger,patient.key,addDays(date,-1),true);
+  return Boolean(returned&&!hospitalAt(patient,date)&&(!prior||prior<returned));
+}
 export function dueState(ledger,patient,date=today()) {
+  const hospital=hospitalAt(patient,date);
+  if(hospital)return {label:'In hospital · 114 blocked',kind:'hospital',last:lastBilling(ledger,patient.key,date,true),hospital};
   if(!patient.panel) return {label:'Ad hoc only',kind:'adhoc',last:lastBilling(ledger,patient.key,date)};
   const last=lastBilling(ledger,patient.key,date,true);
+  const returned=latestHospitalReturn(patient,date);
+  if(returned&&(!last||last<returned))return {last,due:returned,kind:'due',postHospitalReview:true,label:'Post hospital review due'};
   // Existing saved calendar plans are readable but no longer delay a new patient.
   const added=ledger.newPatientStarts?.[patient.key]?.addedDate||
     (patient.newPanelPatient?patient.panelAddedDate:null)||ledger.routineStarts?.[patient.key]?.admissionDate;
@@ -201,6 +211,7 @@ export function setFirstRoutineReview(ledger,patient,admissionDate,firstRoutineD
 export function upsertEntry(ledger,patient,date,items,comment='',id=null) {
   if(!validDate(date)||date>today()) throw new Error('Choose a valid service date, not a future date.');
   if(!items.length) throw new Error('Select at least one code.');
+  assertHospital114(patient,date,items);
   if(ledger.historicalBillings?.some(h=>h.patientKey===patient.key&&h.date===date))throw new Error('This patient/date is already billed in imported history. It cannot be added to pending billing.');
   const l=clone(ledger);const existing=id?l.entries.find(e=>e.id===id):l.entries.find(e=>e.patientKey===patient.key&&e.date===date);
   if(id&&!existing) throw new Error('Entry no longer exists. Reload before editing.');
@@ -270,6 +281,7 @@ export function batchEntries(ledger,from,to) {return ledger.entries.filter(e=>!e
 export function entryIssues(entry,ledger,patient) {
   const errors=[]; const required=(ok,msg)=>{if(!ok)errors.push(msg);};
   const codes=entry.items.map(i=>i.code); const all=ledger.entries;
+  if(codes.includes('00114')&&hospitalAt(patient,entry.date))errors.push('00114: patient was in hospital on this date. Correct the dates or remove this charge; 14077 is still allowed.');
   if(entry.date>today()) errors.push('Future service date.');
   if(new Set(codes).size!==codes.length) errors.push('Duplicate code on the same entry.');
   for(const i of entry.items) {
@@ -303,7 +315,8 @@ export function entryIssues(entry,ledger,patient) {
     if(i.code==='13115') required(!all.some(e=>e.id!==entry.id&&e.patientKey===entry.patientKey&&e.items.some(x=>x.code==='13115'))&&!(ledger.historicalBillings||[]).some(h=>h.patientKey===entry.patientKey&&h.codes.includes('13115')),prefix+'another admission charge is already recorded.');
     if(i.code==='00114') {
       const prior=lastBilling(ledger,entry.patientKey,entry.date,true,entry.id);
-      if(prior&&daysBetween(prior,entry.date)<14) required(Boolean(i.reason?.trim()),prefix+'within 14 days of recorded billing; explanatory claim note required.');
+      const returned=latestHospitalReturn(patient,entry.date);
+      if(prior&&(!returned||prior>=returned)&&daysBetween(prior,entry.date)<14) required(Boolean(i.reason?.trim()),prefix+'within 14 days of recorded billing; explanatory claim note required.');
     }
     if(i.code==='00115'&&i.requestAt&&minutes(i.start)!==null) {
       const gap=(Date.parse(`${entry.date}T${i.start}`)-Date.parse(i.requestAt))/3600000;

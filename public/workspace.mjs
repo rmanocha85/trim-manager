@@ -1,5 +1,5 @@
 // Pure workspace helpers. No patient data or network access.
-import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261015-immediate1';
+import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261024-hospital1';
 
 // Display confirmed identity corrections as one history without rewriting records.
 // Names alone never establish identity; different recorded PHNs stay separate.
@@ -38,7 +38,7 @@ export function routineCandidates(ledger,patients,date){
     const state=dueState(ledger,patient,date),diagnoses=String(patient.codes||'').trim().split(/[,;\s]+/).filter(Boolean);
     const already=[...ledger.entries,...(ledger.historicalBillings||[])].some(e=>e.patientKey===patient.key&&e.date===date);
     const problem=state.kind==='unknown'?'Starting billing history unknown':!diagnoses.length?'Usual ICD-9 missing':!diagnoses.every(validDiagnosis)?'Usual ICD-9 needs review':'';
-    return {patient,last:state.last,diagnosis:diagnoses[0]||'',usualCodes:diagnoses.join(', '),status:already?'billed':problem?'review':state.kind==='due'?'due':'later',reason:already?'Already billed on this date':problem||state.label};
+    return {patient,last:state.last,diagnosis:diagnoses[0]||'',usualCodes:diagnoses.join(', '),status:state.kind==='hospital'?'hospital':already?'billed':problem?'review':state.kind==='due'?'due':'later',reason:state.kind==='hospital'?state.label:already?'Already billed on this date':problem||state.label};
   });
 }
 export function addRoutineBatch(ledger,patients,date,keys){

@@ -1,5 +1,5 @@
-import {billingUI} from './billing-ui.mjs?v=20261022-fixes2';
-import {patientsUI} from './patients-ui.mjs?v=20261022-fixes1';
+import {billingUI} from './billing-ui.mjs?v=20261024-hospital1';
+import {patientsUI} from './patients-ui.mjs?v=20261024-hospital1';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
@@ -56,7 +56,7 @@ async function saveSession(){try{await session.save();billing.notify('');}catch(
 async function start(){
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onRoster:raw=>billing?.setRoster(raw)});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs?v=20261022-fixes1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  notes=laptop?(await import('./notes-ui.mjs?v=20261024-hospital1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
   session=new Session([
     {name:'Patients',state:patients.state,save:patients.save},

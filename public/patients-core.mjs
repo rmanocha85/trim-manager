@@ -1,4 +1,5 @@
 
+import {validateHospitalStays} from './hospital.mjs?v=20261024-hospital1';
   const digits=value=>String(value??'').replace(/\D/g,'');
 export function today(now=new Date()){
     const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
@@ -24,6 +25,7 @@ export function validate(raw){
     const seen={id:new Set(),phn:new Set(),ava:new Set()};
     for(const p of [...raw.patients,...(raw.removedPatients||[]),...(raw.otherPatients||[])]){
       if(!p||['id','name'].some(k=>!Object.hasOwn(p,k))||!String(p.id)||!String(p.name))throw new Error('Incomplete roster identity.');
+      validateHospitalStays(p);
       for(const key of ['id','phn','ava']){
         const value=key==='id'?String(p[key]):digits(p[key]);
         if(!value)continue;

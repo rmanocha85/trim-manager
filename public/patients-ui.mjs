@@ -1,4 +1,6 @@
-import * as TrimRoster from './patients-core.mjs';
+import {updateHospitalStay} from './hospital.mjs?v=20261024-hospital1';
+import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital1';
+import * as TrimRoster from './patients-core.mjs?v=20261024-hospital1';
 import {avaChartUrl} from './patient-links.mjs';
 import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
@@ -27,7 +29,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261022-fixes1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261024-hospital1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   root.append(style);const content=document.createElement('div');content.innerHTML=html;root.append(content);
@@ -127,7 +129,14 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
       if(type!=='click'&&ready&&!inHistoryView&&isForm(event.target))void persist().catch(()=>{});
     }catch(e){setSS(e.message,false);alert(e.message);}
   });
-  const api={connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
+  async function setHospitalStay(key,fields,expected){
+    if(!ready||inHistoryView||writeBlocked||saving||refreshing||localError||hasForm())throw new Error('Finish or resolve the current Patient edit before changing hospital dates.');
+    await serial;
+    const raw=liveRoster(),p=['patients','otherPatients','removedPatients'].flatMap(c=>raw[c]||[]).find(p=>'phn:'+String(p.phn||'').replace(/\D/g,'')===key);
+    if(!p||JSON.stringify(p.hospitalStays||[])!==expected)throw new Error('Hospital dates changed. Reopen the hospital form before saving.');
+    applyRoster(updateHospitalStay(raw,key,fields,TrimRoster.today()));await stageRoster();render();updateStatus();
+  }
+  const api={setHospitalStay,connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
 
 // ── TABS ──
 function showTab(name,btn){
@@ -419,7 +428,7 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}</div>
+                  <div class="pnm">${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}${hospitalFlag(p,TrimRoster.today())}</div>${hospitalSummary(p,TrimRoster.today())}
                   <div class="patient-meta"><span class="pphn">${phnWithCopy(p.phn,'')}</span>${notesUploadControl(p,'patients')}</div>
                 </td>
                 <td><span class="pphn">${phnWithCopy(p.phn)}</span></td>
@@ -513,7 +522,7 @@ function renderOtherPatients(){
     const key='other-'+index;
     return `<div class="usec"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name</th><th style="width:160px">PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
       const ava=String(p.ava||'');const url=avaChartUrl(p);
-      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}</div><div class="patient-meta"><span class="pphn">${phnWithCopy(p.phn,'')}</span>${notesUploadControl(p,'otherPatients')}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
+      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}${hospitalFlag(p,TrimRoster.today())}</div>${hospitalSummary(p,TrimRoster.today())}<div class="patient-meta"><span class="pphn">${phnWithCopy(p.phn,'')}</span>${notesUploadControl(p,'otherPatients')}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
     }).join('')}</tbody></table></div></div>`;
   }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
   list.querySelectorAll('[data-other-doctor]').forEach(el=>el.addEventListener('change',()=>setOtherDoctor(el.dataset.otherDoctor,el.value)));
