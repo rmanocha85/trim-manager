@@ -1,5 +1,5 @@
-import {billingUI} from './billing-ui.mjs?v=20261024-hospital2';
-import {patientsUI} from './patients-ui.mjs?v=20261024-hospital2';
+import {billingUI} from './billing-ui.mjs?v=20261029-roster-ui1';
+import {patientsUI} from './patients-ui.mjs?v=20261029-roster-ui1';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
@@ -15,10 +15,10 @@ function showSection(value){
     const group=['rounds','notes'].includes(b.dataset.tab)?'notes':b.dataset.tab==='settings'?'settings':'billing';
     b.hidden=group!==value;
   });
-  $('calendar').hidden=value==='settings'||value==='notes'&&!laptopRuntime();
-  $('header-billing-date').hidden=['patients','settings'].includes(value)||value==='notes'&&!laptopRuntime();
+  const history=value==='billing'&&lastTab.billing==='history';
+  $('calendar').hidden=history||value==='settings'||value==='notes'&&!laptopRuntime();
+  $('header-billing-date').hidden=history||['patients','settings'].includes(value)||value==='notes'&&!laptopRuntime();
   $('header-billing-date').querySelector('small').textContent=value==='notes'?'Visit date':'Billing for';
-  document.querySelector('.version').hidden=value!=='billing';
 }
 function navigate(tab){
   const group=['rounds','notes'].includes(tab)?'notes':tab==='settings'?'settings':'billing';
@@ -59,11 +59,11 @@ async function start(){
   notes=laptop?(await import('./notes-ui.mjs?v=20261024-hospital2')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
   session=new Session([
-    {name:'Patients',state:patients.state,save:patients.save},
+    {name:'Roster',state:patients.state,save:patients.save},
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
-  const latest=document.createElement('button');latest.id='load-latest';latest.textContent='Load latest changes';$('drive-connection').after(latest);
+  const latest=document.createElement('button');latest.id='load-latest';latest.className='save-control';latest.textContent='Load latest changes';$('drive-connection').after(latest);
   latest.onclick=async()=>{try{session.message='';await billing.loadLatest();}catch(e){billing.notify(e.message);}finally{status();}};
   const patientReview=document.createElement('div');patientReview.className='actions';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
   $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};

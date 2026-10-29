@@ -136,20 +136,7 @@ header h1{font-family:var(--mono);font-size:13px;font-weight:500;letter-spacing:
 .ptbl tr:last-child td{border-bottom:none}
 .ptbl tr:hover td{background:#faf9f7}
 .pnm{font-weight:500;display:flex;align-items:center;gap:5px}.pnm a{color:var(--text);text-decoration:none;font-weight:500}.pnm a:hover{color:var(--accent);text-decoration:underline}
-.patient-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
-.notes-upload{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:0 0 144px;width:144px;min-height:30px;padding:5px 12px;border:1px solid #e1e5de;border-radius:6px;background:#f5f6f2;color:#626e5c;font:11px var(--sans);white-space:nowrap;cursor:pointer}
-.notes-upload[aria-pressed=true]{background:#eaf3e9;color:var(--accent);border-color:#c9ddc7}
-.notes-upload[aria-pressed=false]{width:30px;flex-basis:30px;padding:5px;background:transparent;border-color:transparent}
-.notes-upload:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.notes-upload:hover:not(:disabled){border-color:var(--accent)}
-.notes-upload-icon{display:flex}.notes-upload-icon svg{width:13px;height:13px}
-.notes-upload-dot{position:absolute;width:6px;height:6px;border-radius:50%;background:#b17d20;right:5px;top:5px;display:none}
-.notes-upload[data-dirty=true] .notes-upload-dot{display:block}
-.notes-upload .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-@media(pointer:coarse){.notes-upload{min-height:44px}}
 
-.notes-upload:disabled{cursor:not-allowed;opacity:.65}
-.notes-upload-help{font-size:12px;color:var(--muted);margin:0 0 12px}
 .usec>[id^=ub-]{overflow-x:auto}
 @media(max-width:760px){
   header{height:auto;padding:14px 16px;flex-wrap:wrap;gap:12px}
@@ -350,3 +337,6 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
 .roster-versions pre{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:600px){.roster-versions{grid-template-columns:1fr}}
 .hospital-flag{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;margin-left:7px;padding:0 5px;vertical-align:middle;border:1px solid #d7a03c;border-radius:5px;background:#ffe6ae;color:#684100;font-size:13px;font-weight:700;line-height:1}.hospital-dates{display:block;font-size:12px;color:#785b26;margin:5px 0}
+
+/* Compact roster: identifiers have their own column; hospital dates stay beside the name. */
+.ptbl td{padding:4px 10px;vertical-align:middle}.ptbl .pnm{min-height:28px;flex-wrap:nowrap;white-space:nowrap}.ptbl .hospital-dates{display:inline;font-size:11px;margin:0 0 0 4px;white-space:nowrap;font-weight:400}.ptbl .hospital-flag{height:20px;min-width:20px;font-size:12px;flex-shrink:0;margin-left:3px}.ptbl .btn-sm{min-height:28px;padding:3px 8px}.ptbl .sel{min-height:28px;padding:3px 7px}.uhdr{padding:7px 12px}

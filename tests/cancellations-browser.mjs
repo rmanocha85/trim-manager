@@ -44,9 +44,8 @@ try{
  assert.equal(await card('14077').locator('[data-field=end]').inputValue(),'18:40');
  assert.equal(await card('14077').locator('.inline-time').filter({has:page.locator('[data-field=end]')}).locator('[data-wheel=minute]').inputValue(),'40');
  await draft();assert.equal(writes,0);
- await page.locator('#local-changes').click();assert.equal(await page.locator('#changes-list [data-cancel-code]').count(),4);
- await page.locator('#changes-list [data-cancel-code="13121"]').click();assert.equal(await page.locator('#changes-list [data-cancel-code]').count(),3);
- await page.locator('#changes-list [data-undo-cancel]').click();assert.equal(await page.locator('#changes-list [data-cancel-code]').count(),4);
+ await page.locator('#local-changes').click();assert.equal(await page.locator('#changes-list [data-cancel-code],#changes-list [data-cancel-entry],#changes-list .saved-drive-history').count(),0);
+ assert.match(await page.locator('#changes-list').innerText(),/114/);assert.match(await page.locator('#changes-list').innerText(),/13121/);assert.equal(await page.locator('#changes-discard').innerText(),'Discard local billing changes');
  await page.screenshot({path:'work/cancel-code-review.png'});
  await page.locator('#changes-dialog').getByRole('button',{name:'Close',exact:true}).click();await save();
  assert.equal(cloud.entries[0].items.length,4);assert.equal(cloud.entries[0].items.find(i=>i.code==='13121').diagnosis,'485');
@@ -65,7 +64,7 @@ try{
  await context.setOffline(true);assert.equal(await page.locator('[data-history-code]').first().isEnabled(),false);await context.setOffline(false);
  await page.locator('[data-history]').first().click();
  await card('14077').locator('[data-remove-code]').click();await draft();assert.equal(cloud.entries[0].items.length,4);
-await page.locator('#local-changes').click();assert.equal(await page.locator('#changes-list [data-cancel-code]').count(),3);assert.match(await page.locator('#changes-list').innerText(),/Before local changes/);
+await page.locator('#local-changes').click();assert.equal(await page.locator('#changes-list [data-cancel-code]').count(),0);assert.match(await page.locator('#changes-list').innerText(),/Before local changes/);
  await page.locator('#changes-dialog').getByRole('button',{name:'Close',exact:true}).click();await save();assert.equal(cloud.entries[0].items.some(i=>i.code==='14077'),false);
  // Removing a qualifying visit also removes its now-orphaned bonus, not conference.
  await card('00114').locator('[data-remove-code]').click();assert.equal(await page.locator('.code-details').count(),1);assert.equal(await card('13121').count(),1);

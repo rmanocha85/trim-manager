@@ -1,7 +1,7 @@
 
 
 <header>
-  <h1 id="app-title">TRIM Patients</h1>
+  <h1 id="app-title">Roster</h1>
   <div class="hdr-right">
     <span class="save-status" id="ss">Loading…</span>
     <button class="btn btn-sm" id="btn-connect" data-state="error" data-click="gConnect()" aria-live="polite" title="Reload the saved roster after reviewing any local changes">Reload saved roster</button>
@@ -41,7 +41,6 @@
       <button class="btn btn-green" data-click="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
     </div>
   </div>
-  <p class="notes-upload-help"><strong id="notes-upload-count"></strong> Use the Notes status beside the PHN after adding documents to Incoming. An amber dot means the status change is waiting for Save to Drive.</p>
   <div id="ulist"></div>
 </div>
 
@@ -56,7 +55,6 @@
       <div class="fgrp" style="flex:1;min-width:220px"><label class="flbl" for="other-doctor-filter">Doctor</label><select class="sel" id="other-doctor-filter" data-change="renderOtherPatients()"><option value="">All doctors</option><option value="__unassigned">Unassigned</option></select></div>
     </div>
   </div>
-  <p class="notes-upload-help"><strong id="other-notes-upload-count"></strong> Use the Notes status beside the PHN after adding documents to Incoming. An amber dot means the status change is waiting for Save to Drive.</p>
   <div id="other-list"></div>
 </div>
 

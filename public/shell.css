@@ -57,3 +57,25 @@
 .hospital-flag{display:inline-flex;align-items:center;justify-content:center;min-width:23px;height:23px;margin-left:7px;padding:0 5px;vertical-align:middle;border:1px solid #d7a03c;border-radius:5px;background:#ffe6ae;color:#684100;font-size:13px;font-weight:700;line-height:1}
 .hospital-dates{display:block;font-size:12px;color:#785b26;margin:5px 0}
 .hospital-banner{margin:14px 0;padding:14px;background:#fff3d9;border:1px solid #e7d4ac;border-radius:8px}.hospital-banner p{margin:6px 0 12px}.hospital-menu{position:relative;margin-left:auto}.hospital-menu summary{cursor:pointer;white-space:nowrap}.hospital-menu>div{position:absolute;right:0;top:100%;z-index:5;min-width:215px;background:white;border:1px solid #d9ded6;border-radius:8px;padding:6px;box-shadow:0 6px 18px #0002}.hospital-menu button{display:block;width:100%;text-align:left}.post-hospital-title{margin:12px 0;color:#365c40}#hospital-dialog{max-width:min(550px,95vw)}#hospital-error{color:#9c3131}
+
+/* Shared header: one control height, with the save caption below the entire row. */
+:root{--billing-header-height:80px}
+#workspace>header{grid-template-areas:"sections date actions";grid-template-columns:auto minmax(0,1fr) auto;gap:16px;padding:8px 16px}
+#workspace>header .header-actions{display:grid;grid-template-columns:repeat(4,120px) 50px 90px;gap:4px 6px;align-items:center;justify-content:end}
+#workspace>header .header-actions .session-save{display:contents}
+#workspace>header .header-actions button,#workspace>header .header-actions .save-control{height:40px;min-height:40px;width:100%;min-width:0;padding:5px 8px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;font-size:12px;border-radius:7px}
+#workspace>header #switch-version{max-width:none;align-self:center}
+#workspace>header #saved-time{grid-column:1/-1;order:2;height:12px;line-height:12px;font-size:10px;text-align:right;white-space:nowrap}
+#workspace>header #header-billing-date{padding-left:0;border:0}
+@media(min-width:761px) and (max-width:1279px){:root{--billing-header-height:118px}#workspace>header{grid-template-areas:"sections date" "actions actions";grid-template-columns:1fr auto;gap:4px 12px}#workspace>header .app-sections{justify-self:start}#workspace>header .header-actions{grid-template-columns:repeat(4,minmax(104px,120px)) 50px 90px}#workspace>header #header-billing-date{justify-self:end}}
+@media(max-width:760px){#workspace>header{grid-template-areas:"sections" "date" "actions";grid-template-columns:minmax(0,1fr);gap:8px;padding:12px 14px;height:auto}#workspace>header .app-sections{justify-content:flex-start}#workspace>header .header-actions{grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:6px}#workspace>header #saved-time{text-align:left;height:auto;white-space:normal}#workspace>header #header-billing-date{padding:0}}
+
+/* History has its own always-visible date browser, independent of the service date. */
+.history-date-filter{display:grid;grid-template-columns:minmax(230px,310px) minmax(0,1fr);align-items:center;gap:24px;padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+#history-calendar{min-width:0}.history-date-actions .actions{margin:12px 0}.history-date-actions p:last-child{margin:0}
+#history-calendar .calendar-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+#history-calendar .calendar-heading button{height:32px;width:32px;padding:0;font-size:22px}
+#history-calendar .calendar-days button{min-height:36px;font-size:13px}
+#history-calendar .calendar-days button[aria-pressed=true],#history-date-clear[aria-pressed=true]{background:var(--green);color:white;border-color:var(--green)}
+#history-calendar .calendar-days button.has-billing:after{background:currentColor}
+@media(max-width:600px){.history-date-filter{grid-template-columns:1fr;padding:14px;gap:14px}#history-calendar{max-width:360px;width:100%}}

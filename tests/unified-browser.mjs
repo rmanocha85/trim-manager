@@ -27,20 +27,20 @@ try{
  await section('patients');assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),1);await p('#ulist a[href="https://www.avaemr.ca/patients/123456"]').first().waitFor();
  await p('[data-click="printTrim()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();assert.equal(await page.frameLocator('#patients-print-frame').getByText('SYNTHETIC, Retained',{exact:true}).count(),0);await page.locator('#patients-print-close').click();
  await p('[data-click="printBilling()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();await page.locator('#patients-print-close').click();
- await editRoom('102');await p('[data-notes-upload="own"]').click();await localReady();
+ await editRoom('102');
  await p('[data-click="showTab(\'other-patients\',this)"]').click();await p('[data-other-doctor="other"]').selectOption('Dr. Celine Laferriere');await localReady();
- await p('[data-notes-upload="other"]').click();await localReady();assert.equal(await readFile(rosterPath,'utf8'),originalRoster);
+ assert.equal(await readFile(rosterPath,'utf8'),originalRoster);
  await section('notes');await page.locator('#notes-input').fill('Synthetic local note.');await page.locator('#notes-confirm').click();await page.locator('[data-tab="notes"]').click();await page.locator('[data-assessment]').fill('Synthetic physician-reviewed assessment.');await page.locator('[data-reviewed]').click();await page.locator('#notes-handoff').click();await page.locator('#notes-handoff-result').filter({hasText:'prepared locally'}).waitFor();
  await section('billing');await page.locator('.patient').filter({hasText:person.name}).click();await page.locator('[data-code="00114"]').click();await page.locator('[data-reason-preset="0"]').click();await localReady();
  await assert.rejects(access(path.join(notesPath,'patient-context.json')));assert.equal(await readFile(billingPath,'utf8'),originalBilling);
  // Patient selection is independent: opening Patients does not replace Billing's selection.
  await section('patients');await page.screenshot({path:'work/unified-patients-synthetic.png',fullPage:true});await section('billing');assert.match(await page.locator('#editor h2').innerText(),/Panel/);
- await page.reload();await page.locator('.patient').first().waitFor();await localReady();assert.match(await page.locator('#local-changes').innerText(),/Patients, Notes, Billing pending/);
- await section('patients');assert.match(await p('#ulist').innerText(),/102/);assert.equal(await p('[data-notes-upload="own"]').getAttribute('aria-pressed'),'true');
+ await page.reload();await page.locator('.patient').first().waitFor();await localReady();assert.match(await page.locator('#local-changes').innerText(),/Roster, Notes, Billing pending/);
+ await section('patients');assert.match(await p('#ulist').innerText(),/102/);assert.equal(await p('[data-notes-upload]').count(),0);
  await p('[data-click="showTab(\'other-patients\',this)"]').click();assert.equal(await p('[data-other-doctor="other"]').inputValue(),'Dr. Celine Laferriere');
  // Roster succeeds, Notes fails, Billing remains local. The failure must say exactly that.
  let fail=true;await page.route('**/api/notes/document?*',async route=>{if(fail&&route.request().method()==='PUT')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic notes save unavailable'})});return route.continue();});
- await page.locator('#sync').click();await page.locator('#session-status').filter({hasText:'Patients saved.'}).waitFor();assert.match(await page.locator('#session-status').innerText(),/Remaining changes stay on this device/);
+ await page.locator('#sync').click();await page.locator('#session-status').filter({hasText:'Roster saved.'}).waitFor();assert.match(await page.locator('#session-status').innerText(),/Remaining changes stay on this device/);
  const partial=await readRoster();assert.equal(partial.patients[0].room,'102');assert.deepEqual(partial.unrelated,roster.unrelated);assert.deepEqual(partial.patients[0].extra,person.extra);assert.equal(partial.otherPatients[0].doctor,'Dr. Celine Laferriere');assert.equal(partial.removedPatients.length,1);assert.deepEqual(partial.billingDates,roster.billingDates);assert.equal(await readFile(billingPath,'utf8'),originalBilling);
  const snapshot=(await readdir(path.join(dir,'roster-snapshots')))[0];assert.equal(JSON.parse(await readFile(path.join(dir,'roster-snapshots',snapshot),'utf8')).patients[0].room,'101');
  fail=false;await page.reload();await page.locator('.patient').first().waitFor();await localReady();await page.locator('#sync').click();await saved();
@@ -52,7 +52,7 @@ try{
  // Removal is local until save, retains the entire identity, and can reactivate that same ID.
  await p('[data-click="promptDel(\'own\')"]').click();await p('[data-click="confirmDel()"]').click();await localReady();assert.equal((await readRoster()).patients.length,1);await page.locator('#sync').click();await saved();assert.equal((await readRoster()).patients.length,0);
  for(const [id,value]of Object.entries({'in-name':person.name,'in-phn':person.phn,'in-room':'105','in-codes':person.codes,'in-ava':person.ava}))await p('#'+id).fill(value);await p('#in-unit').selectOption('cedar');await p('[data-click="addPatient()"]').click();await localReady();await page.locator('#sync').click();await saved();const restored=await readRoster();assert.equal(restored.patients[0].id,'own');assert.deepEqual(restored.patients[0].extra,person.extra);assert.equal(restored.patients[0].newPanelPatient,false);assert.equal(restored.removedPatients.length,1);
- await p('[data-click="showTab(\'history\',this)"]').click();await p('#snapshot-list button').first().click();await p('#history-banner').waitFor({state:'visible'});assert.equal(await p('[data-notes-upload="own"]').isDisabled(),true);assert.match(await p('#ulist').innerText(),/101/);await p('[data-click="exitHistoryView()"]').click();assert.match(await p('#ulist').innerText(),/105/);
+ await p('[data-click="showTab(\'history\',this)"]').click();await p('#snapshot-list button').first().click();await p('#history-banner').waitFor({state:'visible'});assert.equal(await p('#ulist .needs-connect').first().evaluate(e=>getComputedStyle(e).pointerEvents),'none');assert.match(await p('#ulist').innerText(),/101/);await p('[data-click="exitHistoryView()"]').click();assert.match(await p('#ulist').innerText(),/105/);
  await section('settings');assert.equal(await page.locator('#starting-dates').evaluate(e=>e.open),false);await page.screenshot({path:'work/unified-settings-synthetic.png',fullPage:true});
  // Laptop backups support preview and full restore with a safety copy.
  await page.locator('#backup-state').filter({hasText:'Drive-folder backup verified'}).waitFor();
