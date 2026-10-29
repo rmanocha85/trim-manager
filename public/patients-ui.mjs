@@ -29,7 +29,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261029-roster-ui1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261029-roster-phn1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   root.append(style);const content=document.createElement('div');content.innerHTML=html;root.append(content);
@@ -403,23 +403,21 @@ function renderUList(){
         <table class="ptbl">
           <thead><tr>
             <th>Room</th>
-            <th>Name</th>
-            <th style="width:130px">PHN</th>
+            <th>Name / PHN</th>
             <th style="width:80px">AVA #</th>
             <th style="width:120px">ICD Codes</th>
             <th style="width:110px">Actions</th>
           </tr></thead>
           <tbody>
-            ${pts.length===0?`<tr><td colspan="6" style="color:var(--muted);font-style:italic;text-align:center;padding:14px">No patients</td></tr>`:''}
+            ${pts.length===0?`<tr><td colspan="5" style="color:var(--muted);font-style:italic;text-align:center;padding:14px">No patients</td></tr>`:''}
             ${pts.map(p=>editId===p.id?`
               <tr>
                 <td><input class="einp" id="er-${esc(p.id)}" value="${esc(p.room)}" style="width:64px"/></td>
-                <td><div class="edit-name-wrap"><input class="einp" id="en-${esc(p.id)}" value="${esc(p.name)}"/><label class="p-toggle"><input id="epf-${esc(p.id)}" type="checkbox"${p.pFlag?' checked':''}/><span>P</span></label></div></td>
-                <td>
-                  <input class="einp" id="ep-${esc(p.id)}" value="${esc(p.phn||'')}"/>
+                <td><div class="edit-name-wrap"><input class="einp" id="en-${esc(p.id)}" value="${esc(p.name)}"/><label class="p-toggle"><input id="epf-${esc(p.id)}" type="checkbox"${p.pFlag?' checked':''}/><span>P</span></label></div><div class="edit-phn-wrap">
+                  <input class="einp" id="ep-${esc(p.id)}" value="${esc(p.phn||'')}" aria-label="PHN"/>
                   <select class="sel" id="eu-${esc(p.id)}" style="font-size:11px;padding:3px 5px;margin-top:3px">
                     ${state.units.map(u=>`<option value="${esc(u.id)}"${u.id===p.unit?' selected':''}>${esc(u.name)}</option>`).join('')}
-                  </select>
+                  </select></div>
                 </td>
                 <td><input class="einp" id="ea-${esc(p.id)}" value="${esc(p.ava||'')}" placeholder="AVA #"/></td>
                 <td><input class="einp" id="ec-${esc(p.id)}" value="${esc(p.codes||'')}"/></td>
@@ -428,9 +426,8 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div>
+                  <div class="pnm">${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div>
                 </td>
-                <td><span class="pphn">${phnWithCopy(p.phn)}</span></td>
                 <td><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(p.ava||'—')}</span></td>
                 <td><span class="pcd">${esc(p.codes)||'<span style="color:var(--muted);font-style:italic">—</span>'}</span></td>
                 <td><div class="pact"><button class="btn btn-outline btn-sm needs-connect" data-click="startEdit('${esc(p.id)}')">Edit</button><button class="btn btn-danger btn-sm needs-connect" data-click="promptDel('${esc(p.id)}')">✕</button></div></td>
@@ -482,9 +479,9 @@ function renderOtherPatients(){
     const rows=pts.filter(p=>unit.id==='__unknown'?!known.has(p.unit):p.unit===unit.id).sort((a,b)=>(a.room||'').localeCompare(b.room||'',undefined,{numeric:true})||a.name.localeCompare(b.name));
     if(!rows.length)return '';
     const key='other-'+index;
-    return `<div class="usec"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name</th><th style="width:160px">PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
+    return `<div class="usec"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name / PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
       const ava=String(p.ava||'');const url=avaChartUrl(p);
-      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
+      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
     }).join('')}</tbody></table></div></div>`;
   }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
   list.querySelectorAll('[data-other-doctor]').forEach(el=>el.addEventListener('change',()=>setOtherDoctor(el.dataset.otherDoctor,el.value)));
