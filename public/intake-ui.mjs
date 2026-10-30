@@ -1,10 +1,10 @@
-import {identityHTML} from './patient-identity.mjs?v=20261030-workspace2';
-import {DriveIntake} from './intake-drive.mjs?v=20261030-workspace2';
-import {DriveNotesRepository} from './notes-storage.mjs?v=20261030-workspace2';
-import {setProfileDisplay} from './profile-display.mjs?v=20261030-workspace2';
-import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261030-workspace2';
-import {escapeHTML as esc} from './core.mjs?v=20261030-workspace2';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261030-workspace2';
+import {identityHTML} from './patient-identity.mjs?v=20261030-workspace3';
+import {DriveIntake} from './intake-drive.mjs?v=20261030-workspace3';
+import {DriveNotesRepository} from './notes-storage.mjs?v=20261030-workspace3';
+import {setProfileDisplay} from './profile-display.mjs?v=20261030-workspace3';
+import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261030-workspace3';
+import {escapeHTML as esc} from './core.mjs?v=20261030-workspace3';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261030-workspace3';
 import {laptopRuntime} from './runtime.mjs';
 const digest=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join('');
 const dataURL=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read the selected file.'));reader.readAsDataURL(file);});
@@ -15,7 +15,7 @@ export function documentIntakeUI({state,notes,onProfiles=()=>{}}){
  let localAdapter;
  const post=async(route,body)=>{let a=repo();if(a.mode!=='local'){if(!laptopRuntime())throw new Error('Open the laptop app to apply or retry analysis.');if(!localAdapter){localAdapter=new LocalAdapter();try{await localAdapter.connect();}catch(e){localAdapter=null;throw e;}}a=localAdapter;}return a.request(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
  async function local(){if(!localAdapter){localAdapter=new LocalAdapter();try{await localAdapter.connect();}catch(e){localAdapter=null;throw e;}}return localAdapter;}
- const connectButton=document.createElement('button');connectButton.id='connect-patient-records';connectButton.className='text-button';connectButton.textContent='Connect patient records';connectButton.hidden=true;document.querySelector('.header-actions').append(connectButton);
+ const connectButton=document.createElement('button');connectButton.id='connect-patient-records';connectButton.className='text-button';connectButton.textContent='Connect patient records';connectButton.hidden=true;document.querySelector('#session-status').after(connectButton);
  const permission=document.createElement('dialog');permission.id='patient-records-connection';permission.innerHTML='<div class="dialog-body"><h2>Connect patient records</h2><p>Read age and MOST from the existing patient summaries and upload documents to Routine notes / Incoming.</p><p>Google will ask for permission to see, edit, create and delete files in your Google Drive. This permission covers your whole Drive; TRIM uses it for your existing private TRIM folders.</p><p>You can use the laptop app with its existing Drive folder instead.</p><p data-records-message role="status"></p><div class="actions"><button data-records-continue class="primary">Continue to Google</button><a href="http://127.0.0.1:4317/" target="_blank" rel="noopener">Open laptop app</a><button data-records-cancel>Cancel</button></div></div>';document.body.append(permission);
  connectButton.onclick=()=>permission.showModal();permission.querySelector('[data-records-cancel]').onclick=()=>permission.close();
  permission.querySelector('[data-records-continue]').onclick=async()=>{const button=permission.querySelector('[data-records-continue]'),out=permission.querySelector('[data-records-message]');button.disabled=true;out.textContent='Connecting…';try{const a=repo();if(a.mode!=='cloud'||!a.accountEmail)throw new Error('Reconnect billing with your usual Google account first.');const candidate=new DriveAdapter(a.fileId,{rosterId:a.rosterId});candidate.accountEmail=a.accountEmail;await candidate.connect({patientRecords:true});if(state().adapter!==a)throw new Error('Workspace changed. Connect patient records again.');const checked=new DriveNotesRepository(candidate);await checked.root(false);recordsAdapter=candidate;cloud=new DriveIntake(candidate);await profiles();if(dialog.open){message('');await refresh();}out.textContent='Connected.';permission.close();}catch(e){out.textContent=e.message;}finally{button.disabled=false;}};

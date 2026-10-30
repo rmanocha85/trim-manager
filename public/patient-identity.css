@@ -5,3 +5,4 @@
 .identity-demographics{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}.identity-most{max-width:100%}
 
 .identity-copy svg{width:15px;height:15px;display:block}.history-patient-choice{display:flex;align-items:center;gap:4px}.history-patient-choice>[data-history-patient]{flex:1;min-width:0}.history-patient-choice>.identity-copy{flex:none;padding:4px!important}
+#connect-patient-records{margin:8px 16px}

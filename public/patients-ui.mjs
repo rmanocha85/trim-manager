@@ -1,4 +1,4 @@
-import {nameHTML,avaHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261030-workspace2';
+import {nameHTML,avaHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261030-workspace3';
 import {updateHospitalStay} from './hospital.mjs?v=20261024-hospital2';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
 import * as TrimRoster from './patients-core.mjs?v=20261024-hospital2';
@@ -30,10 +30,10 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261030-workspace2');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261030-workspace3');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
-  const identityCSS=await fetch('./patient-identity.css?v=20261030-workspace2').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
+  const identityCSS=await fetch('./patient-identity.css?v=20261030-workspace3').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
   let rosterDocument=null,loadedRosterJSON=null,repository,etag,key,ready=false,dirty=false,writeBlocked=false,pendingSaves=0,saving=false,localError='',message='',serial=Promise.resolve();
@@ -115,7 +115,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     if(!ready||saving||writeBlocked)throw new Error('Resolve the roster operation before printing.');
     const dialog=document.getElementById('patients-print-dialog');
     document.getElementById('patients-print-title').textContent=title;
-    document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261030-workspace2',location.href).href+'"><style>body{background:white}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
+    document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261030-workspace3',location.href).href+'"><style>body{background:white}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
     dialog.showModal();
   }
   const actions={renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};

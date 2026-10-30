@@ -1,5 +1,5 @@
 // Three-way session merge. Never treat an old complete file as a replacement for Drive.
-import {clone,validateLedger,assertImmutable} from './core.mjs?v=20261030-workspace2';
+import {clone,validateLedger,assertImmutable} from './core.mjs?v=20261030-workspace3';
 const stable=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const equal=(a,b)=>stable(a)===stable(b);
 const entryKey=e=>`${e.patientKey}|${e.date}`;

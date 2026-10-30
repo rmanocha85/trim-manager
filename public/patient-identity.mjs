@@ -1,4 +1,4 @@
-import {withProfile} from './profile-display.mjs?v=20261030-workspace2';
+import {withProfile} from './profile-display.mjs?v=20261030-workspace3';
 import {avaChartUrl} from './patient-links.mjs';
 import {today,dateParts} from './patients-core.mjs?v=20261024-hospital2';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
