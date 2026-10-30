@@ -1,4 +1,4 @@
-import {nameHTML,avaHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261030-workspace3';
+import {nameHTML,avaHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261030-layout4';
 import {updateHospitalStay} from './hospital.mjs?v=20261024-hospital2';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
 import * as TrimRoster from './patients-core.mjs?v=20261024-hospital2';
@@ -30,10 +30,10 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261030-workspace3');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261030-layout4');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
-  const identityCSS=await fetch('./patient-identity.css?v=20261030-workspace3').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
+  const identityCSS=await fetch('./patient-identity.css?v=20261030-layout4').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
   let rosterDocument=null,loadedRosterJSON=null,repository,etag,key,ready=false,dirty=false,writeBlocked=false,pendingSaves=0,saving=false,localError='',message='',serial=Promise.resolve();
@@ -115,7 +115,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     if(!ready||saving||writeBlocked)throw new Error('Resolve the roster operation before printing.');
     const dialog=document.getElementById('patients-print-dialog');
     document.getElementById('patients-print-title').textContent=title;
-    document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261030-workspace3',location.href).href+'"><style>body{background:white}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
+    document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261030-layout4',location.href).href+'"><style>body{background:white}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
     dialog.showModal();
   }
   const actions={renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
@@ -430,7 +430,7 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${nameHTML(p)}${avaHTML(p)}${demographicsHTML(p)}${p.pFlag?'<span class="pflag">P</span>':''}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div>
+                  <div class="pnm"><span class="roster-name">${nameHTML(p)}${p.pFlag?'<span class="pflag">P</span>':''}${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</span>${avaHTML(p)}${demographicsHTML(p)}<span class="pphn">${phnWithCopy(p.phn)}</span></div>
                 </td>
                 <td><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(p.ava||'—')}</span></td>
                 <td><span class="pcd">${esc(p.codes)||'<span style="color:var(--muted);font-style:italic">—</span>'}</span></td>
@@ -485,7 +485,7 @@ function renderOtherPatients(){
     const key='other-'+index;
     return `<div class="usec"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name / PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
       const ava=String(p.ava||'');const url=avaChartUrl(p);
-      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${nameHTML(p)}${avaHTML(p)}${demographicsHTML(p)}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
+      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm"><span class="roster-name">${nameHTML(p)}${p.pFlag?'<span class="pflag">P</span>':''}${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</span>${avaHTML(p)}${demographicsHTML(p)}<span class="pphn">${phnWithCopy(p.phn)}</span></div></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
     }).join('')}</tbody></table></div></div>`;
   }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
   list.querySelectorAll('[data-other-doctor]').forEach(el=>el.addEventListener('change',()=>setOtherDoctor(el.dataset.otherDoctor,el.value)));

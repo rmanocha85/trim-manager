@@ -1,5 +1,5 @@
 // Pure workspace helpers. No patient data or network access.
-import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261030-workspace3';
+import {clone,dueState,validDiagnosis,validDate,today,upsertInteractiveEntry,validateLedger,entryIssues} from './core.mjs?v=20261030-layout4';
 
 // Display confirmed identity corrections as one history without rewriting records.
 // Names alone never establish identity; different recorded PHNs stay separate.

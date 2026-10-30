@@ -29,8 +29,8 @@
   <div class="stats-row" id="stats"></div>
   <div id="lbanner"></div>
   <div class="connect-hint">🔒 Editing is disabled until the roster is loaded.</div>
-  <div class="card needs-connect">
-    <h3>+ Add New Patient</h3>
+  <details class="card needs-connect add-patient" id="add-patient">
+    <summary>Add new patient</summary>
     <div class="add-patient-grid">
       <div class="fgrp"><label class="flbl">Last, First Name</label><input class="inp" id="in-name" placeholder="e.g. Last, First"/></div>
       <div class="fgrp"><label class="flbl">PHN</label><input class="inp" id="in-phn" placeholder="e.g. 1234567890"/></div>
@@ -41,7 +41,7 @@
       <div class="fgrp"><label class="flbl" for="in-dob">Date of birth</label><input type="date" class="inp" id="in-dob"/></div><div class="fgrp"><label class="flbl" for="in-most">MOST</label><select class="sel" id="in-most"><option value="">Not recorded</option><option>CPR C2</option><option>DNACPR C2</option><option>DNACPR C1</option><option>DNACPR M3</option><option>DNACPR M2</option><option>DNACPR M1</option></select></div><div class="fgrp"><label class="flbl" for="in-pflag">P</label><label class="p-toggle"><input id="in-pflag" type="checkbox"/><span>P</span></label></div>
       <button class="btn btn-green" data-click="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
     </div>
-  </div>
+  </details>
   <div id="ulist"></div>
 </div>
 

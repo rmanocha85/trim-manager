@@ -1,7 +1,7 @@
-import {refreshIdentities} from './patient-identity.mjs?v=20261030-workspace3';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261030-workspace3';
-import {billingUI} from './billing-ui.mjs?v=20261030-workspace3';
-import {patientsUI} from './patients-ui.mjs?v=20261030-workspace3';
+import {refreshIdentities} from './patient-identity.mjs?v=20261030-layout4';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261030-layout4';
+import {billingUI} from './billing-ui.mjs?v=20261030-layout4';
+import {patientsUI} from './patients-ui.mjs?v=20261030-layout4';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
@@ -58,7 +58,7 @@ async function saveSession(){try{await session.save();billing.notify('');if(!ses
 async function start(){
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs?v=20261030-workspace3')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  notes=laptop?(await import('./notes-ui.mjs?v=20261030-layout4')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
   intake=documentIntakeUI({state:()=>billing.state(),notes,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([

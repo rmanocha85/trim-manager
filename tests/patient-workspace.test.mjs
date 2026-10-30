@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm,mkdir} from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';import {randomUUID,createHash} from 'node:crypto';
 import {ageOn,newPatient,demographicsHTML} from '../public/patient-identity.mjs';
-import {profileDisplay,setProfileDisplay} from '../public/profile-display.mjs?v=20261030-workspace3';
+import {profileDisplay,setProfileDisplay} from '../public/profile-display.mjs?v=20261030-layout4';
 import {DocumentIntake} from '../intake-local.mjs';
 import {LocalNotesStore} from '../notes-local.mjs';
 import {contextRecord} from '../public/notes-core.mjs';
@@ -44,3 +44,11 @@ test('offline queue resumes automatically and every document must have the match
  disable();const p=payload();await intake.submit(p);await settle();assert.equal((await intake.read(p.job.id)).status,'waiting');enable();await intake.tick();assert.equal((await intake.read(p.job.id)).status,'ready');
  proposal({documentPhns:[[phn],['0000000002']],summaryMarkdown:'Mixed',sourceSummary:'Mixed identities',reviewIssues:[]});const mixed=payload();const f={...mixed.job.files[0],file:mixed.job.id+'-1.pdf'};mixed.job.files.push(f);mixed.documents.push(mixed.documents[0]);await intake.submit(mixed);await settle();assert.equal((await intake.read(mixed.job.id)).status,'identity-review');
 }));
+
+ test('physician confirmation controls the current designation and retains earlier discussions',()=>{
+ const summaryMarkdown='MOST M2 retained after discussion of possible M1.';
+ const context={summaryMarkdown,currentMost:{designation:'M2',source:'physician',confirmedOn:'2026-10-30'}};
+ const display=profileDisplay(context);assert.equal(display.mostStatus,'M2');assert.match(display.mostEvidence,/Physician confirmed M2 on 2026-10-30/);assert.ok(display.mostEvidence.includes(summaryMarkdown));
+ for(const currentMost of [{...context.currentMost,source:'AI'},{...context.currentMost,confirmedOn:''},{...context.currentMost,designation:'unknown'}])assert.equal(profileDisplay({...context,currentMost}).mostStatus,'Review');
+ setProfileDisplay({patients:{[phn]:display}});const html=demographicsHTML({phn});assert.match(html,/>M2<\/span>/);assert.doesNotMatch(html,/>[^<]*(?:MOST|✚)/);setProfileDisplay(null);
+ });

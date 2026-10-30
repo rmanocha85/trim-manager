@@ -56,7 +56,7 @@ try{
   }
   await page.setViewportSize({width:1440,height:1000});await page.locator('[data-section=patients]').click();
   assert.doesNotMatch(await p('#stats').innerText(),/Capacity|Used|110/);assert.equal(await p('#lbanner').innerText(),'');
-  for(const [id,value] of Object.entries({'in-name':'SYNTHETIC EXTRA, Added','in-phn':'0000009999','in-room':'999','in-codes':'401','in-ava':'999999'}))await p('#'+id).fill(value);
+  await p('#add-patient > summary').click();for(const [id,value] of Object.entries({'in-name':'SYNTHETIC EXTRA, Added','in-phn':'0000009999','in-room':'999','in-codes':'401','in-ava':'999999'}))await p('#'+id).fill(value);
   await p('#in-unit').selectOption('custom');await p('[data-click="addPatient()"]').click();await save();
   assert.equal(JSON.parse(await readFile(rosterPath,'utf8')).patients.length,151);
   await page.reload();await page.locator('.patient').first().waitFor();await saved();await page.locator('#search').fill('SYNTHETIC EXTRA');assert.equal(await page.locator('.patient').count(),1);

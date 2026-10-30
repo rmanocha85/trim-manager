@@ -6,3 +6,33 @@
 
 .identity-copy svg{width:15px;height:15px;display:block}.history-patient-choice{display:flex;align-items:center;gap:4px}.history-patient-choice>[data-history-patient]{flex:1;min-width:0}.history-patient-choice>.identity-copy{flex:none;padding:4px!important}
 #connect-patient-records{margin:8px 16px}
+
+/* Align the same demographic fields regardless of name length. */
+.patient-identity{display:grid;width:100%;grid-template-columns:minmax(112px,1fr) 40px 96px 56px;gap:4px 8px;align-items:center;font-size:12px;font-weight:400}
+.identity-top{grid-column:1/-1;display:flex;min-width:0;flex-wrap:wrap;gap:4px}
+.identity-details,.identity-demographics{display:contents}
+.identity-phn{grid-column:1;font-size:12px;color:#526358}
+.identity-age{grid-column:2;font-size:12px;color:#526358;font-variant-numeric:tabular-nums}
+.identity-most{grid-column:3;border:0;border-radius:0;background:transparent;padding:0;font-size:12px;color:#315d40;white-space:nowrap}
+.identity-ava{grid-column:4;justify-self:start}
+.identity-new{grid-column:1/-1;justify-self:start}
+.patient-row .patient>span:nth-child(2),.rounds-list [data-notes-patient]>span:nth-child(2){width:100%}
+.patient-row .patient{grid-template-columns:40px minmax(0,1fr);align-items:start}
+.patient-row .patient-right{grid-column:2;justify-self:end;margin:0;min-width:0}
+.patient-title>h2,.note-patient-heading>div,.editor-head>div{width:100%;min-width:0}
+.ptbl{table-layout:fixed;min-width:1280px}.ptbl th:nth-child(2),.ptbl td:nth-child(2){min-width:0}
+.ptbl .pnm{display:grid!important;grid-template-columns:minmax(150px,1fr) 130px 40px 96px 56px;gap:4px 8px;white-space:normal!important}
+.roster-name{grid-column:1;grid-row:1;display:flex;align-items:center;gap:4px;min-width:0}
+.ptbl .identity-name{white-space:normal;overflow-wrap:anywhere}
+.ptbl .pphn{grid-column:2;grid-row:1;margin-left:0!important;white-space:nowrap}
+.ptbl .identity-age{grid-column:3;grid-row:1}.ptbl .identity-most{grid-column:4;grid-row:1}.ptbl .identity-ava{grid-column:5;grid-row:1}
+.ptbl .identity-new,.ptbl .hospital-dates{grid-column:1/-1}.ptbl .hospital-flag,.ptbl .pflag{grid-column:1}
+.usec{overflow-x:auto}
+.add-patient>summary{cursor:pointer;font-weight:600;font-size:14px}.add-patient[open]>summary{margin-bottom:14px}
+@media(max-width:600px){.patient-identity{grid-template-columns:minmax(104px,1fr) 34px 84px 48px;gap:4px}.identity-phn,.identity-age,.identity-most{font-size:11px}.identity-ava{font-size:11px;padding:3px 5px}}
+
+.ptbl .roster-name .hospital-dates{white-space:nowrap}.ptbl .pflag{grid-column:1;grid-row:2}.usec{max-width:100%}
+.patient-identity .identity-phn,.patient-identity .identity-age,.patient-identity .identity-most,.patient-identity .identity-ava{grid-row:2}.patient-identity .identity-new{grid-row:3}.patient-identity .identity-top{grid-row:1}
+
+.rounds-grid{grid-template-columns:minmax(360px,32%) minmax(0,1fr)}.rounds-list [data-notes-patient]{display:block}.rounds-list .rounds-room{display:block;font-size:12px;margin-bottom:4px}.rounds-list [data-notes-patient]>span:nth-child(2){display:block}
+@media(max-width:1100px){.rounds-grid{grid-template-columns:1fr}.rounds-list{position:static;max-height:260px}}

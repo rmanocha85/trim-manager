@@ -2,7 +2,7 @@
 
 The roster has a name/PHN/room search and shows “New patient” during the first 14 calendar days after a genuinely new panel addition. This is ordinary text for the browser's Find command. Returning retained patients keep their existing identity and do not become new admissions.
 
-Roster, Billing and Notes group the patient's Last, First name, copy control and Ava chart link on the left, with PHN/copy, age and MOST nearby. Age is calculated from a recorded date of birth. MOST is projected from the Markdown in the individual PHN patient records. Ambiguous, conflicting or proposed statuses display “Review”; hover for the original source wording. Missing information stays blank. DOB can be recorded on the roster; a reported age is never used to invent a DOB.
+Roster, Billing and Notes show the patient's Last, First name and copy control, with aligned PHN/copy, age, designation and Ava columns. Age is calculated from a recorded date of birth. MOST is projected from the Markdown in the individual PHN patient records. Ambiguous, conflicting or proposed statuses display “Review”; hover for the original source wording. Missing information stays blank. DOB can be recorded on the roster; a reported age is never used to invent a DOB.
 
 The local service maintains `patient-display.json` as a disposable display projection in the existing Routine notes folder. It contains no independent clinical authority and can be rebuilt from the individual patient files. The cloud app reads the synced projection only when its dataset matches. Clinical data stays outside this repository. On the laptop, profile reads and uploads use the existing local service even when billing is connected through Google.
 
@@ -17,3 +17,6 @@ Analysis is a proposal. “Use proposed patient summary” saves the proposed Ma
 The Local changes dialog has less status text and closes after all session changes save successfully. Conflicts, failures and unfinished patient forms keep it open. Existing discard protections remain.
 
 Validation uses synthetic records and a fake AI response. Browser tests cover upload and read-back locally and through a mocked Drive API, including interrupted upload retries. A live synthetic PDF plus screenshot also passed through the existing ChatGPT connection (gpt-6.1-sol), with both source PHNs extracted correctly. No real patient documents were sent as a deployment smoke test.
+
+
+October 30 layout refinement: Add new patient is collapsed by default. Roster identities use aligned name, PHN/copy, age, designation and Ava columns; compact Billing/Notes identities use consistent detail columns below the name. Designations are plain text with original evidence on hover. Physician confirmations live only in private patient contexts as currentMost (designation, source: physician, confirmedOn). A validated confirmation takes precedence for display while historical evidence remains in the tooltip. Narrative conflicts without a physician confirmation still show Review. Clinical identifiers and corrections never belong in application code.

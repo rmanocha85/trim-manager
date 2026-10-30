@@ -1,10 +1,10 @@
-import {identityHTML} from './patient-identity.mjs?v=20261030-workspace3';
-import {DriveIntake} from './intake-drive.mjs?v=20261030-workspace3';
-import {DriveNotesRepository} from './notes-storage.mjs?v=20261030-workspace3';
-import {setProfileDisplay} from './profile-display.mjs?v=20261030-workspace3';
-import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261030-workspace3';
-import {escapeHTML as esc} from './core.mjs?v=20261030-workspace3';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261030-workspace3';
+import {identityHTML} from './patient-identity.mjs?v=20261030-layout4';
+import {DriveIntake} from './intake-drive.mjs?v=20261030-layout4';
+import {DriveNotesRepository} from './notes-storage.mjs?v=20261030-layout4';
+import {setProfileDisplay} from './profile-display.mjs?v=20261030-layout4';
+import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261030-layout4';
+import {escapeHTML as esc} from './core.mjs?v=20261030-layout4';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261030-layout4';
 import {laptopRuntime} from './runtime.mjs';
 const digest=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join('');
 const dataURL=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read the selected file.'));reader.readAsDataURL(file);});
