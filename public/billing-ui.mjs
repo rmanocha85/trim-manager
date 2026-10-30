@@ -1,11 +1,11 @@
-import {identityHTML,nameCopy,bindIdentity} from './patient-identity.mjs?v=20261030-workspace1';
+import {identityHTML,nameCopy,bindIdentity} from './patient-identity.mjs?v=20261030-workspace2';
 import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=20261007-dates1';
-import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261030-workspace1';
-import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261030-workspace1';
+import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261030-workspace2';
+import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261030-workspace2';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261007-cancel1';
-import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261030-workspace1';
+import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261030-workspace2';
 import {avaChartUrl} from './patient-links.mjs';
-import {planNewPatients} from './core.mjs?v=20261030-workspace1';
+import {planNewPatients} from './core.mjs?v=20261030-workspace2';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
 import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261019-fixes1';

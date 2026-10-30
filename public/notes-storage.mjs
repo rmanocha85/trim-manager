@@ -25,7 +25,11 @@ export class DriveNotesRepository{
         await this.privateFolder(id);let parent=await this.folder(id,'Working records',create);if(!parent)return null;parent=await this.folder(parent,'Routine notes',create);if(parent){await this.privateFolder(parent);this.rootId=parent;}return parent;
       }id=f.parents?.length===1?f.parents[0]:null;
     }
-    throw new Error('Select the private TRIM AI / Working records / Routine notes Drive folder in Notes settings. The current Google permission cannot locate its parents.');
+    // drive.file can expose the clinical folder while hiding newly organized ancestors.
+    // Reuse a single private accessible match; never create a second workspace here.
+    const matches=await this.list("name = 'Routine notes' and mimeType = 'application/vnd.google-apps.folder'");
+    if(matches.length===1){await this.privateFolder(matches[0].id);this.rootId=matches[0].id;return this.rootId;}
+    throw new Error(matches.length?'Multiple Routine notes folders need reconciliation.':'The existing Routine notes folder is not accessible to this Google connection. Open the laptop app to upload documents.');
   }
   async folder(parent,name,create){const key=parent+'/'+name;if(this.folders.has(key))return this.folders.get(key);const files=await this.list(`'${parent}' in parents and name = '${name}' and mimeType = 'application/vnd.google-apps.folder'`);if(files.length>1)throw new Error('Duplicate clinical folders need reconciliation.');let id=files[0]?.id;if(!id&&create){await this.privateFolder(parent);id=(await this.request(V3+'?fields=id',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',parents:[parent]})})).id;}if(id){await this.privateFolder(id);this.folders.set(key,id);}return id;}
   async locate(name,create=false){

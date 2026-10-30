@@ -1,6 +1,6 @@
-import {DriveNotesRepository} from './notes-storage.mjs?v=20261030-workspace1';
+import {DriveNotesRepository} from './notes-storage.mjs?v=20261030-workspace2';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
-import {checkManifest} from './intake-core.mjs?v=20261030-workspace1';
+import {checkManifest} from './intake-core.mjs?v=20261030-workspace2';
 const V3='https://www.googleapis.com/drive/v3/files';
 const digest=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 export class DriveIntake{

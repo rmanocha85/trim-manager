@@ -7,6 +7,13 @@ import {blankLedger} from '../public/core.mjs';
 import {contextRecord,dayRecord,startVisit,markReviewed,isReviewed,editVisit,makeHandoff,validateHandoff,generationInput,parseGenerated,roundCandidates,validateRecord,QUICK_STATEMENTS,visitStatements} from '../public/notes-core.mjs';
 import {LocalNotesStore} from '../notes-local.mjs';
 import {DriveNotesRepository,checkPath} from '../public/notes-storage.mjs';
+
+test('Drive Notes finds one accessible existing folder when its ancestors are hidden, without creating folders',async()=>{
+ const calls=[];const repo=new DriveNotesRepository({fileId:'billing',request:async(url,options)=>{calls.push({url,options});if(url.includes('permissions'))return {mimeType:'application/vnd.google-apps.folder',permissions:[{role:'owner'}]};if(url.includes('?q='))return {files:[{id:'existing-notes'}]};throw Object.assign(new Error('Hidden ancestor'),{status:404});}});
+ assert.equal(await repo.root(true),'existing-notes');assert.ok(calls.every(c=>!c.options?.method));
+ const missing=new DriveNotesRepository({fileId:'billing',request:async url=>{if(url.includes('?q='))return {files:[]};throw Object.assign(new Error('Hidden ancestor'),{status:403});}});
+ await assert.rejects(missing.root(true),/not accessible/);
+});
 const date='2026-10-12',p={id:'test',key:'phn:0000000001',name:'SYNTHETIC, One',phn:'0000000001',unit:'test',room:'1',panel:true},units=[{id:'test',name:'SYNTHETIC'}];
 function fixture(){const context=contextRecord('test'),day=dayRecord('test',date),entry=startVisit(day,p,units);return {context,day,entry};}
 test('quick statements default off, remain specific to a visit and send only selected facts to AI',()=>{

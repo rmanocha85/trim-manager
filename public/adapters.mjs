@@ -1,4 +1,4 @@
-import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261030-workspace1';
+import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261030-workspace2';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 const ACCOUNT_KEY='trim:drive-account';
@@ -18,12 +18,12 @@ export class LocalAdapter {
 export class DriveAdapter {
   mode='cloud';label='Google Drive';
   constructor(fileId,{rosterId=ROSTER}={}){this.fileId=fileId?.trim();this.rosterId=rosterId;if(this.fileId===ROSTER||this.fileId===rosterId)throw new Error('The original roster can never be used as the billing file.');}
-  async connect({selectAccount=false}={}){
+  async connect({selectAccount=false,patientRecords=false}={}){
     if(!globalThis.google?.accounts?.oauth2) await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(new Error('Google sign-in could not load.'));document.head.append(s);});
     const previous=this.accountEmail;
     const hint=selectAccount?'':previous||preferredDriveAccount();
     const token=await new Promise((resolve,reject)=>google.accounts.oauth2.initTokenClient({
-      client_id:CLIENT,scope:'https://www.googleapis.com/auth/drive.file',
+      client_id:CLIENT,scope:patientRecords?'https://www.googleapis.com/auth/drive':'https://www.googleapis.com/auth/drive.file',
       prompt:hint?'':'select_account',...(hint?{login_hint:hint}:{}),
       callback:r=>{if(r.error||!r.access_token)return reject(new Error(r.error||'Google did not return a connection.'));resolve(r.access_token);},
       error_callback:()=>reject(new Error('Google sign-in was cancelled or blocked. Try again, or choose “Use another account”.'))

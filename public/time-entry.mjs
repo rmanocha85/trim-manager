@@ -1,4 +1,4 @@
-import {escapeHTML as esc,normalizeManualTime,roundedPacificTime} from './core.mjs?v=20261030-workspace1';
+import {escapeHTML as esc,normalizeManualTime,roundedPacificTime} from './core.mjs?v=20261030-workspace2';
 
 export function timeField(item,index,field,label,locked){
   const id=`billing-time-${index}-${field}`;

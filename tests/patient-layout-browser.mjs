@@ -56,7 +56,7 @@ try{
  for(const width of [1440,1280,1024,768,390,360]){
    await page.setViewportSize({width,height:844});await page.evaluate(()=>scrollTo(0,0));
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`horizontal overflow at ${width}`);
-   const buttons=page.locator('#workspace>header .header-actions button');const boxes=await buttons.evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom};}));
+   const buttons=page.locator('#workspace>header .header-actions button:visible');const boxes=await buttons.evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom};}));
    assert.ok(boxes.every(b=>b.h===40&&b.x>=0&&b.right<=width),JSON.stringify({width,boxes}));
    for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];assert.ok(a.right<=b.x+.5||b.right<=a.x+.5||a.bottom<=b.y+.5||b.bottom<=a.y+.5,JSON.stringify({width,a,b}));}
    const header=await page.locator('#workspace>header').boundingBox();assert.ok(boxes.every(b=>b.bottom<=header.y+header.height),JSON.stringify({width,header,boxes}));
