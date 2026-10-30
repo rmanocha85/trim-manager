@@ -25,6 +25,7 @@
 
 <!-- PATIENTS -->
 <div id="tab-patients" class="panel active">
+  <label class="roster-search" for="roster-search">Find a patient<input type="search" class="inp" id="roster-search" placeholder="Name, PHN, room or New" data-input="renderUList()"></label>
   <div class="stats-row" id="stats"></div>
   <div id="lbanner"></div>
   <div class="connect-hint">🔒 Editing is disabled until the roster is loaded.</div>
@@ -37,7 +38,7 @@
       <div class="fgrp"><label class="flbl">Room #</label><input class="inp" id="in-room" placeholder="e.g. 1502"/></div>
       <div class="fgrp"><label class="flbl">ICD Codes</label><input class="inp" id="in-codes" placeholder="e.g. 290 401 V15"/></div>
       <div class="fgrp"><label class="flbl">AVA EMR #</label><input class="inp" id="in-ava" placeholder="e.g. 1234567"/></div>
-      <div class="fgrp"><label class="flbl" for="in-pflag">P</label><label class="p-toggle"><input id="in-pflag" type="checkbox"/><span>P</span></label></div>
+      <div class="fgrp"><label class="flbl" for="in-dob">Date of birth</label><input type="date" class="inp" id="in-dob"/></div><div class="fgrp"><label class="flbl" for="in-most">MOST</label><select class="sel" id="in-most"><option value="">Not recorded</option><option>CPR C2</option><option>DNACPR C2</option><option>DNACPR C1</option><option>DNACPR M3</option><option>DNACPR M2</option><option>DNACPR M1</option></select></div><div class="fgrp"><label class="flbl" for="in-pflag">P</label><label class="p-toggle"><input id="in-pflag" type="checkbox"/><span>P</span></label></div>
       <button class="btn btn-green" data-click="addPatient()" style="height:35px;margin-bottom:1px">Add</button>
     </div>
   </div>

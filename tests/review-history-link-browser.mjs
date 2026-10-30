@@ -30,12 +30,12 @@ try{
  assert.equal(await page.locator('#billing-review-badge').innerText(),'★ 1');
  assert.match(await page.locator('[data-tab=review]').getAttribute('aria-label'),/1 item needs attention/);
  await page.locator('[data-section="billing"]').click();await page.locator('[data-tab=history]').click();await page.locator('#history-by-patient').click();
- await page.locator('#history-search').fill('EXAMPLE');assert.equal(await page.locator('#history-patient-results button').count(),1);
- await page.locator('#history-patient-results button').click();assert.equal(await page.locator('#history-content tbody tr').count(),4);
+ await page.locator('#history-search').fill('EXAMPLE');assert.equal(await page.locator('#history-patient-results [data-history-patient]').count(),1);
+ await page.locator('#history-patient-results [data-history-patient]').click();assert.equal(await page.locator('#history-content tbody tr').count(),4);
  assert.match(await page.locator('#history-content').innerText(),/Sep 5, 2026/);assert.match(await page.locator('#history-content').innerText(),/Sep 19, 2026/);
  assert.match(await page.locator('#history-patient-summary').innerText(),/Oct 10, 2026/);
  await page.locator('#history-by-date').click();await page.locator('[data-history-patient="roster:synthetic"]').first().click();
- assert.equal(await page.locator('#history-content tbody tr').count(),4);assert.equal(await page.locator('#history-patient-results button').count(),1);
+ assert.equal(await page.locator('#history-content tbody tr').count(),4);assert.equal(await page.locator('#history-patient-results [data-history-patient]').count(),1);
  await page.locator('[data-section="billing"]').click();await page.locator('[data-tab=review]').click();
  assert.equal(await page.locator('#review-issues [data-review-entry]').count(),1);
  assert.match(await page.locator('#review-issues').innerText(),/Sep 22, 2026/);

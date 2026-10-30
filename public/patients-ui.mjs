@@ -1,3 +1,4 @@
+import {nameHTML,avaHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261030-workspace1';
 import {updateHospitalStay} from './hospital.mjs?v=20261024-hospital2';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
 import * as TrimRoster from './patients-core.mjs?v=20261024-hospital2';
@@ -6,7 +7,7 @@ import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
 import {mergeRoster} from './roster-merge.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
-export async function patientsUI({host,onChange=()=>{},onRoster=()=>{}}){
+export async function patientsUI({host,onChange=()=>{},onRoster=()=>{},onSaved=async()=>{},onUpload=()=>{}}){
 
 const MAX_D=17;
 const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
@@ -29,14 +30,14 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261029-roster-phn1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261030-workspace1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
-  root.append(style);const content=document.createElement('div');content.innerHTML=html;root.append(content);
+  const identityCSS=await fetch('./patient-identity.css?v=20261030-workspace1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
   let rosterDocument=null,loadedRosterJSON=null,repository,etag,key,ready=false,dirty=false,writeBlocked=false,pendingSaves=0,saving=false,localError='',message='',serial=Promise.resolve();
-  const newPatientFields=['in-name','in-phn','in-room','in-codes','in-ava'];
+  const newPatientFields=['in-name','in-phn','in-room','in-codes','in-ava','in-dob','in-most'];
   let rosterChoices={},rosterConflicts=[],refreshing=false;
   const review=document.createElement('dialog');review.id='roster-conflict-dialog';root.append(review);
   function showRosterConflicts(){
@@ -93,7 +94,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   async function save(){
     if(!ready)throw new Error('TRIM Patients is not loaded.');await serial;if(localError)throw new Error('TRIM Patients local recovery needs attention.');await refresh(true);if(writeBlocked)throw new Error('Review the patient details changed on both computers, then save again.');
     if(!dirty)return;saving=true;updateStatus();
-    try{const result=await repository.save(liveRoster(),etag);etag=result.etag;loadedRosterJSON=JSON.stringify(result.roster);dirty=false;
+    try{const result=await repository.save(liveRoster(),etag);await onSaved(result.roster);etag=result.etag;loadedRosterJSON=JSON.stringify(result.roster);dirty=false;
       if(inHistoryView){liveStateBackup={patients:result.roster.patients,units:result.roster.units,billingDates:result.roster.billingDates};rosterDocument=result.roster;state.removedPatients=result.roster.removedPatients||[];}
       else applyRoster(result.roster);
       await persist();onRoster(result.roster);
@@ -114,10 +115,10 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     if(!ready||saving||writeBlocked)throw new Error('Resolve the roster operation before printing.');
     const dialog=document.getElementById('patients-print-dialog');
     document.getElementById('patients-print-title').textContent=title;
-    document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css',location.href).href+'"><style>body{background:white}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
+    document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261030-workspace1',location.href).href+'"><style>body{background:white}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
     dialog.showModal();
   }
-  const actions={showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
+  const actions={renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
   function argumentsFor(text,element){
     if(!text.trim())return [];const parts=text.match(/'(?:[^']*)'|\bthis\b|\d+/g)||[];
     if(parts.join(',').replace(/\s/g,'')!==text.replace(/\s/g,''))throw new Error('Invalid patient action.');
@@ -136,7 +137,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     if(!p||JSON.stringify(p.hospitalStays||[])!==expected)throw new Error('Hospital dates changed. Reopen the hospital form before saving.');
     applyRoster(updateHospitalStay(raw,key,fields,TrimRoster.today()));await stageRoster();render();updateStatus();
   }
-  const api={setHospitalStay,connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
+  const api={render,setHospitalStay,connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
 
 // ── TABS ──
 function showTab(name,btn){
@@ -154,7 +155,7 @@ function renderRemoved(){
   if(!ready){el.textContent='Connect Google Drive to see retained records.';return;}
   if(inHistoryView){el.textContent='Return to Today (Live) to see retained records.';return;}
   const records=TrimRoster.expire(currentRoster()).removedPatients;
-  el.innerHTML=records.length?`<table><thead><tr><th>Name</th><th>Unit / room</th><th>Removed</th><th>Expires</th></tr></thead><tbody>${records.map(p=>`<tr><td>${esc(p.name)}</td><td>${esc(p.unit)} / ${esc(p.room)}</td><td>${esc(p.removedDate)}</td><td>${TrimRoster.expiresOn(p.removedDate)}</td></tr>`).join('')}</tbody></table>`:'No retained removed patients.';
+  el.innerHTML=records.length?`<table><thead><tr><th>Name</th><th>Unit / room</th><th>Removed</th><th>Expires</th></tr></thead><tbody>${records.map(p=>`<tr><td>${nameHTML(p)}</td><td>${esc(p.unit)} / ${esc(p.room)}</td><td>${esc(p.removedDate)}</td><td>${TrimRoster.expiresOn(p.removedDate)}</td></tr>`).join('')}</tbody></table>`:'No retained removed patients.';
 }
 
 async function renderSnapshotList(){
@@ -219,6 +220,7 @@ function exitHistoryView(){
   render();
 }
 
+function uploadDocuments(id){const p=[...state.patients,...otherPatients()].find(p=>p.id===id);if(p)onUpload(p);}
 // ── PATIENTS ──
 function addPatient(){
   if(!canEdit())return;
@@ -231,9 +233,9 @@ function addPatient(){
   const pFlag=g('in-pflag').checked;
   if(!name||!unit){alert('Please enter a name and unit.');return}
 
-  try{applyRoster(TrimRoster.add(currentRoster(),{name,phn,unit,room,codes,ava,pFlag}));}
+  try{const fields=validateDemographics({name,phn,unit,room,codes,ava,pFlag,dateOfBirth:g('in-dob').value,mostStatus:g('in-most').value});applyRoster(TrimRoster.add(currentRoster(),fields));}
   catch(e){alert(e.message);return;}
-  ['in-name','in-phn','in-room','in-codes','in-ava'].forEach(i=>g(i).value='');
+  ['in-name','in-phn','in-room','in-codes','in-ava','in-dob','in-most'].forEach(i=>g(i).value='');
   g('in-pflag').checked=false;
   stageRoster();render();
 }
@@ -242,10 +244,10 @@ function cancelEdit(){editId=null;render();void persist().catch(()=>{});}
 function saveEdit(id){
   if(!canEdit())return;
   const p=state.patients.find(x=>x.id===id);if(!p)return;
-  try{applyRoster(TrimRoster.edit(currentRoster(),id,{
+  try{applyRoster(TrimRoster.edit(currentRoster(),id,validateDemographics({
     name:g(`en-${id}`).value.trim()||p.name,phn:g(`ep-${id}`).value.trim(),unit:g(`eu-${id}`).value,
-    room:g(`er-${id}`).value.trim(),codes:g(`ec-${id}`).value.trim(),ava:g(`ea-${id}`).value.trim(),pFlag:g(`epf-${id}`).checked
-  }));}catch(e){alert(e.message);return;}
+    room:g(`er-${id}`).value.trim(),codes:g(`ec-${id}`).value.trim(),ava:g(`ea-${id}`).value.trim(),pFlag:g(`epf-${id}`).checked,dateOfBirth:g(`edob-${id}`).value,mostStatus:g(`emost-${id}`).value
+  })));}catch(e){alert(e.message);return;}
   editId=null;stageRoster();render();
 }
 function promptDel(id){
@@ -393,7 +395,9 @@ function populateUSel(){
 function renderUList(){
   let html='';
   state.units.forEach(unit=>{
-    const pts=state.patients.filter(p=>p.unit===unit.id).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+    const query=(g('roster-search')?.value||'').trim().toLowerCase();
+    const pts=state.patients.filter(p=>p.unit===unit.id&&(!query||[p.name,p.phn,p.room,p.ava,p.mostStatus,newPatient(p)?'new patient':''].join(' ').toLowerCase().includes(query))).sort((a,b)=>(parseInt(a.room)||0)-(parseInt(b.room)||0));
+    if(query&&!pts.length)return;
     html+=`<div class="usec">
       <div class="uhdr" data-click="toggleU('${unit.id}')">
         <div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${pts.length} patients</span></div>
@@ -406,7 +410,7 @@ function renderUList(){
             <th>Name / PHN</th>
             <th style="width:80px">AVA #</th>
             <th style="width:120px">ICD Codes</th>
-            <th style="width:110px">Actions</th>
+            <th style="width:190px">Actions</th>
           </tr></thead>
           <tbody>
             ${pts.length===0?`<tr><td colspan="5" style="color:var(--muted);font-style:italic;text-align:center;padding:14px">No patients</td></tr>`:''}
@@ -417,7 +421,7 @@ function renderUList(){
                   <input class="einp" id="ep-${esc(p.id)}" value="${esc(p.phn||'')}" aria-label="PHN"/>
                   <select class="sel" id="eu-${esc(p.id)}" style="font-size:11px;padding:3px 5px;margin-top:3px">
                     ${state.units.map(u=>`<option value="${esc(u.id)}"${u.id===p.unit?' selected':''}>${esc(u.name)}</option>`).join('')}
-                  </select></div>
+                  </select></div><div class="identity-edit"><label>Date of birth<input class="einp" type="date" id="edob-${esc(p.id)}" value="${esc(p.dateOfBirth||p.dob||'')}"/></label><label>MOST<select class="sel" id="emost-${esc(p.id)}">${MOST_OPTIONS.map(v=>`<option value="${esc(v)}"${(p.mostStatus||'')===v?' selected':''}>${esc(v||'Not recorded')}</option>`).join('')}</select></label></div>
                 </td>
                 <td><input class="einp" id="ea-${esc(p.id)}" value="${esc(p.ava||'')}" placeholder="AVA #"/></td>
                 <td><input class="einp" id="ec-${esc(p.id)}" value="${esc(p.codes||'')}"/></td>
@@ -426,18 +430,18 @@ function renderUList(){
               <tr>
                 <td><span class="prm">${esc(p.room)||'—'}</span></td>
                 <td>
-                  <div class="pnm">${avaChartUrl(p)?`<a href="${avaChartUrl(p)}" target="_blank" rel="noopener noreferrer">${esc(p.name)}</a>`:`${esc(p.name)}`}${p.pFlag?'<span class="pflag">P</span>':''}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div>
+                  <div class="pnm">${nameHTML(p)}${avaHTML(p)}${demographicsHTML(p)}${p.pFlag?'<span class="pflag">P</span>':''}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div>
                 </td>
                 <td><span style="font-family:var(--mono);font-size:11px;color:var(--muted)">${esc(p.ava||'—')}</span></td>
                 <td><span class="pcd">${esc(p.codes)||'<span style="color:var(--muted);font-style:italic">—</span>'}</span></td>
-                <td><div class="pact"><button class="btn btn-outline btn-sm needs-connect" data-click="startEdit('${esc(p.id)}')">Edit</button><button class="btn btn-danger btn-sm needs-connect" data-click="promptDel('${esc(p.id)}')">✕</button></div></td>
+                <td><div class="pact"><button class="btn btn-outline btn-sm needs-connect upload-documents" data-click="uploadDocuments('${esc(p.id)}')">Documents</button><button class="btn btn-outline btn-sm needs-connect" data-click="startEdit('${esc(p.id)}')">Edit</button><button class="btn btn-danger btn-sm needs-connect" data-click="promptDel('${esc(p.id)}')">✕</button></div></td>
               </tr>`).join('')}
           </tbody>
         </table>
       </div>
     </div>`;
   });
-  g('ulist').innerHTML=html||`<div class="banner b-info">No units. Add them in the Units tab.</div>`;
+  g('ulist').innerHTML=html||`<div class="banner b-info">No patients match this search.</div>`;
 }
 
 function toggleU(id){
@@ -481,7 +485,7 @@ function renderOtherPatients(){
     const key='other-'+index;
     return `<div class="usec"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(unit.name)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl"><thead><tr><th>Room</th><th>Name / PHN</th><th style="width:100px">AVA #</th><th style="width:260px">Doctor</th></tr></thead><tbody>${rows.map(p=>{
       const ava=String(p.ava||'');const url=avaChartUrl(p);
-      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${url?`<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}</a>`:esc(p.name)}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
+      return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm">${nameHTML(p)}${avaHTML(p)}${demographicsHTML(p)}<span class="pphn">${phnWithCopy(p.phn)}</span>${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</div></td><td>${url?`<a href="${url}" target="_blank" rel="noopener" style="font-family:var(--mono);font-size:11px">${esc(ava)}</a>`:'—'}</td><td><select class="sel" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select></td></tr>`;
     }).join('')}</tbody></table></div></div>`;
   }).join('')||'<div class="banner b-info">'+(all.length?'No patients match these filters.':'No other patients in the roster.')+'</div>';
   list.querySelectorAll('[data-other-doctor]').forEach(el=>el.addEventListener('change',()=>setOtherDoctor(el.dataset.otherDoctor,el.value)));

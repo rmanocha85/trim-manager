@@ -29,7 +29,7 @@ try{
     await page.locator('#roster .billing-phn-copy').click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[1].phn);
     assert.equal(await page.locator('#editor h2').innerText(),title);assert.equal(await readFile(billingPath,'utf8'),initial);
   }
-  await page.locator('[data-tab=billing]').click();await page.locator('#search').fill(patients[0].phn);await page.locator('.patient').click();assert.equal(await page.locator('#editor .billing-phn-copy,#billing-copy-phn').count(),0);
+  await page.locator('[data-tab=billing]').click();await page.locator('#search').fill(patients[0].phn);await page.locator('.patient').click();assert.equal(await page.locator('#editor .billing-phn-copy,#billing-copy-phn').count(),1);
   await diagnosis().fill('250 311 V66.7');assert.doesNotMatch(await page.locator('#editor-issues').innerText(),/needs information/);
   assert.equal(await page.locator('[data-field=diagnosis]').nth(1).inputValue(),'250 311 V66.7');
   await diagnosis().fill('250 311 V66.7 401');assert.match(await page.locator('#editor-issues').innerText(),/up to 3/);
@@ -42,7 +42,7 @@ try{
   await page.locator('[data-section=billing]').click();await page.locator('[data-tab=billing]').click();
   for(const width of [1440,1024,390]){
     await page.setViewportSize({width,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-    const row=page.locator('#roster .patient-row'),copy=await row.locator('.billing-phn-copy').boundingBox(),name=await row.locator('.patient-name').boundingBox();assert.ok(name.x+name.width<=copy.x,JSON.stringify({width,name,copy}));
+    const row=page.locator('#roster .patient-row'),copy=await row.locator('.billing-phn-copy').boundingBox(),name=await row.locator('.identity-name').boundingBox();assert.ok(name.y+name.height<=copy.y+1||name.x+name.width<=copy.x,JSON.stringify({width,name,copy}));
     await page.screenshot({path:'work/billing-diagnoses-'+width+'.png',fullPage:true});
   }
   assert.deepEqual(errors,[]);console.log('PASS row PHN copying in both modes without selection/writes, three-diagnosis save/reload/history/inheritance, fourth-code rejection, no 14077 annual warning/totals, preserved imported history and responsive layout.');

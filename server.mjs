@@ -1,3 +1,5 @@
+import {DocumentIntake} from './intake-local.mjs';
+import {refreshProfileDisplay} from './profile-display-local.mjs';
 import http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
@@ -31,7 +33,10 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const notes=new LocalNotesStore(notesPath,path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMNotes','locks'));
   const types={'.js':'text/javascript','.gz':'application/gzip','.txt':'text/plain','.html':'text/html','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};
   const allowed=new Set(['index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
-  return http.createServer(async(req,res)=>{
+  const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
+  let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
+  const background=()=>{void intake.tick().catch(()=>{});void profiles().catch(()=>{});};
+  const server=http.createServer(async(req,res)=>{
     res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob:; worker-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
     const port=req.socket.localPort;const origins=[`http://127.0.0.1:${port}`,`http://localhost:${port}`];
@@ -39,7 +44,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
     try {
       if(!origins.some(o=>o.slice(7)===req.headers.host))return json(403,{error:'Invalid host.'});
       const url=new URL(req.url,origins[0]);
-      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261029-roster-ui1'});
+      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261030-workspace1'});
       if(url.pathname==='/auth/callback'&&req.method==='GET'){
         let message='ChatGPT connected. Return to TRIM Billing and Notes.',ok=true;
         try{await chatgpt.callback(url.searchParams);}catch(e){ok=false;message=e.message;}
@@ -71,6 +76,11 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
           const current=await store.load();if(current.etag!==req.headers['if-match'])throw Object.assign(new Error('Billing changed before restore. Nothing replaced.'),{status:409});
           await backups.ensure(await snapshot(current.ledger));return json(200,await store.save(await readJSON(),current.etag,{restore:true}));
         }
+        if(url.pathname==='/api/patient-display'&&req.method==='GET')return json(200,await profiles());
+        if(url.pathname==='/api/intake'&&req.method==='GET')return json(200,{jobs:await intake.list(url.searchParams.get('phn'))});
+        if(url.pathname==='/api/intake'&&req.method==='POST')return json(200,await intake.submit(await readJSON()));
+        if(url.pathname==='/api/intake/retry'&&req.method==='POST')return json(200,await intake.retry((await readJSON()).id));
+        if(url.pathname==='/api/intake/accept'&&req.method==='POST'){const saved=await intake.accept((await readJSON()).id);await profiles();return json(200,saved);}
         if(url.pathname==='/api/ai/status'&&req.method==='GET')return json(200,await chatgpt.status());
         if(url.pathname==='/api/ai/connect'&&req.method==='POST')return json(200,await chatgpt.begin(origins[0]));
         if(url.pathname==='/api/ai/disconnect'&&req.method==='POST')return json(200,await chatgpt.logout());
@@ -99,11 +109,12 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
       if(process.env.TRIM_VERIFICATION==='1'&&['drive-live-check.html','drive-live-check.mjs'].includes(file)){
         res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});return res.end(await readFile(path.join(root,'tests',file)));
       }
-      if(!allowed.has(file)&&!['roster-merge.mjs','merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','patient-links.mjs','roster-print.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs','hospital.mjs','hospital-ui.mjs','hospital-entry.mjs'].includes(file))return json(404,{error:'Not found.'});
+      if(!allowed.has(file)&&!['roster-merge.mjs','merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','patient-links.mjs','patient-identity.mjs','patient-identity.css','profile-display.mjs','intake-core.mjs','intake-ui.mjs','intake-drive.mjs','roster-print.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs','hospital.mjs','hospital-ui.mjs','hospital-entry.mjs'].includes(file))return json(404,{error:'Not found.'});
       res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});
       res.end(req.method==='HEAD'?undefined:await readFile(path.join(root,'public',file)));
     } catch(e) {json(e.status||400,{error:e.code==='ENOENT'?'The source file is not available on this laptop. Check Drive sync.':e.message});}
   });
+  const timer=setInterval(background,15000);timer.unref();server.once('listening',background);server.once('close',()=>clearInterval(timer));return server;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   const port=Number(process.env.PORT||4317);const server=createServer();

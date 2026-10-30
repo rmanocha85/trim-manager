@@ -1,10 +1,12 @@
-import {billingUI} from './billing-ui.mjs?v=20261029-roster-ui1';
-import {patientsUI} from './patients-ui.mjs?v=20261029-roster-phn1';
+import {refreshIdentities} from './patient-identity.mjs?v=20261030-workspace1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261030-workspace1';
+import {billingUI} from './billing-ui.mjs?v=20261030-workspace1';
+import {patientsUI} from './patients-ui.mjs?v=20261030-workspace1';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
 const $=id=>document.getElementById(id);
-let billing,notes,patients,session,section='billing';
+let billing,notes,patients,session,intake,section='billing';
 const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
   section=value;
@@ -38,10 +40,10 @@ function status(){
   $('changes-save').textContent='Save to Drive';
   $('saved-time').textContent=pending.length?'Not yet saved to Drive':billing.state().adapter?.mode==='local'?'Drive folder · cloud sync unverified':'Matches last Drive save';
   $('save-status').textContent=pending.length?'Saved locally · pending Save to Drive':busy?'Saving locally…':'Saved · '+$('saved-time').textContent;
-  if($('changes-dialog').open){
+  if($('changes-dialog').open){const tools=document.querySelector('.patient-review-tools');if(tools)tools.hidden=!patients.state().dirty&&!patients.state().error;
     let overview=$('session-changes');
     if(!overview){overview=document.createElement('p');overview.id='session-changes';$('changes-title').after(overview);}
-    overview.textContent=states.map(s=>`${s.name}: ${s.error?'needs attention':s.dirty?'local changes pending':s.ready?'saved':'not connected'}`).join(' · ');
+    overview.hidden=true;overview.textContent=states.map(s=>`${s.name}: ${s.error?'needs attention':s.dirty?'local changes pending':s.ready?'saved':'not connected'}`).join(' · ');
   }
   $('changes-discard').textContent='Discard local billing changes';
   $('session-status').textContent=session.message||(unfinished?'Patient form in progress. Finish Add patient or Save row to include it in the session.':'');
@@ -52,12 +54,13 @@ function status(){
   $('lock').disabled=busy;
   if($('load-latest'))$('load-latest').disabled=busy||!billing.state().adapter||!navigator.onLine;
 }
-async function saveSession(){try{await session.save();billing.notify('');}catch(e){if(patients.state().error)showSection('patients');billing.notify(e.message);}finally{status();}}
+async function saveSession(){try{await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');billing.notify(e.message);}finally{status();}}
 async function start(){
-  patients=await patientsUI({host:$('patients-workspace'),onChange:status,onRoster:raw=>billing?.setRoster(raw)});
+  patients=await patientsUI({host:$('patients-workspace'),onChange:status,onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs?v=20261024-hospital2')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
+  notes=laptop?(await import('./notes-ui.mjs?v=20261030-workspace1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
+  intake=documentIntakeUI({state:()=>billing.state(),notes,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
@@ -65,7 +68,7 @@ async function start(){
   ],status);
   const latest=document.createElement('button');latest.id='load-latest';latest.className='save-control';latest.textContent='Load latest changes';$('drive-connection').after(latest);
   latest.onclick=async()=>{try{session.message='';await billing.loadLatest();}catch(e){billing.notify(e.message);}finally{status();}};
-  const patientReview=document.createElement('div');patientReview.className='actions';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
+  const patientReview=document.createElement('div');patientReview.className='actions patient-review-tools';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
   $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};
   $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();}catch(e){billing.notify(e.message);}status();};
   if(!laptop)document.querySelector('[data-section="notes"]').title='Notes runs on your laptop';

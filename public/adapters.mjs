@@ -1,4 +1,4 @@
-import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261015-immediate1';
+import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261030-workspace1';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 const ACCOUNT_KEY='trim:drive-account';
@@ -48,6 +48,7 @@ export class DriveAdapter {
     try{if(this.accountEmail)globalThis.localStorage?.setItem(ACCOUNT_KEY,this.accountEmail);else globalThis.localStorage?.removeItem(ACCOUNT_KEY);}catch{}
   }
   async request(url,options={}) {const r=await fetch(url,{...options,cache:'no-store',headers:{...options.headers,Authorization:`Bearer ${this.token}`}});if(!r.ok){const e=new Error(r.status===412?'Billing changed elsewhere. Reload and reconcile your saved draft.':r.status===401?'Google connection expired. Your draft stays on this device. Reconnect to save.':`Google Drive request failed (${r.status}).`);e.status=r.status===412?409:r.status;throw e;}return r.json();}
+  async bytes(url){const r=await fetch(url,{cache:'no-store',headers:{Authorization:'Bearer '+this.token}});if(!r.ok)throw new Error('Drive source verification failed ('+r.status+').');return new Uint8Array(await r.arrayBuffer());}
   async roster(){return normalizeRoster(await this.request(`https://www.googleapis.com/drive/v3/files/${this.rosterId}?alt=media`));}
   async locate(){
     if(this.fileId)return;

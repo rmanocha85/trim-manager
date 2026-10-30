@@ -1,3 +1,4 @@
+import {INTAKE_INSTRUCTIONS,parseIntake} from './public/intake-core.mjs';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
 import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
 import path from 'node:path';
@@ -71,6 +72,17 @@ export class ChatGPTConnection{
     const next={...s};delete next.accessToken;delete next.refreshToken;delete next.expiresAt;await this.store.save(next);this.state=next;this.pending=null;this.lastError=null;return {revoked,message:revoked?'Disconnected from ChatGPT.':'Disconnected locally. Remote revocation was not confirmed; manage the connection in ChatGPT settings.'};
   }
   async models(){const token=await this.access(),r=await this.fetch(API+'/models',{headers:{Authorization:'Bearer '+token}}),body=await r.json();if(!r.ok)throw apiError(r.status,body);if(!Array.isArray(body.models))throw new Error('ChatGPT returned an unsupported model catalog.');return body.models.filter(m=>m.visibility==='list'&&m.slug&&m.display_name).map(m=>({id:m.slug,name:m.display_name}));}
+  async analyzeDocuments({model,patient,context,documents}){
+    if(!model||!documents?.length||documents.length>6)throw new Error('Choose a model and documents.');
+    const token=await this.access(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);this.aborters.add(controller);
+    try{
+      const content=[{type:'input_text',text:JSON.stringify({patient,existingContext:context})}];
+      for(const d of documents){if(d.mime==='application/pdf')content.push({type:'input_file',filename:d.name,file_data:d.dataUrl});else content.push({type:'input_image',image_url:d.dataUrl});}
+      const r=await this.fetch(API+'/responses',{method:'POST',signal:controller.signal,headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({model,instructions:INTAKE_INSTRUCTIONS,input:[{role:'user',content}],store:false,stream:true})});
+      if(!r.ok){let b={};try{b=await r.json();}catch{}throw apiError(r.status,b);}
+      return parseIntake(await readCompletedStream(r.body));
+    }finally{clearTimeout(timer);this.aborters.delete(controller);}
+  }
   async generate({model,context,images=[]}){
     if(!model||!context||images.length>6)throw new Error('Choose a model and valid visit input.');
     const token=await this.access(),controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);this.aborters.add(controller);

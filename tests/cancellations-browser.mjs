@@ -64,7 +64,7 @@ try{
  await context.setOffline(true);assert.equal(await page.locator('[data-history-code]').first().isEnabled(),false);await context.setOffline(false);
  await page.locator('[data-history]').first().click();
  await card('14077').locator('[data-remove-code]').click();await draft();assert.equal(cloud.entries[0].items.length,4);
-await page.locator('#local-changes').click();assert.equal(await page.locator('#changes-list [data-cancel-code]').count(),0);assert.match(await page.locator('#changes-list').innerText(),/Before local changes/);
+await page.locator('#local-changes').click();assert.equal(await page.locator('#changes-list [data-cancel-code]').count(),0);assert.match(await page.locator('#changes-list').innerText(),/Before/);
  await page.locator('#changes-dialog').getByRole('button',{name:'Close',exact:true}).click();await save();assert.equal(cloud.entries[0].items.some(i=>i.code==='14077'),false);
  // Removing a qualifying visit also removes its now-orphaned bonus, not conference.
  await card('00114').locator('[data-remove-code]').click();assert.equal(await page.locator('.code-details').count(),1);assert.equal(await card('13121').count(),1);

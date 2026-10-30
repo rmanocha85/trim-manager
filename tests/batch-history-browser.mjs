@@ -47,7 +47,7 @@ try{
  await page.locator('#history-content [data-history-patient="'+patients[0].key+'"]').first().click();
  assert.equal(await page.locator('#history-by-patient').getAttribute('aria-pressed'),'true');assert.match(await page.locator('#history-patient-summary').innerText(),/Thu, Oct 8, 2026/);
  const rows=page.locator('#history-content tbody tr');assert.equal(await rows.count(),2);assert.equal(await rows.last().locator('[data-history-remove]').count(),0);assert.match(await rows.last().innerText(),/Historical synthetic concern/);
- await page.locator('#history-search').fill(patients[1].phn);assert.equal(await page.locator('#history-patient-results button').count(),1);await page.locator('#history-patient-results button').click();
+ await page.locator('#history-search').fill(patients[1].phn);assert.equal(await page.locator('#history-patient-results [data-history-patient]').count(),1);await page.locator('#history-patient-results [data-history-patient]').click();
  assert.match(await page.locator('#history-content').innerText(),/Synthetic reason/);await page.screenshot({path:'work/patient-history-preview.png',fullPage:true});
  await page.locator('[data-history-code="13121"]').click();await local();assert.match(await page.locator('#history-content').innerText(),/Removals waiting to save/);
  await page.locator('#local-changes').click();assert.doesNotMatch(await page.locator('#changes-list').innerText(),/Workspace/);assert.match(await page.locator('#local-changes').innerText(),/Billing pending/);

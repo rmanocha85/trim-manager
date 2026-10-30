@@ -94,7 +94,7 @@ export function normalizeRoster(raw) {
     if(!p.id||!p.name) throw new Error('Roster contains an incomplete identity.');
     validateHospitalStays(p);
     const key=patientKey(p); if(seen.has(key)) throw new Error('Duplicate patient identity in roster; source must be reviewed.');seen.add(key);
-    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel,...(p.hospitalStays?{hospitalStays:clone(p.hospitalStays)}:{}),...(validDate(p.panelAddedDate)?{panelAddedDate:p.panelAddedDate,newPanelPatient:p.newPanelPatient===true}:{})};
+    return {id:String(p.id),key,name:String(p.name),phn:String(p.phn||''),unit:String(p.unit||''),room:String(p.room||''),codes:String(p.codes||''),ava:String(p.ava||''),pFlag:p.pFlag===true,panel,dateOfBirth:String(p.dateOfBirth||p.dob||''),mostStatus:String(p.mostStatus||''),...(p.hospitalStays?{hospitalStays:clone(p.hospitalStays)}:{}),...(validDate(p.panelAddedDate)?{panelAddedDate:p.panelAddedDate,newPanelPatient:p.newPanelPatient===true}:{})};
    });
   };
   return {patients:normalizePatients(raw.patients,true),otherPatients:normalizePatients(raw.otherPatients||[],false),units:raw.units.map(u=>({id:String(u.id),name:String(u.name),floor:u.floor??''}))};

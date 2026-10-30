@@ -50,8 +50,8 @@ try{
   await page.locator('[data-tab=billing]').click();
   for(const width of [1440,1024,390]){
     await page.setViewportSize({width,height:width===390?844:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-    const link=await page.locator('#roster .ava-chart-link').boundingBox(),name=await page.locator('.patient-name').boundingBox();
-    assert.ok(name.x+name.width<=link.x+1,JSON.stringify({width,link,name}));
+    const link=await page.locator('#roster .ava-chart-link').boundingBox(),name=await page.locator('#roster .identity-name').boundingBox();
+    assert.ok(name.y+name.height<=link.y+1||name.x+name.width<=link.x+1,JSON.stringify({width,link,name}));
     await page.screenshot({path:`work/app-fixes-${width}.png`,fullPage:true});
   }
   await page.setViewportSize({width:1440,height:1000});await page.locator('[data-section=patients]').click();

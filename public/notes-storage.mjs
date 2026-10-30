@@ -49,4 +49,4 @@ export class DriveNotesRepository{
     const verified=await this.load(name);if(!equal(verified.data,data))throw new Error('Clinical save could not be verified. Local work retained.');return verified;
   }
 }
-export function checkPath(name){if(!/^(patient-context\.json|visits\/\d{4}-\d{2}-\d{2}\.json|handoffs\/\d{4}-\d{2}-\d{2}\.json|sources\/[a-zA-Z0-9-]{1,80}\.json)$/.test(name||''))throw new Error('Invalid clinical document path.');return name;}
+export function checkPath(name){if(!/^(patient-context\.json|patient-display\.json|index\.json|patients\/\d{10}\.json|visits\/\d{4}-\d{2}-\d{2}\.json|handoffs\/\d{4}-\d{2}-\d{2}\.json|sources\/[a-zA-Z0-9-]{1,80}\.json)$/.test(name||''))throw new Error('Invalid clinical document path.');return name;}
