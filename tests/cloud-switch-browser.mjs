@@ -38,7 +38,7 @@ const page=await context.newPage(),laptop=await context.newPage();for(const p of
 const connect=async(p,url)=>{await p.goto(url);await p.locator('#connect').click();await p.locator('#cloud-connect').click();await p.locator('#workspace').waitFor({state:'visible'});};
 const saved=p=>p.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
 const patients=p=>p.locator('#patients-workspace');
-const editRoom=async(p,value)=>{await p.locator('[data-section=patients]').click();await patients(p).locator('[data-click="startEdit(\'own\')"]').click();await patients(p).locator('#er-own').fill(value);await patients(p).locator('[data-click="saveEdit(\'own\')"]').click();await p.waitForFunction(()=>!document.querySelector('#sync').disabled);};
+const editRoom=async(p,value)=>{await p.locator('[data-section=patients]').click();await patients(p).locator('#patient-actions-own').evaluate(e=>e.showPopover());await patients(p).locator('[data-click="startEdit(\'own\')"]').click();await patients(p).locator('#er-own').fill(value);await patients(p).locator('[data-click="saveEdit(\'own\')"]').click();await p.waitForFunction(()=>!document.querySelector('#sync').disabled);};
 try{
  await connect(page,cloudURL);await saved(page);
  assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'select_account',login_hint:undefined});
@@ -65,7 +65,7 @@ try{
  await editRoom(page,'CLOUD');await editRoom(laptop,'LAPTOP');await laptop.locator('#sync').click();await saved(laptop);await page.locator('[data-section=billing]').click();await page.locator('#sync').click();await page.locator('#session-status').filter({hasText:'changed on both computers'}).waitFor();assert.equal(files.get('1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3').data.patients[0].room,'LAPTOP');assert.equal(await patients(page).isVisible(),true);
  await patients(page).locator('#roster-conflict-dialog input[value=drive]').check();await patients(page).locator('#roster-apply').click();await saved(page);assert.match(await patients(page).locator('#ulist').innerText(),/LAPTOP/);
  // An independent local diagnosis edit combines with the other computer's room edit without uploading on refresh.
- await patients(page).locator('[data-click="startEdit(\'own\')"]').click();await patients(page).locator('#ec-own').fill('401 250');await patients(page).locator('[data-click="saveEdit(\'own\')"]').click();await page.waitForFunction(()=>!document.querySelector('#sync').disabled);
+ await patients(page).locator('#patient-actions-own').evaluate(e=>e.showPopover());await patients(page).locator('[data-click="startEdit(\'own\')"]').click();await patients(page).locator('#ec-own').fill('401 250');await patients(page).locator('[data-click="saveEdit(\'own\')"]').click();await page.waitForFunction(()=>!document.querySelector('#sync').disabled);
  await editRoom(laptop,'INDEPENDENT');await laptop.locator('#sync').click();await saved(laptop);const countBeforeRefresh=writes.length;
  await page.locator('#load-latest').click();await page.waitForFunction(()=>!document.querySelector('#load-latest').disabled);assert.equal(writes.length,countBeforeRefresh);assert.match(await patients(page).locator('#ulist').innerText(),/INDEPENDENT/);assert.match(await patients(page).locator('#ulist').innerText(),/401 250/);
  await page.locator('#sync').click();await saved(page);assert.equal(files.get('1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3').data.patients[0].codes,'401 250');

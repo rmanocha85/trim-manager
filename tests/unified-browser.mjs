@@ -19,14 +19,14 @@ const p=selector=>page.locator('#patients-workspace').locator(selector);
 const section=async name=>page.locator(`[data-section="${name}"]`).click();
 const localReady=()=>page.waitForFunction(()=>!document.querySelector('#sync').disabled);
 const saved=()=>page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
-const editRoom=async room=>{await p('[data-click="startEdit(\'own\')"]').click();await p('#er-own').fill(room);await p('[data-click="saveEdit(\'own\')"]').click();await localReady();};
+const editRoom=async room=>{await p('#patient-actions-own').evaluate(e=>e.showPopover());await p('[data-click="startEdit(\'own\')"]').click();await p('#er-own').fill(room);await p('[data-click="saveEdit(\'own\')"]').click();await localReady();};
 const readRoster=async()=>JSON.parse(await readFile(rosterPath,'utf8'));
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.locator('.patient').first().waitFor();await saved();
  assert.equal(await readFile(rosterPath,'utf8'),originalRoster);assert.equal(await readFile(billingPath,'utf8'),originalBilling);await assert.rejects(access(path.join(dir,'roster-snapshots')));
  await section('patients');assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),1);await p('#ulist a[href="https://www.avaemr.ca/patients/123456"]').first().waitFor();
- await p('[data-click="printTrim()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();assert.equal(await page.frameLocator('#patients-print-frame').getByText('SYNTHETIC, Retained',{exact:true}).count(),0);await page.locator('#patients-print-close').click();
- await p('[data-click="printBilling()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();await page.locator('#patients-print-close').click();
+ await p('#roster-more > summary').click();await p('[data-click="printTrim()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();assert.equal(await page.frameLocator('#patients-print-frame').getByText('SYNTHETIC, Retained',{exact:true}).count(),0);await page.locator('#patients-print-close').click();
+ await p('#roster-more > summary').click();await p('[data-click="printBilling()"]').click();await page.frameLocator('#patients-print-frame').locator('body').filter({hasText:person.name}).waitFor();await page.locator('#patients-print-close').click();
  await editRoom('102');
  await p('[data-click="showTab(\'other-patients\',this)"]').click();await p('[data-other-doctor="other"]').selectOption('Dr. Celine Laferriere');await localReady();
  assert.equal(await readFile(rosterPath,'utf8'),originalRoster);
@@ -48,9 +48,9 @@ try{
  // Lost save acknowledgment is safe to retry without overwriting or duplicating.
  await section('patients');await editRoom('103');let lost=true;await page.route('**/api/roster/document',async route=>{if(lost&&route.request().method()==='PUT'){lost=false;await route.fetch();return route.abort();}return route.continue();});await page.locator('#sync').click();await page.locator('#session-status').filter({hasText:'Remaining changes'}).waitFor();assert.equal((await readRoster()).patients[0].room,'103');await page.locator('#sync').click();await saved();
  // Competing writes block replacement; reload requires an explicit discard confirmation.
- await editRoom('104');const competing=await readRoster();competing.patients[0].room='REMOTE';await writeFile(rosterPath,JSON.stringify(competing));await page.locator('#sync').click();await page.locator('#session-status').filter({hasText:'changed on both computers'}).waitFor();assert.equal((await readRoster()).patients[0].room,'REMOTE');assert.match(await p('#ulist').innerText(),/104/);await p('#roster-close').click();await p('#btn-connect').click();await saved();assert.match(await p('#ulist').innerText(),/REMOTE/);
+ await editRoom('104');const competing=await readRoster();competing.patients[0].room='REMOTE';await writeFile(rosterPath,JSON.stringify(competing));await page.locator('#sync').click();await page.locator('#session-status').filter({hasText:'changed on both computers'}).waitFor();assert.equal((await readRoster()).patients[0].room,'REMOTE');assert.match(await p('#ulist').innerText(),/104/);await p('#roster-close').click();if(!await p('#roster-more').evaluate(e=>e.open))await p('#roster-more > summary').click();await p('#btn-connect').click();await saved();assert.match(await p('#ulist').innerText(),/REMOTE/);
  // Removal is local until save, retains the entire identity, and can reactivate that same ID.
- await p('[data-click="promptDel(\'own\')"]').click();await p('[data-click="confirmDel()"]').click();await localReady();assert.equal((await readRoster()).patients.length,1);await page.locator('#sync').click();await saved();assert.equal((await readRoster()).patients.length,0);
+ await p('#patient-actions-own').evaluate(e=>e.showPopover());await p('[data-click="promptDel(\'own\')"]').click();await p('[data-click="confirmDel()"]').click();await localReady();assert.equal((await readRoster()).patients.length,1);await page.locator('#sync').click();await saved();assert.equal((await readRoster()).patients.length,0);
  await p('#add-patient > summary').click();for(const [id,value]of Object.entries({'in-name':person.name,'in-phn':person.phn,'in-room':'105','in-codes':person.codes,'in-ava':person.ava}))await p('#'+id).fill(value);await p('#in-unit').selectOption('cedar');await p('[data-click="addPatient()"]').click();await localReady();await page.locator('#sync').click();await saved();const restored=await readRoster();assert.equal(restored.patients[0].id,'own');assert.deepEqual(restored.patients[0].extra,person.extra);assert.equal(restored.patients[0].newPanelPatient,false);assert.equal(restored.removedPatients.length,1);
  await p('[data-click="showTab(\'history\',this)"]').click();await p('#snapshot-list button').first().click();await p('#history-banner').waitFor({state:'visible'});assert.equal(await p('#ulist .needs-connect').first().evaluate(e=>getComputedStyle(e).pointerEvents),'none');assert.match(await p('#ulist').innerText(),/101/);await p('[data-click="exitHistoryView()"]').click();assert.match(await p('#ulist').innerText(),/105/);
  await section('settings');assert.equal(await page.locator('#starting-dates').evaluate(e=>e.open),false);await page.screenshot({path:'work/unified-settings-synthetic.png',fullPage:true});
@@ -64,6 +64,7 @@ try{
  // New intake creates its empty Notes file in the same shared save, without changing existing history.
  const existingContext=await readFile(path.join(notesPath,'patients',person.phn+'.json'),'utf8');
  await section('patients');
+ if(!await p('#add-patient').evaluate(e=>e.open))await p('#add-patient > summary').click();
  for(const [id,value]of Object.entries({'in-name':'SYNTHETIC, New intake','in-phn':'0000000004','in-room':'106','in-codes':'290 V15','in-ava':'123459'}))await p('#'+id).fill(value);
  await p('#in-unit').selectOption('cedar');await p('[data-click="addPatient()"]').click();await localReady();
  await assert.rejects(access(path.join(notesPath,'patients','0000000004.json')));

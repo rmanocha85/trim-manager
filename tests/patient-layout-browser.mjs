@@ -39,23 +39,34 @@ try{
  }
  await section('patients');
  assert.equal(await p('[data-notes-upload],.notes-upload-help').count(),0);
- assert.equal(await p('.stats-row').first().innerText().then(t=>t.includes('DATE SLOTS')),false);assert.equal(await p('.tabs-bar').innerText().then(t=>t.includes('Print dates')),false);
+ assert.equal(await p('#stats').isVisible(),false);assert.equal(await p('.tabs-bar').innerText().then(t=>t.includes('Print dates')),false);
  const name=row.locator('.pnm'),flag=row.locator('.pflag');
  const copy=row.locator('.phn-copy');assert.equal(await copy.count(),1);await copy.click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[0].phn);
- assert.equal(await row.locator('.pnm .hospital-dates').count(),1);
+ assert.equal(await row.locator('.roster-hospital .hospital-dates').count(),1);
  const nameBox=await name.boundingBox(),hospitalBox=await row.locator('.hospital-dates').boundingBox();assert.ok(Math.abs((nameBox.y+nameBox.height/2)-(hospitalBox.y+hospitalBox.height/2))<3);assert.ok(hospitalBox.x>nameBox.x);
- assert.ok((await row.boundingBox()).height<=38);
+ assert.ok((await row.boundingBox()).height<=44);
  // Stage a reversible row edit to verify save locking and upload metadata preservation.
- await row.getByRole('button',{name:'Edit',exact:true}).click();await p('#ec-sample-0').fill('401 250');await row.getByRole('button',{name:'Save',exact:true}).click();await ready();
+ await row.locator('.patient-actions-toggle').click();await row.getByRole('button',{name:'Edit',exact:true}).click();await p('#ec-sample-0').fill('401 250');await row.getByRole('button',{name:'Save',exact:true}).click();await ready();
  let release,started;const entered=new Promise(r=>started=r),held=new Promise(r=>release=r);
  await page.route('**/api/roster/document',async route=>{if(route.request().method()==='PUT'){started();await held;}await route.continue();});
  await page.locator('#sync').click();await entered;assert.equal(await page.locator('.app-utility').evaluate(e=>e.inert),true);release();await saved();await page.unroute('**/api/roster/document');
  const savedRoster=JSON.parse(await readFile(rosterPath,'utf8'));assert.equal(savedRoster.patients[1].notesDataUploaded,true);assert.equal(savedRoster.patients[1].notesDataUploadedAt,roster.patients[1].notesDataUploadedAt);
  await p('[data-click="showTab(\'other-patients\',this)"]').click();assert.equal(await p('[data-notes-upload]').count(),0);assert.equal(await p('#other-list tbody tr').first().locator('.phn-copy').count(),1);
+ // Other Patients has the same compact columns and its own add flow.
+ assert.match(await p('#roster-count').innerText(),/1 other patients/);
+ const panelBefore=structuredClone(savedRoster.patients),billingBefore=await readBilling();
+ await p('#add-patient > summary').click();assert.equal(await p('#new-doctor-field').isVisible(),true);
+ for(const [id,value] of Object.entries({'in-name':'Added, Coverage','in-phn':'0000000006','in-room':'1406','in-codes':'401','in-ava':'123461','in-dob':'1940-01-01'}))await p('#'+id).fill(value);
+ await p('#in-unit').selectOption('cedar');await p('#in-doctor').selectOption('Dr. Adam Siemens');await p('#in-most').selectOption('DNACPR M3');await p('[data-click="addPatient()"]').click();await save();
+ const coverage=JSON.parse(await readFile(rosterPath,'utf8'));assert.deepEqual(coverage.patients,panelBefore);assert.equal(coverage.otherPatients.length,2);assert.equal(coverage.otherPatients[1].doctor,'Dr. Adam Siemens');assert.deepEqual(await readBilling(),billingBefore);
+ assert.match(await p('#roster-count').innerText(),/2 other patients/);await p('#other-doctor-filter').selectOption('Dr. Adam Siemens');assert.equal(await p('#other-list tbody tr').count(),1);assert.equal(await p('#other-list .identity-most').innerText(),'DNACPR M3');assert.ok((await p('#other-list tbody tr').boundingBox()).height<=44);
+ const center=async locator=>{const b=await locator.boundingBox();return b.x+b.width/2;};assert.ok(Math.abs(await center(p('#other-list .roster-demographic-head>span').first())-await center(p('#other-list .identity-age')))<1);
+ const nameCol=await p('#other-list tbody td').nth(1).boundingBox(),phnCol=await p('#other-list tbody td').nth(2).boundingBox();assert.equal(nameCol.width,220);assert.equal(phnCol.x-nameCol.x,220);assert.equal(await p('#other-list .identity-ava').count(),0);assert.doesNotMatch(await p('#other-list').innerText(),/123461/);
+ await page.screenshot({path:'work/compact-other-patients.png',fullPage:true});await page.reload();await page.locator('.patient').first().waitFor();await saved();await section('patients');await p('[data-click="showTab(\'other-patients\',this)"]').click();assert.match(await p('#roster-count').innerText(),/2 other patients/);
  await p('[data-click="showTab(\'patients\',this)"]').click();
  for(const width of [1440,1280,1024,768,390,360]){
    await page.setViewportSize({width,height:844});await page.evaluate(()=>scrollTo(0,0));
-   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`horizontal overflow at ${width}`);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`horizontal overflow at ${width}: `+JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('*'),...document.querySelector('#patients-workspace').shadowRoot.querySelectorAll('*')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&e.getBoundingClientRect().width>0).map(e=>[e.tagName,e.id,e.className,e.getBoundingClientRect().right]))));
    const buttons=page.locator('#workspace>header .header-actions button:visible');const boxes=await buttons.evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom};}));
    assert.ok(boxes.every(b=>b.h===40&&b.x>=0&&b.right<=width),JSON.stringify({width,boxes}));
    for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){const a=boxes[i],b=boxes[j];assert.ok(a.right<=b.x+.5||b.right<=a.x+.5||a.bottom<=b.y+.5||b.bottom<=a.y+.5,JSON.stringify({width,a,b}));}

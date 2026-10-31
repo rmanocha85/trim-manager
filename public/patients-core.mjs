@@ -76,3 +76,8 @@ export function edit(raw,id,fields,asOf=today()){
     if(Object.hasOwn(fields,'ava'))updated.ava=digits(fields.ava);
     return validate({...roster,patients:roster.patients.map(p=>p===old?updated:p)});
   }
+
+export function addOther(raw,fields,asOf=today(),newId=()=>globalThis.crypto.randomUUID()){
+ const added=add(raw,fields,asOf,newId),patient={...added.patients.at(-1),newPanelPatient:false};
+ return validate({...added,patients:added.patients.slice(0,-1),otherPatients:[...added.otherPatients,patient]});
+}

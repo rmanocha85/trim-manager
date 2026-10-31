@@ -51,7 +51,7 @@ try{
   for(const width of [1440,1024,390]){
     await page.setViewportSize({width,height:width===390?844:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     const link=await page.locator('#roster .ava-chart-link').boundingBox(),name=await page.locator('#roster .identity-name').boundingBox();
-    assert.ok(name.y+name.height<=link.y+1||name.x+name.width<=link.x+1,JSON.stringify({width,link,name}));
+    assert.deepEqual(name,link);
     await page.screenshot({path:`work/app-fixes-${width}.png`,fullPage:true});
   }
   await page.setViewportSize({width:1440,height:1000});await page.locator('[data-section=patients]').click();
@@ -60,9 +60,9 @@ try{
   await p('#in-unit').selectOption('custom');await p('[data-click="addPatient()"]').click();await save();
   assert.equal(JSON.parse(await readFile(rosterPath,'utf8')).patients.length,151);
   await page.reload();await page.locator('.patient').first().waitFor();await saved();await page.locator('#search').fill('SYNTHETIC EXTRA');assert.equal(await page.locator('.patient').count(),1);
-  await page.locator('[data-section=patients]').click();assert.match(await p('#stats').innerText(),/151/);
+  await page.locator('[data-section=patients]').click();assert.match(await p('#roster-count').innerText(),/151/);
   for(const [action,rows,pages] of [['printTrim','.t-row','.tpage'],['printBilling','.bpn','.bpage']]){
-    await p(`[data-click="${action}()"]`).click();const frame=page.frameLocator('#patients-print-frame');
+    if(!await p('#roster-more').evaluate(e=>e.open))await p('#roster-more > summary').click();await p(`[data-click="${action}()"]`).click();const frame=page.frameLocator('#patients-print-frame');
     await frame.locator(rows).first().waitFor();assert.equal(await frame.locator(rows).count(),151);assert.ok(await frame.locator(pages).count()>=4);
     assert.match(await frame.locator('body').innerText(),/CUSTOM/);
     await page.emulateMedia({media:'print'});

@@ -1,10 +1,10 @@
-import {identityHTML,bindIdentity,nameCopy} from './patient-identity.mjs?v=20261030-layout4';
+import {identityHTML,bindIdentity,nameCopy} from './patient-identity.mjs?v=20261031-compact1';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
-import {escapeHTML as esc,clone,isPostHospitalReview} from './core.mjs?v=20261030-layout4';
+import {escapeHTML as esc,clone,isPostHospitalReview} from './core.mjs?v=20261031-compact1';
 import {formatDate} from './dates.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
-import {contextRecord,dayRecord,validateRecord,startVisit,editVisit,touch,markReviewed,isReviewed,roundCandidates,orderedEntries,makeHandoff,generationInput,MODES,QUICK_STATEMENTS,visitStatements,clinicalRecords,ensurePatientContexts} from './notes-core.mjs?v=20261030-layout4';
-import {LocalNotesRepository,CONTENT_PATH,dayPath,sourcePath,handoffPath} from './notes-storage.mjs?v=20261030-layout4';
+import {contextRecord,dayRecord,validateRecord,startVisit,editVisit,touch,markReviewed,isReviewed,roundCandidates,orderedEntries,makeHandoff,generationInput,MODES,QUICK_STATEMENTS,visitStatements,clinicalRecords,ensurePatientContexts} from './notes-core.mjs?v=20261031-compact1';
+import {LocalNotesRepository,CONTENT_PATH,dayPath,sourcePath,handoffPath} from './notes-storage.mjs?v=20261031-compact1';
 const $=id=>document.getElementById(id),local=()=>['127.0.0.1','localhost'].includes(location.hostname);
 const unitsHTML=(units,value)=>'<option value="">All units</option>'+units.map(u=>`<option value="${esc(u.id)}" ${u.id===value?'selected':''}>${esc(u.name)}</option>`).join('');
 export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){

@@ -1,17 +1,17 @@
+import {normalizeMost,latestDocumentedMost} from './most-designations.mjs';
 // A display projection only. The individual patient context remains authoritative.
 export function profileDisplay(context){
  const summary=String(context?.summaryMarkdown||''),lines=summary.split(/\r?\n/);
- const evidence=lines.filter(l=>!/^[#\s]*$/.test(l)&&!/^#+\s/.test(l)&&(/\bMOST\b/.test(l)||/\b(?:DNA?CPR|DNR)\s+[CM][123]\b/.test(l)));
- const tokens=evidence.flatMap(l=>[...l.matchAll(/\b(?:(DNACPR|DNR|CPR)\s+)?([CM][123])\b/g)].map(m=>m[1]?m[1]+' '+m[2]:m[2]));
- const statuses=[...new Set(tokens.map(t=>t.replace(/^DNR /,'DNACPR ')))];
- // Never pick an apparent latest order from narrative chronology or a proposed change.
- const review=statuses.length>1||evidence.some(l=>/conflict|reconcil|propos|considered|discussed|possible|planned|pending|unfilled|blank|unclear/i.test(l));
+ const evidence=lines.filter(l=>!/^[#\s]*$/.test(l)&&!/^#+\s/.test(l)&&(/\bMOST\b/i.test(l)||/\b(?:DNA?\s*CPR|DNR)\s+[CM][123]\b/i.test(l)));
+ const candidate=latestDocumentedMost(evidence),confirmed=context?.currentMost;
+ const confirmationStatus=confirmed?.source==='physician'&&/^\d{4}-\d{2}-\d{2}$/.test(confirmed.confirmedOn||'')?normalizeMost(confirmed.designation):'';
+ const designation=confirmationStatus||candidate.designation;
+ const pending=!confirmationStatus&&(candidate.pending||evidence.some(l=>/review|conflict|reconcil|propos|possible|pending|unfilled|blank|unclear|not supplied/i.test(l)));
+ const confirmation=confirmationStatus?'Physician confirmed '+confirmationStatus+' on '+confirmed.confirmedOn+'.':'';
+ const review=pending?'Pending review.'+(candidate.ambiguous?' The latest designation cannot be established from the conflicting undated entries.':''):'';
  const dob=context?.patient?.dateOfBirth||context?.dateOfBirth||summary.match(/\b(?:DOB|Date of birth)\s*:\s*(\d{4}-\d{2}-\d{2})\b/i)?.[1]||'';
- const confirmed=context?.currentMost;
- const designation=confirmed?.source==='physician'&&/^\d{4}-\d{2}-\d{2}$/.test(confirmed.confirmedOn||'')&&/^(?:(?:CPR|DNACPR) )?[CM][123]$/.test(confirmed.designation||'')?confirmed.designation:'';
- const confirmation=designation?'Physician confirmed '+designation+' on '+confirmed.confirmedOn+'.':'';
- return {dateOfBirth:dob,mostStatus:designation||(review?'Review':statuses[0]||''),mostEvidence:[confirmation,...evidence].filter(Boolean).join('\n'),sourceUpdatedAt:context?.updatedAt||''};
+ return {dateOfBirth:dob,mostStatus:designation,mostEvidence:[confirmation,review,...evidence].filter(Boolean).join('\n'),sourceUpdatedAt:context?.updatedAt||''};
 }
 let profiles={};
 export function setProfileDisplay(value){profiles=value?.patients||{};}
-export function withProfile(p){const c=profiles[String(p.phn||'').replace(/\D/g,'')]||{};return {...p,dateOfBirth:p.dateOfBirth||p.dob||c.dateOfBirth||'',mostStatus:p.mostStatus||c.mostStatus||'',mostEvidence:p.mostStatus?['Roster entry: '+p.mostStatus,c.mostEvidence].filter(Boolean).join('\n'):c.mostEvidence||''};}
+export function withProfile(p){const c=profiles[String(p.phn||'').replace(/\D/g,'')]||{};const roster=normalizeMost(p.mostStatus);return {...p,dateOfBirth:p.dateOfBirth||p.dob||c.dateOfBirth||'',mostStatus:roster||normalizeMost(c.mostStatus),mostEvidence:[p.mostStatus?'Roster entry: '+p.mostStatus:'',p.mostStatus&&!roster?'Pending review: roster designation is incomplete.':'',c.mostEvidence].filter(Boolean).join('\n')};}
