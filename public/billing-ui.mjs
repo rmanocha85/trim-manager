@@ -9,7 +9,7 @@ import {planNewPatients} from './core.mjs?v=20261031-compact1';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
 import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261019-fixes1';
-import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261024-hospital2';
+import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261031-history-date1';
 import {mergeSession} from './merge.mjs?v=20261015-immediate1';
 import {laptopRuntime} from './runtime.mjs';
 import {sameRosterContent} from './patients-core.mjs?v=20261031-compact1';
@@ -326,7 +326,7 @@ function renderHistory(){
     $('history-content').innerHTML=historyPatient?'<div class="card"><h2>Patient billing history</h2>'+historyTable([...currentRows,...oldRows].sort((a,b)=>b.e.date.localeCompare(a.e.date)||String(b.e.createdAt||'').localeCompare(String(a.e.createdAt||''))))+'</div>':'<div class="card empty">Select a patient to see their previous billings.</div>';
   }else{
     const held=heldImports(ledger).filter(h=>!historyDate||h.date===historyDate);
-    $('history-content').innerHTML='<div class="card"><h2>Billing records</h2><p class="hint">Most recently added first.</p>'+historyTable(currentRows)+'</div><div class="card"><h2>Already billed · '+historical.length+' imported records</h2><p>Read-only. Missing historical details are not inferred.</p>'+historyTable(oldRows)+'</div>'+
+    $('history-content').innerHTML='<div class="card"><h2>Billing records</h2><p class="hint">Newest billing date first.</p>'+historyTable(currentRows)+'</div><div class="card"><h2>Already billed · '+historical.length+' imported records</h2><p>Read-only. Missing historical details are not inferred.</p>'+historyTable(oldRows)+'</div>'+
       '<div class="card"><h2>Held for clarification · '+held.length+'</h2><p>Not charges. Not included in reports or next-billing calculations.</p>'+held.map(h=>'<div class="history-row"><span>'+esc(formatDate(h.date))+' · '+esc(h.name)+nameCopy(h.name)+'<br>'+esc(h.reason)+'<br><small>'+sourceLabel([h.source])+'</small></span></div>').join('')+'</div>'+
       (historyDate?'':ledger.batches.map(b=>'<div class="card"><h3>'+esc(formatDate(b.from))+' → '+esc(formatDate(b.to))+'</h3><p>'+b.entryIds.length+' entries · handed over '+esc(formatTimestamp(b.handedOverAt))+'</p></div>').join(''));
   }

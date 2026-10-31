@@ -67,9 +67,9 @@ export function undoRoutineBatch(ledger,receipt){
 }
 export function newestBillingFirst(entries){
   const entered=e=>{const time=Date.parse(e.createdAt);return Number.isFinite(time)?time:0;};
-  // Entry creation, not service date or last edit. Legacy records without a
-  // creation timestamp stay below dated entries, ordered by service date.
-  return [...entries].sort((a,b)=>entered(b)-entered(a)||b.date.localeCompare(a.date)||String(a.id).localeCompare(String(b.id)));
+  // Billing date determines chronology. Creation time only breaks same-day
+  // ties; imported records without timestamps retain their date position.
+  return [...entries].sort((a,b)=>b.date.localeCompare(a.date)||entered(b)-entered(a)||String(a.id).localeCompare(String(b.id)));
 }
 const stable=value=>JSON.stringify(value,(_k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
 export function sessionChanges(base,current){

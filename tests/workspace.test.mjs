@@ -3,16 +3,17 @@ import assert from 'node:assert/strict';
 import {sessionChanges,extractDemographics,coveragePatient,matchesPatientSearch,newestBillingFirst} from '../public/workspace.mjs';
 import {blankLedger,upsertEntry,entryIssues,rosterView,normalizeRoster} from '../public/core.mjs';
 const p={id:'synthetic',key:'phn:0000000001',phn:'0000000001',name:'SYNTHETIC, Person',panel:true};
-test('History shows newly entered billing first, including backdating, without moving edited older entries',()=>{
+test('History sorts by billing date despite later creation or edits, including missing timestamps',()=>{
  const entries=[
   {id:'older',date:'2026-10-08',createdAt:'2026-10-08T10:00:00Z',updatedAt:'2026-10-08T20:00:00Z'},
   {id:'newer',date:'2026-10-08',createdAt:'2026-10-08T11:00:00Z'},
   {id:'backdated',date:'2026-09-22',createdAt:'2026-10-08T12:00:00Z'},
   {id:'legacy',date:'2026-10-07'},
+  {id:'latest-legacy',date:'2026-10-09'},
   {id:'invalid',date:'2026-09-01',createdAt:'unknown'}
  ];
  const before=structuredClone(entries);
- assert.deepEqual(newestBillingFirst(entries).map(e=>e.id),['backdated','newer','older','legacy','invalid']);
+ assert.deepEqual(newestBillingFirst(entries).map(e=>e.id),['latest-legacy','newer','older','legacy','backdated','invalid']);
  assert.deepEqual(entries,before);
  assert.deepEqual(newestBillingFirst([{id:'b',date:'2026-10-01'},{id:'a',date:'2026-10-01'}]).map(e=>e.id),['a','b']);
 });
