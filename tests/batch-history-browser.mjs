@@ -23,6 +23,8 @@ await context.route('https://www.googleapis.com/**',async route=>{const req=rout
 const connect=async()=>{await page.locator('#connect').click();await page.locator('#cloud-connect').click();await page.locator('.patient').first().waitFor();};
 const local=()=>page.locator('#local-changes').filter({hasText:'pending'}).waitFor();
 try{
+ // Keep this fixed October fixture independent of the execution month.
+ await page.clock.setFixedTime(new Date('2026-10-30T20:00:00Z'));
  await page.goto(`http://127.0.0.1:${server.address().port}/?connection=manual`);await connect();
  await page.locator('[data-day="2026-10-08"]').click();assert.equal(await page.locator('#header-date-value').innerText(),'Thu, Oct 8, 2026');
  await page.locator('[data-tab=routine]').click();assert.equal(await page.locator('#add-patient-section').isVisible(),false);
