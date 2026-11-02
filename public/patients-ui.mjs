@@ -1,7 +1,7 @@
 import {nameHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261031-compact1';
 import {updateHospitalStay} from './hospital.mjs?v=20261024-hospital2';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
-import * as TrimRoster from './patients-core.mjs?v=20261031-compact1';
+import * as TrimRoster from './patients-core.mjs?v=20261102-remove1';
 import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
 import {mergeRoster} from './roster-merge.mjs';
@@ -253,8 +253,9 @@ function saveEdit(id){
 }
 function promptDel(id){
   if(!canEdit())return;
-  delId=id;const p=state.patients.find(x=>x.id===id);
-  g('delmsg').textContent=`Remove "${p?.name}" from the active list today (${TrimRoster.today()})? Their roster record will be retained until ${TrimRoster.expiresOn(TrimRoster.today())} for billing reconciliation. Existing billing is preserved.`;
+  const p=[...state.patients,...otherPatients()].find(x=>x.id===id);if(!p)return;
+  delId=id;const roster=state.patients.includes(p)?'My Patients':'Other Patients';
+  g('delmsg').textContent=`Remove "${p.name}" from ${roster} today (${TrimRoster.today()})? Their roster record will be retained until ${TrimRoster.expiresOn(TrimRoster.today())} for billing reconciliation. Existing billing is preserved.`;
   g('delmv').classList.add('open');
 }
 function closeModal(id){g(id).classList.remove('open')}
@@ -395,7 +396,7 @@ function showPatientActions(id,button){
  menu.style.top=Math.max(8,Math.min(box.bottom+4,window.innerHeight-menu.offsetHeight-8))+'px';
 }
 function rosterColumns(other=false){return `<colgroup><col class="col-room"><col class="col-name"><col class="col-phn"><col class="col-hospital"><col class="col-code"><col class="col-profile"><col class="col-actions"></colgroup><thead><tr><th>Room</th><th>Name</th><th>PHN</th><th>Hospital status</th><th>${other?'Doctor':'ICD codes'}</th><th><span class="roster-demographic-head"><span>Age</span><span>MOST</span></span></th><th aria-label="Actions"></th></tr></thead>`;}
-function rosterRow(p,other=false){return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm roster-name">${nameHTML(p)}${p.pFlag?'<span class="pflag">P</span>':''}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td class="roster-hospital">${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</td><td>${other?`<select class="sel doctor-select" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" title="${esc(p.doctor||'Unassigned')}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select>`:`<span class="pcd">${esc(p.codes)||'—'}</span>`}</td><td class="roster-profile">${demographicsHTML(p)}</td><td><button class="btn btn-ghost btn-sm patient-actions-toggle" aria-label="Actions for ${esc(p.name)}" data-click="showPatientActions('${esc(p.id)}',this)">⋯</button><div popover id="patient-actions-${esc(p.id)}" class="patient-actions-menu"><button class="btn btn-ghost upload-documents" data-click="uploadDocuments('${esc(p.id)}')">Documents</button>${other?'':`<button class="btn btn-ghost needs-connect" data-click="startEdit('${esc(p.id)}')">Edit</button><button class="btn btn-danger needs-connect" data-click="promptDel('${esc(p.id)}')">Remove</button>`}</div></td></tr>`;}
+function rosterRow(p,other=false){return `<tr><td><span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm roster-name">${nameHTML(p)}${p.pFlag?'<span class="pflag">P</span>':''}</div></td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td class="roster-hospital">${hospitalFlag(p,TrimRoster.today())}${hospitalSummary(p,TrimRoster.today())}</td><td>${other?`<select class="sel doctor-select" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" title="${esc(p.doctor||'Unassigned')}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select>`:`<span class="pcd">${esc(p.codes)||'—'}</span>`}</td><td class="roster-profile">${demographicsHTML(p)}</td><td><button class="btn btn-ghost btn-sm patient-actions-toggle" aria-label="Actions for ${esc(p.name)}" data-click="showPatientActions('${esc(p.id)}',this)">⋯</button><div popover id="patient-actions-${esc(p.id)}" class="patient-actions-menu"><button class="btn btn-ghost upload-documents" data-click="uploadDocuments('${esc(p.id)}')">Documents</button>${other?'':`<button class="btn btn-ghost needs-connect" data-click="startEdit('${esc(p.id)}')">Edit</button>`}<button class="btn btn-danger needs-connect" data-click="promptDel('${esc(p.id)}')">Remove from roster</button></div></td></tr>`;}
 function rosterEditRow(p){return `<tr><td colspan="7"><div class="roster-edit">
 <label>Name<input class="einp" id="en-${esc(p.id)}" value="${esc(p.name)}"></label><label>PHN<input class="einp" id="ep-${esc(p.id)}" value="${esc(p.phn||'')}"></label>
 <label>Unit<select class="sel" id="eu-${esc(p.id)}">${state.units.map(u=>`<option value="${esc(u.id)}"${p.unit===u.id?' selected':''}>${esc(u.name)}</option>`).join('')}</select></label><label>Room<input class="einp" id="er-${esc(p.id)}" value="${esc(p.room)}"></label>

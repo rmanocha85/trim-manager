@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mergeRoster} from '../public/roster-merge.mjs';
+import {remove} from '../public/patients-core.mjs';
 const base=()=>({patients:[{id:'one',name:'Synthetic',phn:'0000000001',room:'101',codes:'401'}],otherPatients:[],removedPatients:[],units:[],billingDates:['legacy'],unknown:{keep:true}});
 test('roster combines independent fields, retains unknown data and identical edits',()=>{
  const b=base(),l=base(),r=base();l.patients[0].notesDataUploaded=true;r.patients[0].room='102';r.unknown.new='remote';
@@ -21,4 +22,13 @@ test('roster deletion or collection move conflicts with edits; independent addit
 test('roster duplicate identities and missing baseline cannot be merged silently',()=>{
  const b=base(),l=base(),r=base();l.patients.push({id:'local',name:'Local',phn:'0000000002'});r.patients.push({id:'remote',name:'Remote',phn:'0000000002'});
  assert.throws(()=>mergeRoster(b,l,r),/Duplicate/);assert.throws(()=>mergeRoster(null,l,r),/starting copy/);
+});
+
+test('Other Patients removal merges independent panel edits and flags concurrent doctor changes',()=>{
+ const b=base();b.otherPatients=[{id:'other',name:'Coverage, Synthetic',doctor:'Dr. Adam Siemens'}];
+ const l=remove(b,'other','2026-11-02'),r=structuredClone(b);r.patients[0].room='102';
+ const merged=mergeRoster(b,l,r);assert.equal(merged.conflicts.length,0);
+ assert.equal(merged.roster.patients[0].room,'102');assert.equal(merged.roster.otherPatients.length,0);
+ assert.equal(merged.roster.removedPatients[0].doctor,'Dr. Adam Siemens');
+ r.otherPatients[0].doctor='Dr. Celine Laferriere';assert.equal(mergeRoster(b,l,r).conflicts.length,1);
 });

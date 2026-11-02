@@ -48,12 +48,13 @@ export function expire(raw,asOf=today()){
     return {...roster,removedPatients:roster.removedPatients.filter(p=>asOf<expiresOn(p.removedDate))};
   }
 export function remove(raw,id,asOf=today()){
-    const roster=normalize(raw),target=roster.patients.find(p=>String(p.id)===String(id));
+    const roster=normalize(raw),collection=['patients','otherPatients'].find(key=>roster[key].some(p=>String(p.id)===String(id)));
+    const target=collection&&roster[collection].find(p=>String(p.id)===String(id));
     if(!target){
       if(roster.removedPatients.some(p=>String(p.id)===String(id)))return expire(roster,asOf);
       throw new Error('Patient not found; nothing removed.');
     }
-    return expire({...roster,patients:roster.patients.filter(p=>p!==target),removedPatients:[...roster.removedPatients,{...target,removedDate:asOf}]},asOf);
+    return expire({...roster,[collection]:roster[collection].filter(p=>p!==target),removedPatients:[...roster.removedPatients,{...target,removedDate:asOf}]},asOf);
   }
 export function add(raw,fields,asOf=today(),newId=()=>globalThis.crypto.randomUUID()){
     const roster=expire(raw,asOf),phn=digits(fields.phn),ava=digits(fields.ava);

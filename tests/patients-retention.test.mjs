@@ -29,6 +29,25 @@ test('calendar month clamping, leap years and Pacific midnight/DST',()=>{
   assert.equal(R.today(new Date('2026-03-08T09:59:59Z')),'2026-03-08');
   assert.throws(()=>R.expiresOn('2026-02-30'));
 });
+
+test('Other Patients removal retains identity and doctor, leaves My Patients intact, and supports return',()=>{
+  const other={...patient,id:'coverage',phn:'9000000002',ava:'900002',doctor:'Dr. Adam Siemens'};
+  const raw={...fixture(),otherPatients:[other]},before=structuredClone(raw);
+  const removed=R.remove(raw,other.id,'2026-11-02');
+  assert.deepEqual(raw,before);assert.deepEqual(removed.patients,raw.patients);
+  assert.deepEqual(removed.otherPatients,[]);
+  assert.deepEqual(removed.removedPatients,[{...other,removedDate:'2026-11-02'}]);
+  assert.deepEqual(removed.billingDates,raw.billingDates);assert.deepEqual(removed.unrelated,raw.unrelated);
+  assert.deepEqual(R.remove(removed,other.id,'2026-11-03'),removed);
+  assert.throws(()=>R.remove(raw,'missing','2026-11-02'),/Patient not found/);
+  assert.equal(R.expire(removed,'2027-02-01').removedPatients.length,1);
+  assert.equal(R.expire(removed,'2027-02-02').removedPatients.length,0);
+  const restored=R.addOther(removed,other,'2026-11-03');
+  assert.deepEqual(restored.patients,raw.patients);assert.equal(restored.removedPatients.length,0);
+  assert.equal(restored.otherPatients[0].id,other.id);assert.equal(restored.otherPatients[0].doctor,other.doctor);
+  assert.deepEqual(restored.otherPatients[0].extra,other.extra);
+  assert.equal('removedDate' in restored.otherPatients[0],false);
+});
 test('reactivation preserves ID, unknown fields and rejects duplicate/conflicting identity',()=>{
   const removed=R.remove(fixture(),patient.id,'2026-10-05');
   const returned=R.add(removed,{...patient,id:'ignore',room:'2'},'2026-10-06');
