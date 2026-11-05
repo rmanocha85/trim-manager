@@ -42,7 +42,7 @@ await context.route('https://www.googleapis.com/**',async route=>{
  await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
 });
 const page=await context.newPage(),laptop=await context.newPage();for(const p of [page,laptop]){p.setDefaultTimeout(12000);p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());}
-const connect=async(p,url)=>{await p.goto(url);await p.locator('#connect').click();await p.locator('#cloud-connect').click();await p.locator('#workspace').waitFor({state:'visible'});};
+const connect=async(p,url)=>{await p.goto(url);await p.waitForFunction(()=>typeof document.getElementById('connect')?.onclick==='function');await p.locator('#connect').click();await p.locator('#cloud-connect').click();await p.locator('#workspace').waitFor({state:'visible'});};
 const saved=p=>p.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
 const patients=p=>p.locator('#patients-workspace');
 const editRoom=async(p,value)=>{await p.locator('[data-section=patients]').click();await patients(p).locator('#patient-actions-own').evaluate(e=>e.showPopover());await patients(p).locator('[data-click="startEdit(\'own\')"]').click();await patients(p).locator('#er-own').fill(value);await patients(p).locator('[data-click="saveEdit(\'own\')"]').click();await p.waitForFunction(()=>!document.querySelector('#sync').disabled);};
