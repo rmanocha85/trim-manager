@@ -3,13 +3,14 @@ import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospita
 import {escapeHTML as esc,clone,isPostHospitalReview} from './core.mjs?v=20261105-flags1';
 import {formatDate} from './dates.mjs';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
+import {mergeImportedContext} from './context-refresh.mjs?v=20261105-intake1';
 import {contextRecord,dayRecord,validateRecord,startVisit,editVisit,touch,markReviewed,isReviewed,roundCandidates,orderedEntries,makeHandoff,generationInput,MODES,QUICK_STATEMENTS,visitStatements,clinicalRecords,ensurePatientContexts} from './notes-core.mjs?v=20261105-flags1';
 import {LocalNotesRepository,CONTENT_PATH,dayPath,sourcePath,handoffPath} from './notes-storage.mjs?v=20261031-compact1';
 const $=id=>document.getElementById(id),local=()=>['127.0.0.1','localhost'].includes(location.hostname);
 const unitsHTML=(units,value)=>'<option value="">All units</option>'+units.map(u=>`<option value="${esc(u.id)}" ${u.id===value?'selected':''}>${esc(u.name)}</option>`).join('');
 export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
   let repository,context,day,date,dataset,patientKey=null,unit='',search='',showAll=false,ready=false,busy=false,dirty=false,contextTag='new',dayTag='new',pending=0,serial=Promise.resolve(),localError=false,csrf,ai={},models=[],model='',pollTimer,loadEpoch=0;
-  let sourceCache={},noteMessage='',loading=false,aiConnection='checking',aiRefresh=null,aiConnectionError='',pendingHandoff=null,handoffTag='new';
+  let sourceCache={},baseContext,noteMessage='',loading=false,aiConnection='checking',aiRefresh=null,aiConnectionError='',pendingHandoff=null,handoffTag='new';
   const nav=document.querySelector('.sidebar nav');for(const [id,label]of [['rounds','Rounds'],['notes','Output / Notes']]){const b=document.createElement('button');b.className='nav';b.dataset.tab=id;b.textContent=label;nav.insertBefore(b,nav.querySelector('[data-tab="reports"]'));}
   const content=document.querySelector('main.content');
   for(const id of ['rounds','notes']){const section=document.createElement('section');section.id=id;section.className='tab notes-module';section.hidden=true;content.append(section);}
@@ -25,7 +26,7 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
   function safe(fn){return async(...args)=>{try{return await fn(...args);}catch(e){report(e.message,true);$('notes-folder-status').textContent=e.message;if(setupDialog.open)$('notes-ai-status').textContent=e.message;}};}
   const recoveryKey=()=>`notes:${dataset}:${repository?.mode}:${date}`;
   function persist(){
-    if(!ready)return Promise.resolve();pending++;const key=recoveryKey(),snapshot={context:clone(context),day:clone(day),contextTag,dayTag,dirty,sourceCache:clone(sourceCache),pendingHandoff:clone(pendingHandoff),handoffTag};
+    if(!ready)return Promise.resolve();pending++;const key=recoveryKey(),snapshot={context:clone(context),baseContext:baseContext?clone(baseContext):null,day:clone(day),contextTag,dayTag,dirty,sourceCache:clone(sourceCache),pendingHandoff:clone(pendingHandoff),handoffTag};
     serial=serial.catch(()=>{}).then(()=>saveRecovery(key,snapshot)).then(()=>{pending--;localError=false;updateStatus();}).catch(e=>{pending--;localError=true;report('Local save failed. Keep this tab open: '+e.message,true);updateStatus();throw e;});updateStatus();return serial;
   }
   function changed(){if(pendingHandoff){pendingHandoff=null;report('Notes changed. Review and prepare the Meditech handoff again.');}dirty=true;void persist().catch(()=>{});updateStatus();}
@@ -44,8 +45,9 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
     await serial.catch(()=>{});ready=false;date=nextDate;patientKey=null;render();
     const repo=repository,ds=dataset;const [c,d]=await Promise.all([repo.load(CONTENT_PATH),repo.load(dayPath(date))]);if(epoch!==loadEpoch)return;
     context=c.data?validateRecord(c.data,ds,'context'):contextRecord(ds);day=d.data?validateRecord(d.data,ds,'visits',date):dayRecord(ds,date);contextTag=c.etag;dayTag=d.etag;dirty=false;sourceCache={};pendingHandoff=null;handoffTag='new';
-    const recovery=await loadRecovery(recoveryKey());if(epoch!==loadEpoch)return;
+    baseContext=clone(context);const recovery=await loadRecovery(recoveryKey());if(epoch!==loadEpoch)return;
     if(recovery?.dirty){validateRecord(recovery.context,ds,'context');validateRecord(recovery.day,ds,'visits',date);context=recovery.context;day=recovery.day;contextTag=recovery.contextTag;dayTag=recovery.dayTag;sourceCache=recovery.sourceCache||{};pendingHandoff=recovery.pendingHandoff||null;handoffTag=recovery.handoffTag||'new';dirty=true;noteMessage='Recovered your unsaved notes on this device.';}
+    if(recovery?.dirty)baseContext=recovery.baseContext||null;
     ready=true;if(c.data)await ensureRoster(state().roster);render();$('notes-folder-status').textContent=repo.rootId?'Connected to your private Routine notes folder.':repo.mode==='local'?'Using the designated laptop Drive folder. Cloud sync is not verified.':'';
   }
   async function selectDate(value){if(!repository)return;loading=true;try{await persist();await loadDay(value);}catch(e){ready=false;render();report(e.message,true);}finally{loading=false;updateStatus();}}
@@ -54,7 +56,8 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
     try{
       // Image files are separate from the compact patient summary and daily text.
       for(const [id,source]of Object.entries(sourceCache)){if(source.uploaded)continue;await repository.save(sourcePath(id),{app:'trim-notes-source',schema:1,datasetId:dataset,id,mime:source.mime,dataUrl:source.dataUrl},'new');source.uploaded=true;}
-      const c=await repository.save(CONTENT_PATH,context,contextTag);contextTag=c.etag;await persist();
+      const latest=await repository.load(CONTENT_PATH);if(latest.etag!==contextTag){context=mergeImportedContext(baseContext,context,validateRecord(latest.data,dataset,'context'));contextTag=latest.etag;baseContext=clone(latest.data);}
+      const c=await repository.save(CONTENT_PATH,context,contextTag);contextTag=c.etag;baseContext=clone(context);await persist();
       const d=await repository.save(dayPath(date),day,dayTag);dayTag=d.etag;await persist();
       let handoffMessage='';
       if(pendingHandoff){await repository.save(handoffPath(date),pendingHandoff,handoffTag);handoffMessage=` Handoff ready: ${pendingHandoff.patients.length} reviewed notes for ${formatDate(date)}.`;pendingHandoff=null;}
@@ -157,5 +160,11 @@ export function notesUI({state,reconcileBilling,switchTab,onStatus=()=>{}}){
   $('notes-folder-save').onclick=safe(async()=>{if(!state().ledger)throw new Error('Connect your billing workspace first.');if(dirty||busy||loading||pending)throw new Error('Save current notes before reconnecting.');await connect();});
   window.addEventListener('beforeunload',e=>{if(dirty||pending||busy){e.preventDefault();e.returnValue='';}});
   void refreshAI().catch(()=>{});
-  return {save,ensureRoster,status:()=>({dirty,busy:busy||loading||pending>0,error:localError,ready,mode:repository?.mode}),connected:()=>connect().catch(e=>{ready=false;render();report(e.message,true);$('notes-folder-status').textContent=e.message;}),selectDate,render,hasChanges:()=>dirty||pending||busy||loading,beforeLock:async()=>{if(busy||loading)throw new Error('Wait for the current Notes operation before locking.');await serial;}};
+  async function refreshImported(){
+    if(!ready||dirty||busy||loading||pending||document.activeElement?.matches('input,textarea,select'))return;
+    const repo=repository,epoch=loadEpoch,c=await repo.load(CONTENT_PATH);
+    if(repo!==repository||epoch!==loadEpoch||dirty||busy||loading||pending||c.etag===contextTag)return;
+    context=validateRecord(c.data,dataset,'context');baseContext=clone(context);contextTag=c.etag;await persist();render();
+  }
+  return {save,ensureRoster,refreshImported,status:()=>({dirty,busy:busy||loading||pending>0,error:localError,ready,mode:repository?.mode}),connected:()=>connect().catch(e=>{ready=false;render();report(e.message,true);$('notes-folder-status').textContent=e.message;}),selectDate,render,hasChanges:()=>dirty||pending||busy||loading,beforeLock:async()=>{if(busy||loading)throw new Error('Wait for the current Notes operation before locking.');await serial;}};
 }

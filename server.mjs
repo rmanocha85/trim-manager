@@ -34,8 +34,9 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const types={'.js':'text/javascript','.gz':'application/gzip','.txt':'text/plain','.html':'text/html','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};
   const allowed=new Set(['index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
   const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
+  allowed.add('context-refresh.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
-  const background=()=>{void intake.tick().catch(()=>{});void profiles().catch(()=>{});};
+  const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};
   const server=http.createServer(async(req,res)=>{
     res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob:; worker-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
@@ -44,7 +45,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
     try {
       if(!origins.some(o=>o.slice(7)===req.headers.host))return json(403,{error:'Invalid host.'});
       const url=new URL(req.url,origins[0]);
-      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261102-search1'});
+      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261105-intake1',intakeRunning:intake.running});
       if(url.pathname==='/auth/callback'&&req.method==='GET'){
         let message='ChatGPT connected. Return to TRIM Billing and Notes.',ok=true;
         try{await chatgpt.callback(url.searchParams);}catch(e){ok=false;message=e.message;}
@@ -77,7 +78,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
           await backups.ensure(await snapshot(current.ledger));return json(200,await store.save(await readJSON(),current.etag,{restore:true}));
         }
         if(url.pathname==='/api/patient-display'&&req.method==='GET')return json(200,await profiles());
-        if(url.pathname==='/api/intake'&&req.method==='GET')return json(200,{jobs:await intake.list(url.searchParams.get('phn'))});
+        if(url.pathname==='/api/intake'&&req.method==='GET')return json(200,{jobs:await intake.list(url.searchParams.get('phn')),service:{...intake.service,running:intake.running}});
         if(url.pathname==='/api/intake'&&req.method==='POST')return json(200,await intake.submit(await readJSON()));
         if(url.pathname==='/api/intake/retry'&&req.method==='POST')return json(200,await intake.retry((await readJSON()).id));
         if(url.pathname==='/api/intake/accept'&&req.method==='POST'){const saved=await intake.accept((await readJSON()).id);await profiles();return json(200,saved);}

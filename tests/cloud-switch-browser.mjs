@@ -43,7 +43,7 @@ try{
  await connect(page,cloudURL);await saved(page);
  assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'select_account',login_hint:undefined});
  assert.equal(await page.evaluate(()=>localStorage.getItem('trim:drive-account')),'synthetic@example.test');
- await page.reload();await page.locator('#connect').click();await page.locator('#connection-options > summary').click();assert.match(await page.locator('#cloud-account').innerText(),/synthetic@example.test/);await page.locator('#cloud-connect').click();await saved(page);
+ await page.reload();await page.locator('#connect').click();await page.locator('#connection-options > summary').click();await page.locator('#cloud-account').filter({hasText:'synthetic@example.test'}).waitFor();await page.locator('#cloud-connect').click();await saved(page);
  assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'',login_hint:'synthetic@example.test'});
  await page.reload();await page.locator('#connect').click();await page.locator('#connection-options > summary').click();await page.locator('#cloud-switch-account').click();await saved(page);
  assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'select_account',login_hint:undefined});assert.equal(writes.length,0);assert.equal(await page.locator('#local-option').isVisible(),false);
