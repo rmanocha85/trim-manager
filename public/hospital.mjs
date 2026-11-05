@@ -29,3 +29,30 @@ export function updateHospitalStay(raw,key,{id=null,admittedDate,returnedDate=nu
   p.hospitalStays=old?stays.map(s=>s.id===id?stay:s):[...stays,stay];
   validateHospitalStays(p);return next;
 }
+
+const identity=p=>'phn:'+String(p.phn||'').replace(/\D/g,'');
+function patient(raw,key){
+ const matches=['patients','otherPatients'].flatMap(c=>(raw[c]||[]).filter(p=>identity(p)===key));
+ if(!/^phn:\d{10}$/.test(key)||matches.length!==1)throw new Error('Hospital return requires one active roster patient with a verified PHN.');
+ return matches[0];
+}
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+export function returnFromHospitalToday(raw,key,date){
+ const p=patient(raw,key),before=hospitalAt(p,date);
+ if(!before||before.returnedDate)throw new Error('This patient is no longer awaiting a hospital return.');
+ const roster=updateHospitalStay(raw,key,{id:before.id,admittedDate:before.admittedDate,returnedDate:date},date);
+ const after=patient(roster,key).hospitalStays.find(s=>s.id===before.id);
+ return {roster,undo:{key,patientId:p.id,before:structuredClone(before),after:structuredClone(after)}};
+}
+export function canUndoHospitalReturn(raw,undo){
+ try{
+  const p=patient(raw,undo.key);
+  return p.id===undo.patientId&&undo.before.id===undo.after.id&&undo.before.returnedDate===null&&!!undo.after.returnedDate&&same(p.hospitalStays?.find(s=>s.id===undo.after.id),undo.after);
+ }catch{return false;}
+}
+export function undoHospitalReturn(raw,undo){
+ if(!canUndoHospitalReturn(raw,undo))throw new Error('Hospital dates changed after this return. Reopen the dates to review them.');
+ const roster=structuredClone(raw),p=patient(roster,undo.key);
+ p.hospitalStays=p.hospitalStays.map(s=>s.id===undo.after.id?structuredClone(undo.before):s);
+ validateHospitalStays(p);return roster;
+}

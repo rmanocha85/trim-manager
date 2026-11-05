@@ -1,8 +1,8 @@
 import {hospitalAt,hospitalBlocks114,latestHospitalStay} from './hospital.mjs?v=20261024-hospital2';
 import {hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
 import {today,escapeHTML as esc} from './core.mjs?v=20261031-compact1';
-export function hospitalEditor({patients,guard,notify}){
-  const dialog=document.createElement('dialog');dialog.id='hospital-dialog';document.body.append(dialog);
+export function hospitalEditor({patients,guard,notify,host=document.body,dialogId='hospital-dialog'}){
+  const dialog=document.createElement('dialog');dialog.id=dialogId;host.append(dialog);
   let target=null;
   function open(patient,date,stay=null,returning=false){
     guard();const raw=patients.roster(),records=['patients','otherPatients','removedPatients'].flatMap(c=>raw[c]||[]);
@@ -19,7 +19,7 @@ export function hospitalEditor({patients,guard,notify}){
     };
     dialog.showModal();dialog.querySelector(returning?'#hospital-returned':'#hospital-admitted').focus();
   }
-  return {mount(editor,patient,date){
+  return {open,mount(editor,patient,date){
     const title=editor.querySelector('.patient-title');if(!title)return;
     const active=hospitalAt(patient,date),stay=latestHospitalStay(patient,date);
     const menu=document.createElement('details');menu.className='hospital-menu';menu.innerHTML='<summary>More ⋯</summary><div>'+(active?'':'<button type="button" data-hospital-new>Admitted to hospital…</button>')+(stay?'<button type="button" data-hospital-edit>Edit hospital dates…</button>':'')+'</div>';title.append(menu);
