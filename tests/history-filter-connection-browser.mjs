@@ -19,7 +19,7 @@ const browser=await chromium.launch({channel:'chrome',headless:true}),page=await
 try{
   await page.route('https://accounts.google.com/**',r=>r.fulfill({contentType:'text/javascript',body:''}));
   const url=`http://127.0.0.1:${server.address().port}/?connection=manual`;
-  const connect=async()=>{await page.locator('#connect').click();await page.locator('#local-connect').click();await page.locator('.patient').first().waitFor();};
+  const connect=async()=>{await page.locator('#connect').click();await page.locator('#connection-options > summary').click();await page.locator('#local-connect').click();await page.locator('.patient').first().waitFor();};
   await page.goto(url);await page.locator('#notes-setup-open').filter({hasText:'ChatGPT connected'}).waitFor();await page.reload();await page.locator('#notes-setup-open').filter({hasText:'ChatGPT connected'}).waitFor();assert.ok(checks>=2);await connect();
   await page.locator('[data-section="settings"]').click();await page.locator('#notes-ai-connect').filter({hasText:'ChatGPT connected'}).waitFor();assert.equal(await page.locator('#notes-ai-connect').isDisabled(),true);assert.equal(await page.locator('#baseline-patient option').count(),2);assert.match(await page.locator('#baseline-needed-count').innerText(),/2 need history/);
   await page.locator('[data-section="billing"]').click();await page.locator('[data-tab="history"]').click();assert.equal(await page.locator('#history-content tbody tr').count(),4);const serviceDate=await page.locator('#service-date').inputValue();

@@ -83,6 +83,15 @@ export function addOther(raw,fields,asOf=today(),newId=()=>globalThis.crypto.ran
  return validate({...added,patients:added.patients.slice(0,-1),otherPatients:[...added.otherPatients,patient]});
 }
 
+export function editOtherLocation(raw,id,{unit,room}){
+ const roster=normalize(raw),matches=roster.otherPatients.filter(p=>String(p.id)===String(id));
+ if(matches.length!==1)throw new Error('Location changes require one Other Patients record.');
+ const old=matches[0];
+ if(typeof unit!=='string'||typeof room!=='string')throw new Error('Invalid unit or room.');
+ if(unit&&unit!==old.unit&&!roster.units.some(u=>u.id===unit))throw new Error('Choose a unit from the list or Unit not recorded.');
+ return validate({...roster,otherPatients:roster.otherPatients.map(p=>p===old?{...p,unit,room:room.trim()}:p)});
+}
+
 // Flags belong to the active roster, independently of clinical notes or billing.
 export function setPatientFlag(raw,id,flag,value){
  if(!['pFlag','palliativeFlag'].includes(flag)||typeof value!=='boolean')throw new Error('Invalid patient flag.');

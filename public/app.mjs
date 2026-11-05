@@ -1,7 +1,7 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261105-flags1';
 import {documentIntakeUI} from './intake-ui.mjs?v=20261105-flags1';
-import {billingUI} from './billing-ui.mjs?v=20261105-flags1';
-import {patientsUI} from './patients-ui.mjs?v=20261105-flags1';
+import {billingUI} from './billing-ui.mjs?v=20261105-location-login1';
+import {patientsUI} from './patients-ui.mjs?v=20261105-location-login1';
 import {Session} from './session.mjs';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 

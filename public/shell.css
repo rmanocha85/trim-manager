@@ -79,3 +79,27 @@
 #history-calendar .calendar-days button[aria-pressed=true],#history-date-clear[aria-pressed=true]{background:var(--green);color:white;border-color:var(--green)}
 #history-calendar .calendar-days button.has-billing:after{background:currentColor}
 @media(max-width:600px){.history-date-filter{grid-template-columns:1fr;padding:14px;gap:14px}#history-calendar{max-width:360px;width:100%}}
+/* Focused connection prompt; account/file recovery stays available on demand. */
+#connection-dialog{width:438px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 40px);overflow:auto;border:1px solid #dce5dd;border-radius:18px;background:#fffefa;color:#23382d;box-shadow:0 16px 50px #20352b22}
+#connection-dialog::backdrop{background:#20352b70;backdrop-filter:blur(3px)}
+#connection-dialog .focused-connection{padding:30px}
+.connection-brand{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600;letter-spacing:1px;margin-bottom:25px}
+.connection-mark{display:grid;place-items:center;width:31px;height:31px;border-radius:9px;background:#193f2b;color:white;font-size:19px}
+#connection-dialog h2,#gate .gate-card h1{font-size:24px;line-height:1.25;font-weight:600;letter-spacing:-.5px;margin:0 0 9px}
+#connection-dialog .connection-intro,#gate .gate-card>p{font-size:14px;line-height:1.5;color:#606d65;margin:0}
+#connection-dialog #cloud-connect,#gate #connect{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:47px;padding:12px 17px;margin:25px 0 0;border:0;border-radius:9px;background:#193f2b;color:white;font-size:14px;font-weight:600}
+#connection-options{margin-top:24px;padding-top:17px;border-top:1px solid #dce5dd;color:#606d65;font-size:13px}
+#connection-options summary{cursor:pointer;padding:3px 0}
+#connection-options label{margin:18px 0 8px;color:#23382d;display:grid;gap:8px}
+#connection-options input{width:100%;padding:10px;border-radius:6px;background:#fffefa}
+#connection-options #cloud-account{margin:14px 0 5px;overflow-wrap:anywhere}
+#connection-options .hint{font-size:12px;line-height:1.5}
+#connection-dialog .text-button{padding:5px 0;font-size:13px;border:0;background:none;color:#193f2b}
+#connection-dialog .connection-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:20px;font-size:12px;color:#606d65}
+.connection-footer>span{display:flex;align-items:center;gap:6px}.connection-footer svg{width:15px;height:15px}
+#connection-error:empty{display:none}#connection-dialog #connection-error{font-size:13px;line-height:1.5;margin:14px 0 0;overflow-wrap:anywhere}#connection-error[data-state=connecting]{color:#606d65}
+#connection-dialog button:focus-visible,#connection-dialog summary:focus-visible{outline:2px solid #54765d;outline-offset:4px}
+#gate{padding:24px;background:#f0f2ed;grid-template-columns:minmax(0,1fr)}#gate .gate-card{width:min(438px,100%);min-width:0;padding:30px;border:1px solid #dce5dd;border-radius:18px;background:#fffefa;box-shadow:0 10px 30px #20352b12;text-align:left}
+body:has(#connection-dialog[open]) #gate .gate-card{visibility:hidden}
+#gate .connection-brand{justify-content:flex-start}
+@media(max-width:420px){#connection-dialog .focused-connection,#gate .gate-card{padding:23px}#gate{padding:16px}}

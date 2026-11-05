@@ -43,9 +43,9 @@ try{
  await connect(page,cloudURL);await saved(page);
  assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'select_account',login_hint:undefined});
  assert.equal(await page.evaluate(()=>localStorage.getItem('trim:drive-account')),'synthetic@example.test');
- await page.reload();await page.locator('#connect').click();assert.match(await page.locator('#cloud-account').innerText(),/synthetic@example.test/);await page.locator('#cloud-connect').click();await saved(page);
+ await page.reload();await page.locator('#connect').click();await page.locator('#connection-options > summary').click();assert.match(await page.locator('#cloud-account').innerText(),/synthetic@example.test/);await page.locator('#cloud-connect').click();await saved(page);
  assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'',login_hint:'synthetic@example.test'});
- await page.reload();await page.locator('#connect').click();await page.locator('#cloud-switch-account').click();await saved(page);
+ await page.reload();await page.locator('#connect').click();await page.locator('#connection-options > summary').click();await page.locator('#cloud-switch-account').click();await saved(page);
  assert.deepEqual(await page.evaluate(()=>globalThis.oauthRequest),{prompt:'select_account',login_hint:undefined});assert.equal(writes.length,0);assert.equal(await page.locator('#local-option').isVisible(),false);
  await page.locator('[data-section=notes]').click();await page.getByRole('heading',{name:'TRIM Notes runs on your laptop'}).waitFor();assert.equal(await page.locator('#notes-input').count(),0);assert.equal(staticRequests.some(s=>/notes-ui|\/api\//.test(s)),false);
  await editRoom(page,'102');assert.equal(files.get('1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3').data.patients[0].room,'101');

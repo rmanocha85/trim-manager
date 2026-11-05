@@ -12,7 +12,7 @@ import {renderReport} from './reports.mjs?v=20261019-fixes1';
 import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261031-history-date1';
 import {mergeSession} from './merge.mjs?v=20261015-immediate1';
 import {laptopRuntime} from './runtime.mjs';
-import {sameRosterContent} from './patients-core.mjs?v=20261105-flags1';
+import {sameRosterContent} from './patients-core.mjs?v=20261105-location-login1';
 import {RosterRepository} from './roster-repository.mjs';
 
 import {hospitalBlocks114,assertHospital114} from './hospital.mjs?v=20261024-hospital2';
@@ -121,11 +121,11 @@ function applyNewPatientPlans(){
 function openConnectionDialog(){
   const email=preferredDriveAccount();
   $('cloud-account').textContent=email?`Continue with ${email}`:'Choose your Google account on the first connection.';
-  $('connection-error').textContent='';$('connection-dialog').showModal();
+  $('connection-error').textContent='';$('connection-options').open=false;$('connection-dialog').showModal();$('cloud-connect').focus();
 }
 async function connect(mode,create=false,selectAccount=false){
   if(dirty||notes.hasChanges()||patients.hasChanges())return notice('Save or discard your local session before changing connections.');
-  if(connecting)return;connecting=true;
+  if(connecting)return;connecting=true;for(const id of ['cloud-connect','cloud-switch-account','local-connect','create-cloud'])$(id).disabled=true;$('connection-dialog').setAttribute('aria-busy','true');
   let replacedConnection=false;
   $('create-cloud').hidden=true;$('setup-note').hidden=true;
   $('setup-import').hidden=true;setupCandidate=create?setupCandidate:null;
@@ -159,7 +159,7 @@ async function connect(mode,create=false,selectAccount=false){
     onConnected();
     return true;
   }catch(e){if(replacedConnection&&releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;$('connection-error').dataset.state='error';}
-  finally{connecting=false;}
+  finally{connecting=false;for(const id of ['cloud-connect','cloud-switch-account','local-connect','create-cloud'])$(id).disabled=false;$('connection-dialog').removeAttribute('aria-busy');}
 }
 function commit(next){guardWrite();ledger=next;ledger.units=clone(roster.units);seq++;dirty=true;printedSignature=null;status('Saving on this device…',true);persistRecovery().then(()=>{if(!blocked&&!saving&&!writeUnavailable())status('Saved on this device — not yet in Drive',true);}).catch(()=>{});renderStats();renderRoster();updateWriteLock();}
 async function flush(){
