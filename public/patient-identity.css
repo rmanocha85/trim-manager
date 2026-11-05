@@ -53,3 +53,17 @@
 .other-filters{margin-bottom:14px}.other-filters .fg{max-width:800px;gap:12px}.roster-search{display:flex;align-items:center;gap:10px;margin-bottom:14px}.roster-search input{flex:1}.sr-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 [hidden]{display:none!important}
 @media(max-width:600px){.roster-toolbar{width:100%;justify-content:flex-end}.roster-toolbar .add-patient-grid{grid-template-columns:repeat(2,minmax(0,1fr));max-height:70vh;overflow:auto}.roster-edit{grid-template-columns:repeat(2,minmax(0,1fr))}.roster-search{display:block}.roster-search input{display:block;width:100%;margin-top:4px}}
+.patient-flag{display:inline-flex;align-items:center;justify-content:center;flex:none;width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-left:3px;line-height:1;font-size:20px;font-family:Georgia,serif;font-weight:600}
+.patient-flag svg{width:19px;height:19px;display:block}
+.flag-psych{color:#285b86;background:#eaf2fa}
+.flag-palliative{color:#78439a;background:#f1e9f7}
+.patient-actions-menu .flag-toggle{display:flex;align-items:center;gap:8px;width:100%}
+.flag-toggle svg,.p-toggle svg{width:22px;height:22px;flex:none;color:#78439a}
+.flag-toggle>span:first-child{font-size:22px;color:#285b86;min-width:22px}
+.flag-toggle .flag-check{margin-left:auto;min-width:14px}
+.palliative-section .uhdr{background:#f1e9f7;color:#583270;border:1px solid #dfcce9}
+.palliative-section .unm{color:#583270}
+.palliative-section .ucnt{background:#e2d2ed;color:#583270}
+.roster-table .pinned-unit{display:block;font-size:9px;line-height:12px;color:#6a5975;overflow-wrap:anywhere;margin-bottom:2px}
+.roster-table .patient-flag{width:22px;height:22px;margin-left:1px;font-size:19px}
+.roster-table .patient-flag svg{width:18px;height:18px}

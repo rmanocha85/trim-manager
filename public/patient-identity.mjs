@@ -1,6 +1,6 @@
 import {withProfile} from './profile-display.mjs?v=20261031-compact1';
 import {avaChartUrl} from './patient-links.mjs';
-import {today,dateParts} from './patients-core.mjs?v=20261031-compact1';
+import {today,dateParts} from './patients-core.mjs?v=20261105-flags1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const MOST_OPTIONS=['','CPR C2','DNACPR C2','DNACPR C1','DNACPR M3','DNACPR M2','DNACPR M1'];
 export function ageOn(dob,asOf=today()){
@@ -16,7 +16,7 @@ export function validateDemographics(fields){
   return fields;
 }
 export function nameCopy(name){return `<button type="button" class="identity-copy name-copy" data-copy-value="${esc(name)}" aria-label="Copy name: ${esc(name)}" title="Copy Last name, First name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button>`;}
-export function nameHTML(p){const url=avaChartUrl(p);return (url?`<a class="identity-name ava-chart-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Open Ava chart" aria-label="Open Ava chart for ${esc(p.name)}">${esc(p.name)}</a>`:`<span class="identity-name">${esc(p.name)}</span>`)+nameCopy(p.name);}
+export function nameHTML(p){const url=avaChartUrl(p);return (url?`<a class="identity-name ava-chart-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Open Ava chart" aria-label="Open Ava chart for ${esc(p.name)}">${esc(p.name)}</a>`:`<span class="identity-name">${esc(p.name)}</span>`)+nameCopy(p.name)+patientFlagsHTML(p);}
 export function avaHTML(p){const url=avaChartUrl(p);return url?`<a class="identity-ava ava-chart-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="Open Ava chart for ${esc(p.name)}">Ava ↗</a>`:'';}
 export function phnHTML(p){const phn=String(p.phn||'').replace(/\D/g,'');return `<span class="identity-phn">${esc(phn||'—')}${/^\d{10}$/.test(phn)?`<button type="button" class="identity-copy billing-phn-copy" data-copy-value="${phn}" aria-label="Copy PHN for ${esc(p.name)}" title="Copy PHN"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button>`:''}</span>`;}
 export function demographicsHTML(p,asOf=today()){
@@ -34,3 +34,23 @@ export function bindIdentity(root){
 }
 
 export function refreshIdentities(root){for(const el of root.querySelectorAll('[data-profile-phn]')){const d=el.dataset;el.outerHTML=demographicsHTML({phn:d.profilePhn,dateOfBirth:d.profileDob,mostStatus:d.profileMost,newPanelPatient:d.profileNew==='yes',panelAddedDate:d.profileAdded});}}
+
+/* Heart-handshake icon: Lucide, https://lucide.dev/icons/heart-handshake
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+*/
+export function flagIcon(flag){return flag==='pFlag'?'<span aria-hidden="true">Ψ</span>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19.414 14.414C21 12.828 22 11.5 22 9.5a5.5 5.5 0 0 0-9.591-3.676.6.6 0 0 1-.818.001A5.5 5.5 0 0 0 2 9.5c0 2.3 1.5 4 3 5.5l5.535 5.362a2 2 0 0 0 2.879.052 2.12 2.12 0 0 0-.004-3 2.124 2.124 0 1 0 3-3 2.124 2.124 0 0 0 3.004 0 2 2 0 0 0 0-2.828l-1.881-1.882a2.41 2.41 0 0 0-3.409 0l-1.71 1.71a2 2 0 0 1-2.828 0 2 2 0 0 1 0-2.828l2.823-2.762" /></svg>';}
+export function patientFlagsHTML(p){return ['pFlag','palliativeFlag'].filter(flag=>p[flag]===true).map(flag=>{const label=flag==='pFlag'?'Psychiatric consult':'Palliative protocol';return '<span class="patient-flag '+(flag==='pFlag'?'flag-psych':'flag-palliative')+'" role="img" aria-label="'+label+'" title="'+label+'">'+flagIcon(flag)+'</span>';}).join('');}

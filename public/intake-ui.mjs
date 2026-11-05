@@ -1,9 +1,9 @@
-import {identityHTML} from './patient-identity.mjs?v=20261031-compact1';
+import {identityHTML} from './patient-identity.mjs?v=20261105-flags1';
 import {DriveIntake} from './intake-drive.mjs?v=20261031-compact1';
 import {DriveNotesRepository} from './notes-storage.mjs?v=20261031-compact1';
 import {setProfileDisplay} from './profile-display.mjs?v=20261031-compact1';
-import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261031-compact1';
-import {escapeHTML as esc} from './core.mjs?v=20261031-compact1';
+import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261105-flags1';
+import {escapeHTML as esc} from './core.mjs?v=20261105-flags1';
 import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261031-compact1';
 import {laptopRuntime} from './runtime.mjs';
 const digest=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join('');

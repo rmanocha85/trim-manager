@@ -82,3 +82,13 @@ export function addOther(raw,fields,asOf=today(),newId=()=>globalThis.crypto.ran
  const added=add(raw,fields,asOf,newId),patient={...added.patients.at(-1),newPanelPatient:false};
  return validate({...added,patients:added.patients.slice(0,-1),otherPatients:[...added.otherPatients,patient]});
 }
+
+// Flags belong to the active roster, independently of clinical notes or billing.
+export function setPatientFlag(raw,id,flag,value){
+ if(!['pFlag','palliativeFlag'].includes(flag)||typeof value!=='boolean')throw new Error('Invalid patient flag.');
+ const roster=normalize(raw),matches=['patients','otherPatients'].flatMap(collection=>roster[collection].filter(p=>String(p.id)===String(id)).map(patient=>({collection,patient})));
+ if(matches.length!==1)throw new Error('Flag changes require one active roster patient.');
+ const {collection,patient}=matches[0];
+ if(Boolean(patient[flag])===value)return roster;
+ return validate({...roster,[collection]:roster[collection].map(p=>p===patient?{...p,[flag]:value}:p)});
+}
