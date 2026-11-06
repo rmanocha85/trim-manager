@@ -14,6 +14,7 @@ import {validateHandoff} from './public/notes-core.mjs';
 import {RosterStore} from './roster-storage.mjs';
 import {LocalBackupStore} from './backup-storage.mjs';
 import {snapshot,hash} from './public/backups.mjs';
+import {MaidStore} from './maid-storage.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const home=os.homedir();
 const testRoot=process.env.TRIM_TEST_MODE==='1'?path.join(os.tmpdir(),'trim-isolated-no-live-data'):null;
@@ -21,8 +22,10 @@ export const defaults={
   roster:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Roster','trim-patients-data.json'),
   billing:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Billing','trim-billing-data-v1.json')
 };
-export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,snapshotPaths,chatgpt}={}) {
+export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,snapshotPaths,chatgpt}={}) {
   const live=path.resolve(rosterPath)===path.resolve(defaults.roster)&&path.resolve(billingPath)===path.resolve(defaults.billing);
+  maidPath ||= live?path.join(home,'My Drive','00. MAID','MAID AI','maid-roster.json'):path.join(path.dirname(rosterPath),'maid-roster.json');
+  const maidStore=new MaidStore(maidPath);
   notesPath ||= live?path.join(home,'My Drive','02. TRIM','TRIM AI','Working records','Routine notes'):path.join(path.dirname(billingPath),'notes');
   chatgpt ||= live?new ChatGPTConnection():{status:async()=>({connected:false,planEnabled:false}),models:async()=>[],generate:async()=>{throw new Error('AI is disabled for isolated data. Inject a test connection.');}};
   if(path.resolve(rosterPath)===path.resolve(billingPath))throw new Error('Roster and billing paths must be different.');
@@ -35,6 +38,9 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const allowed=new Set(['index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
   const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
   allowed.add('context-refresh.mjs');
+  allowed.add('clinic-roster.mjs');
+  allowed.add('clinic-roster.css');
+  allowed.add('clinic-roster-repository.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
   const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};
   const server=http.createServer(async(req,res)=>{
@@ -64,6 +70,13 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         if(!req.headers.cookie?.split(';').some(c=>c.trim()===`trim_session=${session}`)||req.headers['x-trim-session']!==session)return json(401,{error:'Connect this laptop first.'});
         if(!['GET','HEAD'].includes(req.method)&&!origins.includes(req.headers.origin))return json(403,{error:'Origin required.'});
         const readJSON=async()=>{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>20000000)throw Object.assign(new Error('Clinical request is too large.'),{status:413});}return JSON.parse(raw||'{}');};
+        if(url.pathname==='/api/maid/roster'){
+          if(req.method==='GET')return json(200,await maidStore.load());
+          if(req.method==='POST'){
+            const action=await readJSON();if(!['status','remove'].includes(action.type))return json(400,{error:'Unsupported MAID app action.'});
+            return json(200,await maidStore.mutate(action,req.headers['if-match']));
+          }
+        }
         if(url.pathname.startsWith('/api/backups')){
           const dataset=await hash((await store.load()).ledger.datasetId);
           if(req.method==='GET'&&url.searchParams.get('dataset')!==dataset)throw new Error('Wrong backup dataset.');

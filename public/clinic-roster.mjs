@@ -1,0 +1,77 @@
+import {avaChartUrl} from './patient-links.mjs';
+
+// No patient data is persisted in browser storage; each action verifies its saved revision.
+export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
+  const maid=kind==='maid', title=maid?'MAID':'OAT Fraser Health';
+  let patients=[],view='active',query='',busy=false,ready=false;
+  host.classList.add('clinic-workspace');
+  host.innerHTML=`<div class="clinic-heading"><div><h1>${title}</h1><p>${maid?'Current patients and assessment history.':'Your clinic list, in the order you provide.'}</p></div><span class="clinic-count" role="status" aria-live="polite"></span></div>
+    <div class="clinic-toolbar">${maid?'<nav class="clinic-filters" aria-label="MAID patient status"><button data-view="active" aria-pressed="true">Active</button><button data-view="history" aria-pressed="false">History</button><button data-view="all" aria-pressed="false">All</button></nav>':''}<input type="search" aria-label="Search ${title}" placeholder="Search name, PHN or location" autocomplete="off"></div>
+    <div class="clinic-table-wrap"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient / Ava chart</th><th scope="col">PHN</th><th scope="col">Location</th>${maid?'<th scope="col">Assessment</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
+    <div class="clinic-empty"><h2>Waiting for your patient list</h2><p>${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.</p></div><p class="clinic-feedback" role="status" aria-live="polite"></p>`;
+  if(maid&&onReload){const reload=document.createElement('button');reload.textContent='Reload MAID';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
+  const dialog=document.createElement('dialog');dialog.className='clinic-remove-dialog';dialog.innerHTML='<form method="dialog"><h2>Remove patient from MAID?</h2><p class="remove-name"></p><p>This deletes all of their tracking information from Active and History. Their original documents and folders stay in place.</p><div class="actions"><button value="cancel">Cancel</button><button value="remove" class="danger">Remove patient</button></div></form>';if(maid)host.append(dialog);
+  async function act(action){
+    if(busy||!ready||!onAction)return;busy=true;onChange();render();
+    let message='';
+    try{const result=await onAction(action);patients=structuredClone(result.patients);message=action.type==='remove'?'Patient removed.':'Patient status saved.';if(result.local)message+=' Saved to the laptop Drive folder; cloud sync is unverified.';}
+    catch(error){patients=[];ready=false;message=error.message+' Reload MAID to check the saved list before continuing.';}
+    finally{busy=false;render();feedback.textContent=message;onChange();}
+  }
+  async function confirmRemove(patient){
+    if(busy||dialog.open)return;dialog.querySelector('.remove-name').textContent=patient.name;dialog.returnValue='';
+    const answer=new Promise(resolve=>dialog.addEventListener('close',()=>resolve(dialog.returnValue),{once:true}));dialog.showModal();
+    if(await answer==='remove')await act({type:'remove',patientId:patient.id});
+  }
+  const count=host.querySelector('.clinic-count'),body=host.querySelector('tbody'),empty=host.querySelector('.clinic-empty'),feedback=host.querySelector('.clinic-feedback');
+  const cell=(row,value)=>{const td=document.createElement('td');td.textContent=value??'Not recorded';row.append(td);return td;};
+  function render(){
+    body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy);
+    const inView=patients.map((patient,index)=>({patient,index})).filter(({patient})=>!maid||view==='all'||patient.status===view);
+    const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,p.location,...(p.contacts||[]).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
+    count.textContent=`${visible.length} of ${inView.length} patients`;
+    empty.hidden=visible.length>0;
+    if(!visible.length){
+      empty.querySelector('h2').textContent=patients.length?'No patients match this view':'Waiting for your patient list';
+      empty.querySelector('p').textContent=patients.length?'Try another search or patient view.':`${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.`;
+    }
+    for(const {patient:p,index} of visible){
+      const row=document.createElement('tr');cell(row,String(index+1));
+      const name=cell(row,'');const url=avaChartUrl(p);
+      if(url){const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=p.name;link.title='Open Ava chart';name.append(link);}
+      else {name.textContent=p.name;const hint=document.createElement('small');hint.textContent='Ava number needed';name.append(hint);}
+      const phn=cell(row,'');const digits=String(p.phn||'').replace(/\D/g,'');
+      if(/^\d{10}$/.test(digits)){
+        const value=document.createElement('span');value.textContent=digits;phn.append(value);
+        const copy=document.createElement('button');copy.type='button';copy.textContent='Copy PHN';copy.setAttribute('aria-label',`Copy PHN for ${p.name}`);
+        copy.onclick=async()=>{try{await navigator.clipboard.writeText(digits);feedback.textContent='PHN copied.';}catch{feedback.textContent='Could not copy. Select the displayed PHN to copy it.';}};phn.append(copy);
+      }else phn.textContent='Not recorded';
+      cell(row,p.location||'Not recorded');
+      if(maid){
+        cell(row,p.assessmentDate||'Not recorded');cell(row,p.form1645===true?'Yes':p.form1645===false?'No':'Not verified');
+        const detail=cell(row,'');const disclosure=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Details';disclosure.append(summary);
+        const list=document.createElement('dl');
+        for(const [label,value] of [['1632 signed',p.forms?.['1632']?.signedDate],['1633 signed',p.forms?.['1633']?.signedDate],['1633 doctor / NP',p.forms?.['1633']?.practitioner],['1634 completed',p.forms?.['1634']?.completedDate],['1645 signed',p.forms?.['1645']?.signedDate]]){
+          const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value||'Not recorded';list.append(dt,dd);
+        }
+        disclosure.append(list);
+        const contacts=document.createElement('p');contacts.textContent=p.contacts?.length?p.contacts.map(c=>[c.name,c.role,c.phone,c.email].filter(Boolean).join(' · ')).join('\n'):'No contacts recorded';disclosure.append(contacts);detail.append(disclosure);
+        const status=document.createElement('small');status.textContent=p.status==='active'?'Active':'History';detail.append(status);
+        if(onAction){const actions=document.createElement('div');actions.className='clinic-row-actions';const move=document.createElement('button'),remove=document.createElement('button');
+          move.textContent=p.status==='active'?'Move to History':'Move to Active';move.disabled=busy||!ready;move.onclick=()=>act({type:'status',patientId:p.id,status:p.status==='active'?'history':'active'});
+          remove.textContent='Remove';remove.className='text-button danger';remove.setAttribute('aria-label','Remove '+p.name);remove.disabled=busy||!ready;remove.onclick=()=>confirmRemove(p);actions.append(move,remove);detail.append(actions);
+        }
+      }
+      body.append(row);
+    }
+  }
+  host.querySelector('input').oninput=e=>{query=e.target.value.trim().toLocaleLowerCase();render();};
+  host.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{view=button.dataset.view;host.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render();});
+  render();
+  return {
+    state(){return {busy,ready,dirty:false};},
+    setPatients(records){if(busy)return;patients=structuredClone(records);ready=true;render();},
+    loading(){ready=false;patients=[];render();empty.querySelector('h2').textContent='Loading MAID patients…';empty.querySelector('p').textContent='';},
+    error(message){ready=false;patients=[];render();empty.querySelector('h2').textContent='MAID roster could not load';empty.querySelector('p').textContent=message;}
+  };
+}

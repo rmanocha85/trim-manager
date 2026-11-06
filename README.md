@@ -29,6 +29,10 @@ After a successful Google workspace connection, the browser remembers the accoun
 
 Automated tests use synthetic temporary records and fake AI/Google responses. Their server fixture refuses production data paths. Browser logs and synthetic screenshots go to ignored `work/`. The handoff integration test also verifies the existing canonical TRIM routine-billing helper; it does not enter an EMR. The opt-in `tests/drive-live-check.*` acceptance page verifies the actual Drive APIs using a marked private folder containing synthetic records. The local server serves it only with `TRIM_VERIFICATION=1`; it refuses the production roster and billing IDs. Remove its staged preview after verification and move its synthetic folder to Trash.
 
+## MAID and OAT roster extension — November 6, 2026
+
+MAID reads and writes the private `00. MAID/MAID AI/maid-roster.json`, shared with the consolidated MAID workflows. Active/History/All, Ava links, Copy PHN, location and expandable metadata use `clinic-roster.mjs`. Status changes save immediately; confirmed Remove deletes the entire patient object while preserving source folders. No app backup, tombstone or browser recovery copy is created for MAID. `MaidRepository` uses conditional Google Drive writes; `MaidStore` locks, revision-checks, atomically replaces and verifies local saves. `scripts/update-maid-roster.mjs` provides the same writer for explicit workflow updates. Stale revisions fail closed. Use one connection while desktop sync is pending. OAT Fraser Health remains an empty ordered-list placeholder; it has no patient file or workflow integration yet. Tests: `tests/maid-roster.test.mjs`, `tests/clinic-roster-browser.mjs`. All fixtures are synthetic.
+
 ## Application structure
 
 `public/app.mjs` owns navigation and common save controls. `session.mjs` coordinates explicit saves in Patients, Notes, Billing order, stopping and reporting partial success on error. Each section retains its own selection and work; selecting a patient does not move another section's selection.

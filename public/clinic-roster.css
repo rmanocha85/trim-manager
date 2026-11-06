@@ -1,0 +1,21 @@
+.clinic-workspace{padding:24px;min-height:70vh;background:#f6f7f4}
+#workspace>header .app-sections button[aria-pressed=true]{background:#e4eee3;color:#183c27}
+.clinic-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}
+.clinic-heading h1{font-size:25px;margin:0 0 6px}.clinic-heading p{margin:0;color:#59685d}
+.clinic-count{white-space:nowrap;border:1px solid #d8e2d7;border-radius:20px;padding:8px 12px;background:white;font-size:13px;color:#284b32}
+.clinic-toolbar{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+.clinic-toolbar input{width:min(440px,100%);min-height:42px;background:white}
+.clinic-filters{display:flex;gap:6px}.clinic-filters button{min-height:40px}.clinic-filters [aria-pressed=true]{background:#e4eee3;border-color:#9ab89f;color:#183c27}
+.clinic-table-wrap{overflow-x:auto;border:1px solid #dce3da;border-radius:10px;background:white}
+.clinic-table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}
+.clinic-table th{background:#edf2eb;color:#465e49;font-size:12px;padding:12px;white-space:nowrap}
+.clinic-table td{padding:14px 12px;border-top:1px solid #e5eae2;vertical-align:top}
+.clinic-table a{font-weight:650;color:#235b46;text-decoration:none}.clinic-table a:hover{text-decoration:underline}
+.clinic-table small{display:block;color:#677268;margin-top:5px;font-size:12px}
+.clinic-table td:nth-child(3){white-space:nowrap}.clinic-table td:nth-child(3) span{user-select:all}.clinic-table td:nth-child(3) button{display:block;margin-top:6px;font-size:12px;padding:5px 8px}
+.clinic-table summary{cursor:pointer;color:#235b46}.clinic-table dl{min-width:180px}.clinic-table dt{font-size:12px;color:#59685d;margin-top:10px}.clinic-table dd{margin:2px 0}.clinic-table details p{white-space:pre-line}
+.clinic-empty{text-align:center;padding:48px 20px;border:1px dashed #cbd7c7;border-radius:10px;margin-top:16px;background:#fffefa}.clinic-empty h2{font-size:18px;color:#284b32}.clinic-empty p{color:#59685d;line-height:1.6;max-width:520px;margin:0 auto}
+.clinic-feedback{font-size:13px;color:#284b32;min-height:20px}
+@media(max-width:760px){.clinic-workspace{padding:16px}.clinic-heading{align-items:flex-start;flex-wrap:wrap}.clinic-heading h1{font-size:22px}.clinic-toolbar input{width:100%}}
+
+.clinic-row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.clinic-row-actions button{font-size:12px;padding:6px 8px}.clinic-remove-dialog{max-width:460px;border:1px solid #cad8c8;border-radius:12px;padding:24px}.clinic-remove-dialog::backdrop{background:#12291f66}.clinic-remove-dialog p{line-height:1.6}.clinic-remove-dialog .remove-name{font-weight:700}.clinic-table td:nth-child(3) button{display:inline-flex;margin:0 0 0 8px}

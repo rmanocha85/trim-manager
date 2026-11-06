@@ -17,3 +17,6 @@ handoffs/
 runs/
 *backups/
 
+
+maid-roster.json
+active-maid-cases.json

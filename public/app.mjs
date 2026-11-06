@@ -3,15 +3,28 @@ import {documentIntakeUI} from './intake-ui.mjs?v=20261105-intake1';
 import {billingUI} from './billing-ui.mjs?v=20261105-location-login1';
 import {patientsUI} from './patients-ui.mjs?v=20261105-location-login1';
 import {Session} from './session.mjs';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261106-rosters1';
+import {MaidRepository} from './clinic-roster-repository.mjs?v=20261106-rosters1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
 const $=id=>document.getElementById(id);
-let billing,notes,patients,session,intake,section='billing';
+let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidLoad=0,section='billing';
+async function refreshMaid(){
+  if(maidRoster?.state().busy)return;
+  const adapter=billing?.state().adapter,version=++maidLoad;if(!adapter)return;
+  maidSnapshot=null;maidRepository=new MaidRepository(adapter);
+  maidRoster.loading();
+  try{const data=await maidRepository.load();if(version===maidLoad){maidSnapshot=data;maidRoster.setPatients(data.roster.patients);}}
+  catch(error){if(version===maidLoad)maidRoster.error(error.message);}
+}
 const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
   section=value;
+  const clinic=['maid','oat-fh'].includes(value);
   $('patients-workspace').hidden=value!=='patients';
-  document.querySelector('.shell').hidden=value==='patients';
+  $('maid-workspace').hidden=value!=='maid';
+  $('oat-fh-workspace').hidden=value!=='oat-fh';
+  document.querySelector('.shell').hidden=value==='patients'||clinic;
   document.querySelectorAll('[data-section]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.section===value)));
   document.querySelectorAll('.sidebar .nav').forEach(b=>{
     const group=['rounds','notes'].includes(b.dataset.tab)?'notes':b.dataset.tab==='settings'?'settings':'billing';
@@ -19,7 +32,7 @@ function showSection(value){
   });
   const history=value==='billing'&&lastTab.billing==='history';
   $('calendar').hidden=history||value==='settings'||value==='notes'&&!laptopRuntime();
-  $('header-billing-date').hidden=history||['patients','settings'].includes(value)||value==='notes'&&!laptopRuntime();
+  $('header-billing-date').hidden=history||clinic||['patients','settings'].includes(value)||value==='notes'&&!laptopRuntime();
   $('header-billing-date').querySelector('small').textContent=value==='notes'?'Visit date':'Billing for';
 }
 function navigate(tab){
@@ -56,18 +69,25 @@ function status(){
 }
 async function saveSession(){try{await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');billing.notify(e.message);}finally{status();}}
 async function start(){
+  maidRoster=clinicRosterUI({host:$('maid-workspace'),kind:'maid',onChange:status,onReload:refreshMaid,onAction:async action=>{
+    if(!maidSnapshot||!maidRepository)throw new Error('Reload MAID before editing.');
+    const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
+    return {patients:saved.roster.patients,local:maidRepository.adapter.mode==='local'};
+  }});
+  clinicRosterUI({host:$('oat-fh-workspace'),kind:'oat-fh'});
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261105-intake1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(section);status();},saveSession});
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshMaid();void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
   intake=documentIntakeUI({state:()=>billing.state(),notes,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
+    {name:'MAID',state:maidRoster.state,save:async()=>{}},
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
   const latest=document.createElement('button');latest.id='load-latest';latest.className='save-control';latest.textContent='Load latest changes';$('drive-connection').after(latest);
-  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();}catch(e){billing.notify(e.message);}finally{status();}};
+  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();await refreshMaid();}catch(e){billing.notify(e.message);}finally{status();}};
   const patientReview=document.createElement('div');patientReview.className='actions patient-review-tools';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
   $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};
   $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();}catch(e){billing.notify(e.message);}status();};
@@ -78,12 +98,13 @@ async function start(){
   if(!laptop)$('open-laptop-notes').onclick=e=>{if(session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft){e.preventDefault();switcher.click();}};
   document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{
     session.message='';
-    if(b.dataset.section==='patients')showSection('patients');else billing.switchTab(lastTab[b.dataset.section]);
+    if(['patients','maid','oat-fh'].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
     status();
   });
   $('patients-print-close').onclick=()=>$('patients-print-dialog').close();
   $('patients-print').onclick=()=>{$('patients-print-frame').contentWindow.focus();$('patients-print-frame').contentWindow.print();};
   window.addEventListener('beforeunload',e=>{if(patients.hasChanges()){e.preventDefault();e.returnValue='';}});
+  setInterval(()=>{if(section==='maid'&&document.visibilityState==='visible'&&!maidRoster.state().busy)void refreshMaid();},60000);
   showSection('billing');billing.start();
 }
 start().catch(e=>{$('gate').hidden=false;$('workspace').hidden=true;$('gate').querySelector('h1').textContent='TRIM could not start';const p=document.createElement('p');p.textContent=e.message;$('gate').querySelector('.gate-card').append(p);});
