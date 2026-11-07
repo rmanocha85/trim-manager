@@ -34,12 +34,12 @@ try{
  await page.locator('[data-routine-patient]').last().uncheck();assert.equal(await page.locator('#routine-add').innerText(),'Add 114 for 1 patient');
  await page.screenshot({path:'work/routine-batch-preview.png',fullPage:true});
  await page.locator('#routine-add').click();await local();assert.equal(writes,0);assert.deepEqual(cloud,original);
- assert.match(await page.locator('#local-changes').innerText(),/Billing pending/);
+ assert.match(await page.locator('#local-changes').innerText(),/Changes pending/);
  await page.locator('#undo-routine-batch').click();await local();assert.equal(await page.locator('[data-routine-patient]').count(),2);
- await page.locator('#routine-add').click();await local();assert.match(await page.locator('#local-changes').innerText(),/Billing pending/);
+ await page.locator('#routine-add').click();await local();assert.match(await page.locator('#local-changes').innerText(),/Changes pending/);
  assert.equal(await page.locator('#routine-add').isEnabled(),false);
  await context.setOffline(true);assert.equal(await page.locator('#undo-routine-batch').isEnabled(),false);await context.setOffline(false);await page.locator('#drive-connection:not(:disabled)').waitFor();
- await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();assert.equal(writes,1);
+ await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();assert.equal(writes,1);
  assert.equal(cloud.entries.filter(e=>e.date==='2026-10-08').length,3);assert.equal(cloud.entries.flatMap(e=>e.items).filter(i=>i.code==='13334').length,1);
  assert.equal(await page.locator('#undo-routine-batch').count(),0);
  await page.locator('[data-day="2026-10-10"]').click();assert.match(await page.locator('#routine-review').innerText(),/1 due/);assert.match(await page.locator('#routine-review').innerText(),/2 not yet due/);
@@ -52,7 +52,7 @@ try{
  await page.locator('#history-search').fill(patients[1].phn);assert.equal(await page.locator('#history-patient-results [data-history-patient]').count(),1);await page.locator('#history-patient-results [data-history-patient]').click();
  assert.match(await page.locator('#history-content').innerText(),/Synthetic reason/);await page.screenshot({path:'work/patient-history-preview.png',fullPage:true});
  await page.locator('[data-history-code="13121"]').click();await local();assert.match(await page.locator('#history-content').innerText(),/Removals waiting to save/);
- await page.locator('#local-changes').click();assert.doesNotMatch(await page.locator('#changes-list').innerText(),/Workspace/);assert.match(await page.locator('#local-changes').innerText(),/Billing pending/);
+ await page.locator('#local-changes').click();assert.doesNotMatch(await page.locator('#changes-list').innerText(),/Workspace/);assert.match(await page.locator('#local-changes').innerText(),/Changes pending/);
  await page.locator('[data-undo-cancel]').click();await page.locator('#changes-dialog [data-close]').click();
  assert.equal(writes,1);assert.deepEqual(cloud.historicalBillings,original.historicalBillings);
  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);

@@ -13,8 +13,8 @@ try{
  await page.locator('#rules-reviewed').check();await page.locator('#generate').click();await page.frameLocator('#report-frame').locator('body').filter({hasText:'SYNTHETIC, Print'}).waitFor();
  await page.screenshot({path:'work/unified-print-batch-synthetic.png',fullPage:true});
  await page.locator('#report-frame').evaluate(frame=>{frame.contentWindow.print=()=>{};});await page.locator('#print-report').click();await page.locator('[data-close="report-dialog"]').click();
- await page.locator('#finalize').click();await page.locator('#local-changes').filter({hasText:'Billing pending'}).waitFor();assert.equal(JSON.parse(await readFile(billingPath,'utf8')).batches.length,0);
- await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();const saved=JSON.parse(await readFile(billingPath,'utf8'));assert.equal(saved.batches.length,1);assert.ok(saved.entries[0].batchId);
+ await page.locator('#finalize').click();await page.locator('#local-changes').filter({hasText:'Changes pending'}).waitFor();assert.equal(JSON.parse(await readFile(billingPath,'utf8')).batches.length,0);
+ await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();const saved=JSON.parse(await readFile(billingPath,'utf8'));assert.equal(saved.batches.length,1);assert.ok(saved.entries[0].batchId);
  await page.locator('[data-tab="history"]').click();assert.equal(await page.locator('[data-history-remove]').count(),0);
  await page.reload();await page.locator('.patient').waitFor();await page.locator('.patient').click();assert.equal(await page.locator('[data-code="00114"]').isDisabled(),true);assert.deepEqual(errors,[]);
  console.log('PASS printable batch, report verification, explicit local finalization then Save to Drive, immutable handed-over records after reload.');

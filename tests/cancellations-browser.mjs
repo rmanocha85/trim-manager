@@ -19,14 +19,14 @@ try{
  await page.goto(`http://127.0.0.1:${server.address().port}/?connection=manual`);
  const connect=async()=>{await page.locator('#connect').click();await page.locator('#cloud-connect').click();await page.locator('.patient').first().waitFor();};
  const draft=()=>page.locator('#local-changes').filter({hasText:'pending'}).waitFor();
- const save=async()=>{await syncClick();await page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();};
+ const save=async()=>{await syncClick();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();};
 
  await connect();await page.locator('.patient').first().click();await page.locator('[data-code="00114"]').click();await page.locator('[data-reason-preset="1"]').click();
  await page.locator('[data-code="13121"]').click();await page.locator('[data-code="14077"]').click();
  const card=code=>page.locator('.code-details').filter({has:page.locator('[data-remove-code="'+code+'"]')});
  assert.equal(await card('13121').locator('[data-field=diagnosis]').inputValue(),'038.9');
  assert.equal(await card('14077').locator('[data-field=diagnosis]').inputValue(),'038.9');
- assert.equal(await page.locator('.inline-time-picker:visible').count(),4);
+ assert.equal(await page.locator('.inline-time-picker:visible').count(),0);
  assert.equal(await card('00114').locator('h3').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(45, 90, 61)');
  assert.equal(await card('00114').locator('h3').evaluate(e=>getComputedStyle(e).color),'rgb(255, 255, 255)');
  assert.equal(await card('13334').locator('h3').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(230, 231, 229)');
@@ -40,9 +40,9 @@ try{
  assert.equal(await card('13121').locator('[data-field=diagnosis]').inputValue(),'485');
  assert.equal(await card('14077').locator('[data-field=diagnosis]').inputValue(),'786.2');
  const wheel=card('14077').locator('.inline-time').filter({has:page.locator('[data-field=start]')});
- await wheel.locator('[data-wheel=hour]').selectOption('18');await wheel.locator('[data-wheel=minute]').selectOption('30');
+ await wheel.locator('[data-field=start]').fill('1830');
  assert.equal(await card('14077').locator('[data-field=end]').inputValue(),'18:40');
- assert.equal(await card('14077').locator('.inline-time').filter({has:page.locator('[data-field=end]')}).locator('[data-wheel=minute]').inputValue(),'40');
+ assert.equal(await card('14077').locator('.inline-time-picker').count(),0);
  await draft();assert.equal(writes,0);
  await page.locator('#local-changes').click();assert.equal(await page.locator('#changes-list [data-cancel-code],#changes-list [data-cancel-entry],#changes-list .saved-drive-history').count(),0);
  assert.match(await page.locator('#changes-list').innerText(),/114/);assert.match(await page.locator('#changes-list').innerText(),/13121/);assert.equal(await page.locator('#changes-discard').innerText(),'Discard local billing changes');

@@ -23,7 +23,7 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true}),context=await browser.newContext({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']}),page=await context.newPage(),errors=[];
 page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>void d.accept());await context.route('https://**/*',r=>r.abort());await mkdir('work',{recursive:true});
 const p=s=>page.locator('#patients-workspace').locator(s),section=s=>page.locator(`[data-section="${s}"]`).click();
-const saved=()=>page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
+const saved=()=>page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
 const ready=()=>page.waitForFunction(()=>!document.querySelector('#sync').disabled);
 const save=async()=>{await ready();await page.locator('#sync').click();await saved();};
 const readBilling=async()=>JSON.parse(await readFile(billingPath,'utf8'));
@@ -32,7 +32,7 @@ const diagnosis=()=>page.locator('.code-details').filter({has:page.locator('[dat
 const row=p('#ulist tbody tr').first();
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.locator('.patient').first().waitFor();await saved();
- assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes']);
+ assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes','MAID','OAT Fraser Health']);
  for(const name of ['patients','billing','notes']){
    await section(name);const footer=await page.locator('.app-utility').boundingBox();assert.equal(footer.y+footer.height,1000);
    await section('settings');assert.equal(await page.locator('#settings').isVisible(),true);assert.equal(await page.locator('#calendar').isVisible(),false);assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),0);

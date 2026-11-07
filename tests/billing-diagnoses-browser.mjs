@@ -18,7 +18,7 @@ await writeFile(rosterPath,JSON.stringify(roster));await writeFile(billingPath,J
 const server=createServer({rosterPath,billingPath,notesPath:path.join(dir,'notes'),lockPath:path.join(dir,'billing.lock')});await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true}),context=await browser.newContext({permissions:['clipboard-read','clipboard-write'],viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
 page.on('pageerror',e=>errors.push(e.message));await context.route('https://**/*',r=>r.abort());
-const saved=()=>page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
+const saved=()=>page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
 const diagnosis=()=>page.locator('[data-field=diagnosis]').first();
 try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('.patient').first().waitFor();await saved();

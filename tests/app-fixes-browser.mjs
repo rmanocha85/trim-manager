@@ -18,13 +18,13 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true}),context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[],dialogs=[];
 await mkdir('work',{recursive:true});page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{if(d.type()!=='beforeunload')dialogs.push(d.message());void d.accept();});
 await context.route('https://**/*',r=>r.fulfill({contentType:'text/html',body:'Synthetic chart destination'}));
-const p=s=>page.locator('#patients-workspace').locator(s),saved=()=>page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
+const p=s=>page.locator('#patients-workspace').locator(s),saved=()=>page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
 const ready=()=>page.waitForFunction(()=>!document.querySelector('#sync').disabled);
 const save=async()=>{await ready();await page.locator('#sync').click();await saved();};
 const readBilling=async()=>JSON.parse(await readFile(billingPath,'utf8'));
 try{
   await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.locator('.patient').first().waitFor();await saved();
-  assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes']);
+  assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes','MAID','OAT Fraser Health']);
   assert.deepEqual(await page.locator('#calendar .calendar-weekdays span').allTextContents(),['Sun','Mon','Tue','Wed','Thu','Fri','Sat']);
   for(const mode of ['billing','routine']){
     await page.locator(`[data-tab="${mode}"]`).click();

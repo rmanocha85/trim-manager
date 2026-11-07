@@ -20,7 +20,7 @@
 #workspace>header .header-actions{grid-area:actions;margin:0;gap:6px;flex-wrap:nowrap}
 #workspace>header .header-actions .save-control,#workspace>header .header-actions .session-save{width:120px;min-width:120px;flex-basis:120px}
 #workspace>header #switch-version{max-width:85px;line-height:1.3;align-self:center}
-#session-status:not(:empty){padding:10px 24px;background:#fff3d4;border-bottom:1px solid #e6cf91;color:#584216}
+#changes-dialog #session-status{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
 #patients-workspace{background:#f6f7f4;min-height:70vh}
 #patients-print-dialog{width:96vw;max-width:1300px;height:92vh;padding:0;border:1px solid #ccc;border-radius:10px}
 #patients-print-dialog .report-top{display:flex;align-items:center;gap:14px;padding:12px 20px}
@@ -103,3 +103,10 @@
 body:has(#connection-dialog[open]) #gate .gate-card{visibility:hidden}
 #gate .connection-brand{justify-content:flex-start}
 @media(max-width:420px){#connection-dialog .focused-connection,#gate .gate-card{padding:23px}#gate{padding:16px}}
+
+/* Save feedback occupies permanent header slots; details live in the review dialog. */
+#workspace>header #local-changes{overflow:hidden;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+#workspace>header #saved-time{overflow:hidden;text-overflow:ellipsis;height:14px;line-height:14px;white-space:nowrap}
+.simple-time{display:flex;flex-direction:column;gap:5px}.simple-time input{width:100%}
+
+.app-utility button{min-width:0;flex-shrink:1;line-height:1.2}

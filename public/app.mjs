@@ -1,8 +1,8 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261105-flags1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261107-maid-connect1';
-import {billingUI} from './billing-ui.mjs?v=20261105-location-login1';
-import {patientsUI} from './patients-ui.mjs?v=20261105-location-login1';
-import {Session} from './session.mjs';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261107-workflow1';
+import {billingUI} from './billing-ui.mjs?v=20261107-workflow1';
+import {patientsUI} from './patients-ui.mjs?v=20261107-workflow1';
+import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261106-rosters1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261107-maid-path1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
@@ -44,22 +44,26 @@ function status(){
   const states=session.state(),pending=states.filter(s=>s.dirty),errors=states.filter(s=>s.error),busy=session.saving||states.some(s=>s.busy);
   const unfinished=patients?.state().draft;
   if(pending.length&&!session.saving&&session.message&&!session.message.includes('Remaining changes'))session.message='';
-  $('local-changes').textContent=errors.length?'! '+errors.map(s=>s.name).join(', ')+' need attention':pending.length?'● '+pending.map(s=>s.name).join(', ')+' pending':busy?'◌ Saving locally…':unfinished?'● Patient form in progress':'✓ No local changes';
-  $('local-changes').dataset.state=errors.length?'error':pending.length||unfinished?'pending':'ok';
-  $('sync').textContent=session.saving?'◌ Saving session…':'Save to Drive';
+  const connection=billing.connectionStatus();
+  if(session.lastError&&!busy&&!pending.length&&!errors.length&&connection.connected){session.lastError='';session.message='';}
+  const indicator=saveIndicator({states,session,unfinished,connection});
+  $('local-changes').textContent=indicator.label;
+  $('local-changes').dataset.state=indicator.state;
+  $('local-changes').title=indicator.detail;
+  $('sync').textContent=session.saving?'Saving…':session.lastError?'Retry save':'Save to Drive';
   $('sync').disabled=busy||!pending.length;
   $('sync').dataset.state=session.saving?'busy':pending.length?'pending':'quiet';
   $('changes-save').disabled=$('sync').disabled;
-  $('changes-save').textContent='Save to Drive';
-  $('saved-time').textContent=pending.length?'Not yet saved to Drive':billing.state().adapter?.mode==='local'?'Drive folder · cloud sync unverified':'Matches last Drive save';
-  $('save-status').textContent=pending.length?'Saved locally · pending Save to Drive':busy?'Saving locally…':'Saved · '+$('saved-time').textContent;
+  $('changes-save').textContent=$('sync').textContent;
+  $('saved-time').textContent=indicator.time;
+  $('save-status').textContent=indicator.label;
   if($('changes-dialog').open){const tools=document.querySelector('.patient-review-tools');if(tools)tools.hidden=!patients.state().dirty&&!patients.state().error;
     let overview=$('session-changes');
     if(!overview){overview=document.createElement('p');overview.id='session-changes';$('changes-title').after(overview);}
     overview.hidden=true;overview.textContent=states.map(s=>`${s.name}: ${s.error?'needs attention':s.dirty?'local changes pending':s.ready?'saved':'not connected'}`).join(' · ');
   }
   $('changes-discard').textContent='Discard local billing changes';
-  $('session-status').textContent=session.message||(unfinished?'Patient form in progress. Finish Add patient or Save row to include it in the session.':'');
+  $('session-status').textContent=session.message||indicator.detail;
   document.querySelector('.shell').inert=session.saving;
   $('patients-workspace').inert=session.saving;
   document.querySelector('.app-sections').inert=session.saving;
@@ -67,7 +71,7 @@ function status(){
   $('lock').disabled=busy;
   if($('load-latest'))$('load-latest').disabled=busy||!billing.state().adapter||!navigator.onLine;
 }
-async function saveSession(){try{await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');billing.notify(e.message);}finally{status();}}
+async function saveSession(){try{await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');session.lastError=e.message;if(!session.message)session.message=e.message;billing.notify('');}finally{status();}}
 async function start(){
   maidRoster=clinicRosterUI({host:$('maid-workspace'),kind:'maid',onChange:status,onReload:refreshMaid,onAction:async action=>{
     if(!maidSnapshot||!maidRepository)throw new Error('Reload MAID before editing.');
@@ -87,10 +91,10 @@ async function start(){
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
   const latest=document.createElement('button');latest.id='load-latest';latest.className='save-control';latest.textContent='Load latest changes';$('drive-connection').after(latest);
-  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();await refreshMaid();}catch(e){billing.notify(e.message);}finally{status();}};
+  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();await refreshMaid();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
   const patientReview=document.createElement('div');patientReview.className='actions patient-review-tools';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
   $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};
-  $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();}catch(e){billing.notify(e.message);}status();};
+  $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}status();};
   if(!laptop)document.querySelector('[data-section="notes"]').title='Notes runs on your laptop';
   const switcher=document.createElement('button');switcher.id='switch-version';switcher.textContent=laptop?'Open cloud app':'Open laptop app';switcher.className='text-button';
   const switching=document.createElement('dialog');switching.id='switch-version-dialog';switching.innerHTML='<div class="dialog-body"><h2>Switch TRIM versions</h2><p id="switch-version-message"></p><a id="switch-version-link" target="_blank" rel="noopener">'+(laptop?'Open cloud TRIM ↗':'Open laptop TRIM ↗')+'</a><button id="switch-version-connect" hidden>Connect through Google</button><button id="switch-version-close">Close</button></div>';document.body.append(switching);document.querySelector('.header-actions').append(switcher);

@@ -1,18 +1,18 @@
 import {identityHTML,nameCopy,bindIdentity} from './patient-identity.mjs?v=20261105-flags1';
 import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=20261007-dates1';
-import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261105-flags1';
-import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261105-flags1';
-import {timeField,bindTimeFields} from './time-entry.mjs?v=20261007-cancel1';
+import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261107-workflow1';
+import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261107-workflow1';
+import {timeField,bindTimeFields} from './time-entry.mjs?v=20261107-workflow1';
 import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261031-compact1';
 import {avaChartUrl} from './patient-links.mjs';
-import {planNewPatients} from './core.mjs?v=20261105-flags1';
+import {planNewPatients} from './core.mjs?v=20261107-workflow1';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
 import {backupUI} from './backup-ui.mjs?v=20261012-backup1';
 import {renderReport} from './reports.mjs?v=20261019-fixes1';
 import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261031-history-date1';
 import {mergeSession} from './merge.mjs?v=20261015-immediate1';
 import {laptopRuntime} from './runtime.mjs';
-import {sameRosterContent} from './patients-core.mjs?v=20261105-location-login1';
+import {sameRosterContent} from './patients-core.mjs?v=20261107-workflow1';
 import {RosterRepository} from './roster-repository.mjs';
 
 import {hospitalBlocks114,assertHospital114} from './hospital.mjs?v=20261024-hospital2';
@@ -557,8 +557,8 @@ function renderSaveControls(){
   if(!$('drive-connection'))return;
   renderReviewBadge();
   const offline=!navigator.onLine,connected=driveReachable&&!offline;
-  $('drive-connection').dataset.state=checking?'busy':connected?'ok':'error';
-  $('drive-connection').textContent=checking?'◌ Checking Drive…':connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):'● Reconnect Drive';
+  $('drive-connection').dataset.state=connected?'ok':'error';
+  $('drive-connection').textContent=connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):'● Reconnect Drive';
   $('drive-connection').title=lastChecked?'Last checked '+formatTimestamp(lastChecked):'Check your connection without saving billing';
   $('drive-connection').disabled=saving||checking||loadingLatest||!adapter;
   const changes=localChanges(),count=changedBillCount(changes);
@@ -662,6 +662,7 @@ async function openLaptopWorkspace(){
     status:()=>({dirty,busy:saving||checking||loadingLatest||recoveryPending>0,error:localRecoveryFailed||mergeConflicts.length>0,ready:!!ledger,mode:adapter?.mode}),
     switchTab,recordRoutine,notify:notice,chooseConnection:openConnectionDialog,loadLatest,
     setRoster:raw=>{roster=normalizeRoster(raw);if(ledger){renderAll();notes.render();applyNewPatientPlans();}},
+    connectionStatus:()=>({mode:adapter?.mode,connected:driveReachable&&navigator.onLine,ready:!!ledger,lastChecked:lastChecked?.toISOString()}),
     localChanges,
   };
 

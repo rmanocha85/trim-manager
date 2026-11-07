@@ -25,7 +25,7 @@ if(process.env.TRIM_ASSET_BASE)await page.route('**/*',async route=>{
  }else await route.fallback();
 });
 const p=s=>page.locator('#patients-workspace').locator(s),ready=()=>page.waitForFunction(()=>!document.querySelector('#sync').disabled);
-const saved=()=>page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
+const saved=()=>page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
 const save=async()=>{await ready();await page.locator('#sync').click();await saved();};
 const readRoster=async()=>JSON.parse(await readFile(rosterPath,'utf8')),readBilling=async()=>JSON.parse(await readFile(billingPath,'utf8'));
 const tab=async name=>{await page.locator('[data-section=patients]').click();await p(`[data-click="showTab('${name}',this)"]`).click();};

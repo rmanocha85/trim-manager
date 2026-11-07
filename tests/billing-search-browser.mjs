@@ -23,7 +23,7 @@ try{
  await page.waitForFunction(()=>!document.querySelector('#sync').disabled);assert.equal(JSON.parse(await readFile(billingPath,'utf8')).entries.length,0);
  await page.reload();await page.locator('.patient').first().waitFor();await select(0);assert.equal(await page.getByLabel('Note (optional)',{exact:true}).inputValue(),'Keep this unfinished billing note.');
  await page.locator('#search').fill('Example');await empty();await page.locator('#search').fill('no such patient');await empty();await page.locator('#search').fill('');await empty();
- await page.waitForFunction(()=>!document.querySelector('#sync').disabled);await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
+ await page.waitForFunction(()=>!document.querySelector('#sync').disabled);await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
  const saved=JSON.parse(await readFile(billingPath,'utf8'));assert.equal(saved.entries.length,1);assert.equal(saved.entries[0].patientKey,'phn:'+patients[0].phn);assert.equal(saved.entries[0].items[0].reason,'Keep this unfinished billing note.');
  // Clear a history-opened editing ID, then select a different patient.
  await page.locator('[data-tab=history]').click();await page.locator('[data-history]').first().click();await page.locator('#search').fill(patients[1].phn);await empty();await page.locator('.patient').press('Enter');assert.match(await page.locator('#editor h2').innerText(),/Example, 2/);assert.equal(await page.locator('#editor .code-chip.on').count(),0);

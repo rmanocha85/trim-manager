@@ -101,3 +101,15 @@ export function setPatientFlag(raw,id,flag,value){
  if(Boolean(patient[flag])===value)return roster;
  return validate({...roster,[collection]:roster[collection].map(p=>p===patient?{...p,[flag]:value}:p)});
 }
+
+// Completion is retained after the temporary new-patient controls expire.
+export function setMedReconciliation(raw,id,completed,asOf=today()){
+ const roster=normalize(raw);dateParts(asOf);
+ const collection=['patients','otherPatients'].find(k=>roster[k].some(p=>String(p.id)===String(id)));
+ const p=collection&&roster[collection].find(p=>String(p.id)===String(id));
+ if(!p||typeof completed!=='boolean')throw new Error('Choose an active new patient.');
+ dateParts(p.panelAddedDate);
+ const days=(Date.parse(asOf)-Date.parse(p.panelAddedDate))/86400000;
+ if(!p.newPanelPatient||days<0||days>=14)throw new Error('Medication reconciliation control is available during the first 14 days.');
+ return {...roster,[collection]:roster[collection].map(x=>x===p?{...x,medReconciliationDate:completed?(p.medReconciliationDate||asOf):''}:x)};
+}

@@ -36,7 +36,7 @@ try{
  assert.equal([...files.values()].filter(f=>f.text).length,1);assert.equal(writes,0);assert.deepEqual(cloud,original);
  await page.locator('#backup-retry').click();await page.waitForFunction(()=>document.querySelector('#backup-state').textContent.includes('Drive backup verified'));assert.equal([...files.values()].filter(f=>f.text).length,1);
  await page.locator('[data-section="billing"]').click();await page.locator('[data-tab=history]').click();await page.locator('[data-history-remove]').first().click();
- delayBackups=true;await page.locator('#sync').click();await page.waitForFunction(()=>document.querySelector('#local-changes').textContent.includes('No local changes'));
+ delayBackups=true;await page.locator('#sync').click();await page.waitForFunction(()=>document.querySelector('#local-changes').textContent.includes('Saved to'));
  assert.equal(writes,1);assert.equal(cloud.entries.length,0);
  assert.match(await page.locator('#backup-state').textContent(),/Backing up in background/);
  // Editing/navigation remains available while the deliberately slow backup runs.

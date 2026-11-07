@@ -12,7 +12,7 @@ const roster={patients:[p],units:[{id:'a',name:'Synthetic unit'}]},ledger=blankL
 const rosterPath=path.join(dir,'roster.json'),billingPath=path.join(dir,'billing.json');await writeFile(rosterPath,JSON.stringify(roster));await writeFile(billingPath,JSON.stringify(ledger));await mkdir('work',{recursive:true});
 const server=createServer({rosterPath,billingPath,notesPath:path.join(dir,'notes'),lockPath:path.join(dir,'billing.lock')});await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true}),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('https://**/*',r=>r.abort());
-const saved=()=>page.locator('#local-changes').filter({hasText:'No local changes'}).waitFor();
+const saved=()=>page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
 const save=async()=>{await page.waitForFunction(()=>!document.querySelector('#sync').disabled);await page.locator('#sync').click();await saved();};
 try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('.patient').waitFor();await saved();await page.locator('.patient').click();

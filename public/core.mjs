@@ -251,7 +251,7 @@ export function undoBillingCancellation(ledger,id){
 export function inheritConferenceDiagnoses(items,usual=''){
   const primary=items.find(i=>i.code==='00114');
   const usualPrimary=String(usual).trim().split(/[,;\s]+/)[0]||'';
-  return items.map(i=>CONFERENCE_CODES.includes(i.code)&&i.diagnosisSource==='primary114'?{...i,diagnosis:primary?primary.diagnosis||usualPrimary:i.diagnosis||usualPrimary}:i);
+  return items.map(i=>CONFERENCE_CODES.includes(i.code)&&i.diagnosisSource==='primary114'?{...i,diagnosis:primary?primary.diagnosis?.trim()||String(usual).trim():i.diagnosis||usualPrimary}:i);
 }
 // Only interactive new qualifying selections receive an automatic bonus. Imports,
 // historical records and merely opening an existing day are never retrofitted.
