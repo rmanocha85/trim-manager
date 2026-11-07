@@ -1,4 +1,4 @@
-const V3='https://www.googleapis.com/drive/v3/files',V2='https://www.googleapis.com/drive/v2/files';
+const V2='https://www.googleapis.com/drive/v2/files';
 const conflict=()=>Object.assign(new Error('MAID changed elsewhere. Reload the MAID list and review before trying again.'),{status:409});
 export function validateClinicRoster(data){
   if(data?.schemaVersion!==1||!Array.isArray(data.patients))throw new Error('Invalid clinic roster.');
@@ -36,15 +36,9 @@ export function applyMaidAction(data,action,now=new Date().toISOString()){
   next.updatedAt=now;return validateClinicRoster(next);
 }
 export class MaidRepository {
-  constructor(adapter){this.adapter=adapter;}
-  async locate(){
-    if(this.fileId)return this.fileId;let parent;
-    for(const [name,folder] of [['00. MAID',true],['MAID AI',true],['maid-roster.json',false]]){
-      const q="name = '"+name+"' and trashed = false"+(folder?" and mimeType = 'application/vnd.google-apps.folder'":'')+(parent?" and '"+parent+"' in parents":'');
-      const result=await this.adapter.request(V3+'?q='+encodeURIComponent(q)+'&fields=files(id),nextPageToken');
-      if(result.nextPageToken||result.files?.length!==1)throw new Error('MAID roster location is missing or ambiguous in this Google Drive account.');parent=result.files[0].id;
-    }return this.fileId=parent;
-  }
+  // The private roster keeps its Drive identity when its containing folder moves.
+  constructor(adapter){this.adapter=adapter;this.fileId='11WLFL5WHoIK93YaQpZUHDnLbGJzXfLB4';}
+  async locate(){return this.fileId;}
   async load(){
     if(this.adapter.mode==='local'){const result=await this.adapter.request('/api/maid/roster');validateClinicRoster(result.roster);return result;}
     const id=await this.locate();

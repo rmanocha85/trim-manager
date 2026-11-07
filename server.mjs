@@ -24,7 +24,7 @@ export const defaults={
 };
 export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,snapshotPaths,chatgpt}={}) {
   const live=path.resolve(rosterPath)===path.resolve(defaults.roster)&&path.resolve(billingPath)===path.resolve(defaults.billing);
-  maidPath ||= live?path.join(home,'My Drive','00. MAID','MAID AI','maid-roster.json'):path.join(path.dirname(rosterPath),'maid-roster.json');
+  maidPath ||= live?path.join(home,'My Drive','00. MAID','00. MAID info','MAID AI','maid-roster.json'):path.join(path.dirname(rosterPath),'maid-roster.json');
   const maidStore=new MaidStore(maidPath);
   notesPath ||= live?path.join(home,'My Drive','02. TRIM','TRIM AI','Working records','Routine notes'):path.join(path.dirname(billingPath),'notes');
   chatgpt ||= live?new ChatGPTConnection():{status:async()=>({connected:false,planEnabled:false}),models:async()=>[],generate:async()=>{throw new Error('AI is disabled for isolated data. Inject a test connection.');}};

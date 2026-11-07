@@ -4,7 +4,7 @@ import {billingUI} from './billing-ui.mjs?v=20261105-location-login1';
 import {patientsUI} from './patients-ui.mjs?v=20261105-location-login1';
 import {Session} from './session.mjs';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261106-rosters1';
-import {MaidRepository} from './clinic-roster-repository.mjs?v=20261106-rosters1';
+import {MaidRepository} from './clinic-roster-repository.mjs?v=20261107-maid-path1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
 const $=id=>document.getElementById(id);
