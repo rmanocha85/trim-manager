@@ -1,5 +1,5 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261105-flags1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261105-intake1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261107-maid-connect1';
 import {billingUI} from './billing-ui.mjs?v=20261105-location-login1';
 import {patientsUI} from './patients-ui.mjs?v=20261105-location-login1';
 import {Session} from './session.mjs';
@@ -11,11 +11,11 @@ const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidLoad=0,section='billing';
 async function refreshMaid(){
   if(maidRoster?.state().busy)return;
-  const adapter=billing?.state().adapter,version=++maidLoad;if(!adapter)return;
+  const adapter=intake?.recordsConnection?.()||billing?.state().adapter,version=++maidLoad;if(!adapter)return;
   maidSnapshot=null;maidRepository=new MaidRepository(adapter);
   maidRoster.loading();
   try{const data=await maidRepository.load();if(version===maidLoad){maidSnapshot=data;maidRoster.setPatients(data.roster.patients);}}
-  catch(error){if(version===maidLoad)maidRoster.error(error.message);}
+  catch(error){if(version===maidLoad){const needsAccess=adapter.mode==='cloud'&&[403,404].includes(error.status);if(needsAccess)intake?.offerConnection?.();maidRoster.error(needsAccess?'Connect patient records to allow access to the existing MAID roster, then reload MAID. You can also use the laptop app.':error.message);}}
 }
 const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
@@ -79,7 +79,7 @@ async function start(){
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261105-intake1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshMaid();void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
-  intake=documentIntakeUI({state:()=>billing.state(),notes,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
+  intake=documentIntakeUI({state:()=>billing.state(),notes,onRecordsConnected:refreshMaid,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
     {name:'MAID',state:maidRoster.state,save:async()=>{}},
