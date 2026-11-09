@@ -21,6 +21,7 @@ people[0].contacts=[
  {name:'Hidden Social Synthetic',role:'Social worker',phone:'604-555-0107'},
  {name:'Witness Synthetic',role:'Witness',phone:null,source:'Synthetic 1632 witness section'}
 ];
+people[1].contacts=[{name:'Synthetic Hospice',role:'Inpatient team',phone:'604-555-0108'}];
 people[2].contacts=[{name:'History Synthetic',role:'Patient',phone:'604-555-0104'},{name:'Contact Synthetic',role:'Preferred contact',relationship:'Daughter',primary:true,phone:'604-555-0105',source:'Synthetic 1632',verifiedDate:'2026-11-08'}];
 const maid=JSON.stringify({schemaVersion:1,patients:people});
 await Promise.all([writeFile(rosterPath,roster),writeFile(billingPath,ledger),writeFile(maidPath,maid),mkdir('work',{recursive:true})]);
@@ -36,15 +37,19 @@ try{
  assert.equal(await m.locator('tbody a[target="_blank"]').first().getAttribute('href'),'https://www.avaemr.ca/patients/123457');
  assert.deepEqual(await m.locator('thead th').allTextContents(),['#','Patient','PHN','Patient phone','Primary / family contact','Location','Assessment','1645','Details / actions']);
  const first=m.locator('tbody tr').first(),own=first.locator('.clinic-patient-phone'),family=first.locator('.clinic-contacts');
- assert.match(await own.innerText(),/Patient - preferred contact on 1632/);assert.doesNotMatch(await own.innerText(),/Family Synthetic/);
+ assert.match(await own.innerText(),/^604-555-0101\nPatient - preferred contact/);assert.doesNotMatch(await own.innerText(),/on 1632/);assert.doesNotMatch(await own.innerText(),/Family Synthetic/);
  assert.equal(await own.locator('a').getAttribute('href'),'tel:6045550101');
- assert.match(await family.innerText(),/Family Synthetic/);assert.match(await family.innerText(),/Son - MAID referral contact/);assert.match(await family.innerText(),/Care team \/ inpatient/);assert.match(await family.innerText(),/Synthetic hospital · Unit A/);assert.match(await family.innerText(),/Other contacts\s+Witness Synthetic/);
+ assert.match(await family.innerText(),/Family Synthetic/);assert.match(await family.innerText(),/Son - MAID referral contact/);assert.match(await family.innerText(),/Synthetic hospital · Unit A/);assert.match(await family.innerText(),/Other contacts\s+Phone not recorded\s+Witness Synthetic/);
  assert.equal(await family.getByRole('link',{name:/Call Team Synthetic/}).getAttribute('href'),'tel:6045550103');
  assert.match(await family.getByRole('link',{name:/Call Team Synthetic/}).getAttribute('title'),/enter extension 42 after connection/);
  assert.equal(await first.locator('.clinic-phn-copy').innerText(),'');assert.equal(await first.locator('.clinic-phn-copy svg').count(),1);
  await first.locator('summary').click();assert.match(await first.locator('.clinic-contact-sources').innerText(),/Synthetic 1632 patient\/contact sections · Source date: 2026-10-01 · Verified: 2026-11-08/);await first.locator('summary').click();
  assert.equal(await m.locator('tbody tr').nth(1).locator('.clinic-patient-phone').innerText(),'Not recorded');
  assert.doesNotMatch(await first.textContent(),/Hidden Doctor Synthetic|Hidden Social Synthetic/);
+ assert.match(await family.innerText(),/^604-555-0102\nFamily Synthetic/);
+ const ownTop=await own.locator('.clinic-phone').first().boundingBox(),familyTop=await family.locator('.clinic-phone').first().boundingBox();assert.ok(Math.abs(ownTop.y-familyTop.y)<1);
+ const hospiceContact=m.locator('tbody tr').nth(1).locator('.clinic-contacts');assert.equal(await hospiceContact.innerText(),'604-555-0108');
+
  // Inspect links only: no protocol navigation and no external call is permitted in this test.
  await m.getByRole('button',{name:'Copy PHN for Zulu Synthetic',exact:true}).click();
  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'0000000002');

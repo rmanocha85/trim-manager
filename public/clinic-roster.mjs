@@ -28,16 +28,19 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   }
   const count=host.querySelector('.clinic-count'),body=host.querySelector('tbody'),empty=host.querySelector('.clinic-empty'),feedback=host.querySelector('.clinic-feedback');
   const cell=(row,value)=>{const td=document.createElement('td');td.textContent=value??'Not recorded';row.append(td);return td;};
-  function contactCard(contact,{patient=false,source=false}={}){
+  function contactCard(contact,{patient=false,source=false,phoneOnly=false}={}){
     const card=document.createElement('div');card.className='clinic-contact';
-    if(!patient){const name=document.createElement('strong');name.textContent=contact.name||'Name not recorded';card.append(name);}
-    const role=contactRole(contact);if(role){const label=document.createElement('small');label.textContent=role;card.append(label);}
-    if(contact.primary===true){const primary=document.createElement('small');primary.textContent='Primary contact';card.append(primary);}
-    const location=[contact.facility,contact.unit].filter(Boolean).join(' · ');if(location){const label=document.createElement('small');label.textContent=location;card.append(label);}
+    const role=contactRole(contact).replace(/\s+on\s+1632\b/gi,'').trim();
     const phone=phoneLink(contact.phone,contact.extension),number=document.createElement(phone?'a':'span');number.className='clinic-phone';number.textContent=contact.phone||'Phone not recorded';
     if(phone){number.href=phone.href;number.title=`Call in your phone app (ZAC on this PC)${phone.extension?`; enter extension ${phone.extension} after connection`:''}`;number.setAttribute('aria-label',`Call ${contact.name||role||'contact'} at ${contact.phone}${phone.extension?`, extension ${phone.extension}`:''}`);}
     card.append(number);
     if(contact.extension){const ext=document.createElement('small');ext.textContent=`Extension ${contact.extension}`;card.append(ext);}
+    if(!phoneOnly){
+    if(!patient){const name=document.createElement('strong');name.textContent=contact.name||'Name not recorded';card.append(name);}
+    if(role){const label=document.createElement('small');label.textContent=role;card.append(label);}
+    if(contact.primary===true){const primary=document.createElement('small');primary.textContent='Primary contact';card.append(primary);}
+    const location=[contact.facility,contact.unit].filter(Boolean).join(' · ');if(location){const label=document.createElement('small');label.textContent=location;card.append(label);}
+    }
     const provenance=[contact.source,contact.sourceDate&&`Source date: ${contact.sourceDate}`,contact.verifiedDate&&`Verified: ${contact.verifiedDate}`].filter(Boolean).join(' · ');
     if(provenance)card.title=provenance;
     if(source){for(const text of [contact.email,provenance,contact.note])if(text){const line=document.createElement('small');line.textContent=text;card.append(line);}}
@@ -47,8 +50,11 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
     const groups=contactGroups(p.contacts),own=cell(row,'');own.className='clinic-patient-phone';
     if(groups.patient.length)for(const c of groups.patient)own.append(contactCard(c,{patient:true}));else own.textContent='Not recorded';
     const others=cell(row,'');others.className='clinic-contacts';
-    if(groups.family.length)for(const c of groups.family)others.append(contactCard(c));else{const missing=document.createElement('span');missing.textContent='Not recorded';others.append(missing);}
-    for(const [key,label] of [['care','Care team / inpatient'],['other','Other contacts']])if(groups[key].length){const heading=document.createElement('small');heading.className='clinic-contact-heading';heading.textContent=label;others.append(heading);for(const c of groups[key])others.append(contactCard(c));}
+    const hospice=/\b(hospice|CMH)\b/i.test(patientLocation(p));
+    for(const c of groups.family)others.append(contactCard(c));
+    for(const c of groups.care)others.append(contactCard(c,{phoneOnly:hospice}));
+    if(!groups.family.length&&!groups.care.length){const missing=document.createElement('span');missing.textContent='Not recorded';others.append(missing);}
+    if(groups.other.length){const heading=document.createElement('small');heading.className='clinic-contact-heading';heading.textContent='Other contacts';others.append(heading);for(const c of groups.other)others.append(contactCard(c));}
   }
   function render(){
     body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading');
