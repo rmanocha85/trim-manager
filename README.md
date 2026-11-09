@@ -35,6 +35,12 @@ MAID reads and writes the private `00. MAID/00. MAID info/MAID AI/maid-roster.js
 
 ## Application structure
 
+### MAID contact display — November 8, 2026
+
+Active, History and All show the patient's own phone separately from primary/family contacts, with named care-team/inpatient contacts when recorded. Roles and relationships remain visible; sources, source dates, verification dates and notes remain in Details. Patient/preferred-contact records are not substituted for family contacts, witnesses remain separately labeled, and missing numbers stay unknown. The renderer never modifies the canonical roster or scans patient folders. The Patient heading retains Ava links; the compact PHN copy icon uses the TRIM roster artwork, an accessible label and live clipboard feedback. Location, Assessment, 1645 and Details/actions remain separate. OAT remains an empty placeholder.
+
+Phone links use standard `tel:` URLs, activated only by the physician clicking a number. Windows inspection on November 8 confirmed ZAC 10.0.10 as the TEL handler. [Zultys documents TEL click-to-dial support](https://www.zultys.com/release/zac-9-4-15-release-notes/): activation may initiate a call, rather than merely prefill a dial pad. No calls were made during verification. Other devices use their configured phone application. Extensions remain visible for manual entry after connection; ambiguous or multiple numbers remain plain text. Synthetic contact classification, phone-link, clipboard, responsive layout and existing roster action checks cover this change.
+
 `public/app.mjs` owns navigation and common save controls. `session.mjs` coordinates explicit saves in Patients, Notes, Billing order, stopping and reporting partial success on error. Each section retains its own selection and work; selecting a patient does not move another section's selection.
 
 - Patients: `patients-ui.mjs`, `patients-core.mjs`, `patients.html`, `patients.css`, `roster-repository.mjs`, `roster-merge.mjs`. Tables, Ava links, doctor assignments, removal/reactivation and both print layouts are retained. Rooms and names align at the top of each row. Only completed document-upload sign-off displays “Notes uploaded”; the empty checkbox remains available to mark it uploaded. An amber dot marks an unsaved status change. The Dates/Slots counter and Print dates tab are removed; historical print-date data is preserved.

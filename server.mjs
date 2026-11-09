@@ -39,6 +39,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
   allowed.add('context-refresh.mjs');
   allowed.add('clinic-roster.mjs');
+  allowed.add('clinic-contacts.mjs');
   allowed.add('clinic-roster.css');
   allowed.add('clinic-roster-repository.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));

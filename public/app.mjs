@@ -3,7 +3,7 @@ import {documentIntakeUI} from './intake-ui.mjs?v=20261107-workflow1';
 import {billingUI} from './billing-ui.mjs?v=20261107-workflow1';
 import {patientsUI} from './patients-ui.mjs?v=20261107-workflow1';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261106-rosters1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-contacts1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261107-maid-path1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
