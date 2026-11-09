@@ -5,6 +5,6 @@ import path from 'node:path';
 export function createServer(options={}){
  const temp=path.resolve(os.tmpdir()),fallback=path.join(temp,'trim-no-live-data');
  const config={rosterPath:path.join(fallback,'roster.json'),billingPath:path.join(fallback,'billing.json'),...options};
- for(const key of ['rosterPath','billingPath','notesPath','lockPath','maidPath'])if(config[key]&&!path.resolve(config[key]).startsWith(temp+path.sep))throw new Error('Tests must use temporary data paths.');
+ for(const key of ['rosterPath','billingPath','notesPath','lockPath','maidPath','oatPath'])if(config[key]&&!path.resolve(config[key]).startsWith(temp+path.sep))throw new Error('Tests must use temporary data paths.');
  return server(config);
 }

@@ -15,6 +15,7 @@ import {RosterStore} from './roster-storage.mjs';
 import {LocalBackupStore} from './backup-storage.mjs';
 import {snapshot,hash} from './public/backups.mjs';
 import {MaidStore} from './maid-storage.mjs';
+import {OatStore} from './oat-storage.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const home=os.homedir();
 const testRoot=process.env.TRIM_TEST_MODE==='1'?path.join(os.tmpdir(),'trim-isolated-no-live-data'):null;
@@ -22,10 +23,12 @@ export const defaults={
   roster:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Roster','trim-patients-data.json'),
   billing:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Billing','trim-billing-data-v1.json')
 };
-export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,snapshotPaths,chatgpt}={}) {
+export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,oatPath,snapshotPaths,chatgpt}={}) {
   const live=path.resolve(rosterPath)===path.resolve(defaults.roster)&&path.resolve(billingPath)===path.resolve(defaults.billing);
   maidPath ||= live?path.join(home,'My Drive','00. MAID','00. MAID info','MAID AI','maid-roster.json'):path.join(path.dirname(rosterPath),'maid-roster.json');
   const maidStore=new MaidStore(maidPath);
+  oatPath ||= live?path.join(home,'My Drive','01. Active List','05. OAT','OAT AI','oat-fh-roster.json'):path.join(path.dirname(rosterPath),'oat-fh-roster.json');
+  const oatStore=new OatStore(oatPath);
   notesPath ||= live?path.join(home,'My Drive','02. TRIM','TRIM AI','Working records','Routine notes'):path.join(path.dirname(billingPath),'notes');
   chatgpt ||= live?new ChatGPTConnection():{status:async()=>({connected:false,planEnabled:false}),models:async()=>[],generate:async()=>{throw new Error('AI is disabled for isolated data. Inject a test connection.');}};
   if(path.resolve(rosterPath)===path.resolve(billingPath))throw new Error('Roster and billing paths must be different.');
@@ -44,6 +47,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('clinic-contacts.mjs');
   allowed.add('clinic-roster.css');
   allowed.add('clinic-roster-repository.mjs');
+  allowed.add('oat-roster-repository.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
   const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};
   const server=http.createServer(async(req,res)=>{
@@ -73,6 +77,10 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         if(!req.headers.cookie?.split(';').some(c=>c.trim()===`trim_session=${session}`)||req.headers['x-trim-session']!==session)return json(401,{error:'Connect this laptop first.'});
         if(!['GET','HEAD'].includes(req.method)&&!origins.includes(req.headers.origin))return json(403,{error:'Origin required.'});
         const readJSON=async()=>{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>20000000)throw Object.assign(new Error('Clinical request is too large.'),{status:413});}return JSON.parse(raw||'{}');};
+        if(url.pathname==='/api/oat-fh/roster'){
+          if(req.method==='GET')return json(200,await oatStore.load());
+          return json(405,{error:'OAT FH roster access is read-only.'});
+        }
         if(url.pathname==='/api/maid/roster'){
           if(req.method==='GET')return json(200,await maidStore.load());
           if(req.method==='POST'){

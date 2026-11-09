@@ -1,14 +1,39 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261105-flags1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261107-workflow1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261108-oat1';
 import {billingUI} from './billing-ui.mjs?v=20261107-workflow1';
 import {patientsUI} from './patients-ui.mjs?v=20261107-workflow1';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-planning1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-oat1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261108-planning1';
+import {OatRepository} from './oat-roster-repository.mjs?v=20261108-oat1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
+let oatRoster,oatRepository,oatPending,oatLoad=0;
+async function refreshOat(){
+  const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
+  if(!adapter){oatRoster.error('Connect your workspace, then reload OAT FH.');return;}
+  if(oatPending?.adapter===adapter)return oatPending.promise;
+  const preserve=oatRepository?.adapter===adapter,version=++oatLoad,repository=new OatRepository(adapter);
+  oatRepository=repository;oatRoster.loading({preserve});
+  const pending={adapter};oatPending=pending;
+  pending.promise=(async()=>{
+    let timeout;
+    try{
+      const data=await Promise.race([repository.load(),new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('OAT FH took too long to load. Check your connection and reload OAT FH.')),30000);})]);
+      if(version===oatLoad)oatRoster.setPatients(data.roster.patients);
+    }catch(error){
+      if(version===oatLoad){
+        const needsAccess=adapter.mode==='cloud'&&[401,403,404].includes(error.status);
+        if(adapter.mode==='cloud')intake?.offerConnection?.();
+        oatRoster.error(needsAccess?'Connect patient records to load or renew access to the OAT FH roster, then reload OAT FH. You can also use the laptop app.':error.message);
+      }
+    }finally{clearTimeout(timeout);if(oatPending===pending)oatPending=null;}
+  })();
+  return pending.promise;
+}
+function refreshClinics(){return Promise.all([refreshMaid(),refreshOat()]);}
 async function refreshMaid(){
   if(maidRoster?.state().busy)return;
   const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
@@ -87,12 +112,12 @@ async function start(){
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
     return {patients:saved.roster.patients,local:maidRepository.adapter.mode==='local'};
   }});
-  clinicRosterUI({host:$('oat-fh-workspace'),kind:'oat-fh'});
-  patients=await patientsUI({host:$('patients-workspace'),onChange:status,onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
+  oatRoster=clinicRosterUI({host:$('oat-fh-workspace'),kind:'oat-fh',onReload:refreshOat});
+  patients=await patientsUI({host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs?v=20261105-intake1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshMaid();void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
-  intake=documentIntakeUI({state:()=>billing.state(),notes,onRecordsConnected:refreshMaid,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
+  notes=laptop?(await import('./notes-ui.mjs?v=20261108-units1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
+  intake=documentIntakeUI({state:()=>billing.state(),notes,onRecordsConnected:refreshClinics,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
     {name:'MAID',state:maidRoster.state,save:async()=>{}},
@@ -100,7 +125,7 @@ async function start(){
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
   const latest=document.createElement('button');latest.id='load-latest';latest.className='save-control';latest.textContent='Load latest changes';$('drive-connection').after(latest);
-  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();await refreshMaid();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
+  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();await refreshClinics();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
   const patientReview=document.createElement('div');patientReview.className='actions patient-review-tools';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
   $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};
   $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}status();};
@@ -113,12 +138,13 @@ async function start(){
     session.message='';
     if(['patients','maid','oat-fh'].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
     if(b.dataset.section==='maid')void refreshMaid();
+    if(b.dataset.section==='oat-fh')void refreshOat();
     status();
   });
   $('patients-print-close').onclick=()=>$('patients-print-dialog').close();
   $('patients-print').onclick=()=>{$('patients-print-frame').contentWindow.focus();$('patients-print-frame').contentWindow.print();};
   window.addEventListener('beforeunload',e=>{if(patients.hasChanges()){e.preventDefault();e.returnValue='';}});
-  setInterval(()=>{if(section==='maid'&&document.visibilityState==='visible'&&!maidRoster.state().busy)void refreshMaid();},60000);
+  setInterval(()=>{if(document.visibilityState!=='visible')return;if(section==='maid'&&!maidRoster.state().busy)void refreshMaid();if(section==='oat-fh')void refreshOat();},60000);
   showSection('billing');billing.start();
 }
 start().catch(e=>{$('gate').hidden=false;$('workspace').hidden=true;$('gate').querySelector('h1').textContent='TRIM could not start';const p=document.createElement('p');p.textContent=e.message;$('gate').querySelector('.gate-card').append(p);});

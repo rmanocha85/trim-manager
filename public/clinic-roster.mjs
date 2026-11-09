@@ -13,7 +13,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
     <p class="clinic-load-status" role="status" aria-live="polite" hidden></p>
     <div class="clinic-table-wrap" role="region" aria-label="${title} patient list" tabindex="0"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient</th><th scope="col">PHN</th>${maid?'<th scope="col">Patient phone</th><th scope="col">Primary / family contact</th>':''}<th scope="col">Location</th>${maid?'<th scope="col" class="clinic-planning-heading">1634 scheduling</th><th scope="col">Assessment completed</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
     <div class="clinic-empty"><h2>Waiting for your patient list</h2><p>${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.</p></div><p class="clinic-feedback" role="status" aria-live="polite"></p>`;
-  if(maid&&onReload){const reload=document.createElement('button');reload.textContent='Reload MAID';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
+  if(onReload){const reload=document.createElement('button');reload.textContent=maid?'Reload MAID':'Reload OAT FH';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
   const dialog=document.createElement('dialog');dialog.className='clinic-remove-dialog';dialog.innerHTML='<form method="dialog"><h2>Remove patient from MAID?</h2><p class="remove-name"></p><p>This deletes all of their tracking information from Active and History. Their original documents and folders stay in place.</p><div class="actions"><button value="cancel">Cancel</button><button value="remove" class="danger">Remove patient</button></div></form>';if(maid)host.append(dialog);
   const planningDialog=document.createElement('dialog');planningDialog.className='clinic-planning-dialog';
   planningDialog.innerHTML='<form><h2>1634 assessment planning</h2><p class="planning-name"></p><label>Assessment date<input name="date" type="date"></label><label>Assessment time (optional)<input name="time" type="time"></label><p class="planning-help">Pacific time. This records the appointment; it does not create a calendar event.</p><label>Request urgency<select name="urgency" aria-label="Request urgency"><option value="unknown">Not specified</option><option value="routine">Routine / non-urgent</option><option value="semi-urgent">Semi-urgent</option><option value="urgent">Urgent</option></select></label><p class="planning-error" role="alert"></p><div class="actions"><button type="button" data-cancel>Cancel</button><button type="button" data-clear>Clear date</button><button type="submit">Save planning</button></div></form>';
@@ -80,23 +80,21 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   }
   function render(){
     body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open);
-    const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!maid||!['loading','error'].includes(loadState);
-    loadStatus.textContent=loadState==='error'?loadMessage+(loaded?' Showing the last loaded list; changes are disabled until reload succeeds.':''):loaded?'Refreshing MAID patients…':'Loading MAID patients…';
+    const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!['loading','error'].includes(loadState);
+    loadStatus.textContent=loadState==='error'?loadMessage+(loaded?(maid?' Showing the last loaded list; changes are disabled until reload succeeds.':' Showing the last loaded list.'): ''):loaded?`Refreshing ${title} patients…`:`Loading ${title} patients…`;
     const showPlanning=maid&&view==='active';host.querySelector('.clinic-planning-heading')?.toggleAttribute('hidden',!showPlanning);
     const appPatients=maid?maidAppPatients(patients):patients;
     const inView=appPatients.map((patient,index)=>({patient,index})).filter(({patient})=>!maid||view==='all'||(isProvisionPending(patient)?'active':patient.status)===view);
     const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,patientLocation(p),...appContacts(p.contacts).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
-    count.textContent=maid&&!loaded?(loadState==='loading'?'Loading patients…':loadState==='error'?'Patient list unavailable':'Patient list not loaded'):`${visible.length} of ${inView.length} patients`;
+    count.textContent=!loaded?(loadState==='loading'?'Loading patients…':loadState==='error'?'Patient list unavailable':'Patient list not loaded'):`${visible.length} of ${inView.length} patients`;
     empty.hidden=visible.length>0;
     if(!visible.length){
       empty.querySelector('h2').textContent=appPatients.length?'No patients match this view':'Waiting for your patient list';
       empty.querySelector('p').textContent=appPatients.length?'Try another search or patient view.':`${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.`;
-      if(maid){
-        if(loadState==='loading'){empty.querySelector('h2').textContent='Loading MAID patients…';empty.querySelector('p').textContent='Reading the existing patient list.';}
-        else if(loadState==='error'){empty.querySelector('h2').textContent='MAID roster could not load';empty.querySelector('p').textContent=loadMessage;}
-        else if(!loaded){empty.querySelector('h2').textContent='MAID patient list not loaded';empty.querySelector('p').textContent='Connect your workspace, then reload MAID.';}
-        else if(!appPatients.length){empty.querySelector('h2').textContent='No MAID patients';empty.querySelector('p').textContent='There are no patients to show. Completed provisions are removed automatically after closeout.';}
-      }
+      if(loadState==='loading'){empty.querySelector('h2').textContent=`Loading ${title} patients…`;empty.querySelector('p').textContent='Reading the existing patient list.';}
+      else if(loadState==='error'){empty.querySelector('h2').textContent=`${title} roster could not load`;empty.querySelector('p').textContent=loadMessage;}
+      else if(!loaded){empty.querySelector('h2').textContent=`${title} patient list not loaded`;empty.querySelector('p').textContent=maid?'Connect your workspace, then reload MAID.':'Connect your workspace, then reload OAT FH.';}
+      else if(!appPatients.length){empty.querySelector('h2').textContent=`No ${title} patients`;empty.querySelector('p').textContent=maid?'There are no patients to show. Completed provisions are removed automatically after closeout.':'The saved OAT FH roster is empty.';}
     }
     for(const {patient:p,index} of visible){
       const row=document.createElement('tr');cell(row,String(index+1));
