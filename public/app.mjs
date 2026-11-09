@@ -3,19 +3,28 @@ import {documentIntakeUI} from './intake-ui.mjs?v=20261107-workflow1';
 import {billingUI} from './billing-ui.mjs?v=20261107-workflow1';
 import {patientsUI} from './patients-ui.mjs?v=20261107-workflow1';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-contacts1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-load2';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261107-maid-path1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
 
 const $=id=>document.getElementById(id);
-let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidLoad=0,section='billing';
+let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
 async function refreshMaid(){
   if(maidRoster?.state().busy)return;
-  const adapter=intake?.recordsConnection?.()||billing?.state().adapter,version=++maidLoad;if(!adapter)return;
-  maidSnapshot=null;maidRepository=new MaidRepository(adapter);
-  maidRoster.loading();
-  try{const data=await maidRepository.load();if(version===maidLoad){maidSnapshot=data;maidRoster.setPatients(data.roster.patients);}}
-  catch(error){if(version===maidLoad){const needsAccess=adapter.mode==='cloud'&&[403,404].includes(error.status);if(needsAccess)intake?.offerConnection?.();maidRoster.error(needsAccess?'Connect patient records to allow access to the existing MAID roster, then reload MAID. You can also use the laptop app.':error.message);}}
+  const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
+  if(!adapter){maidRoster.error('Connect your workspace, then reload MAID.');return;}
+  if(maidPending?.adapter===adapter)return maidPending.promise;
+  const preserve=maidRepository?.adapter===adapter,version=++maidLoad,repository=new MaidRepository(adapter);
+  maidSnapshot=null;maidRepository=repository;
+  maidRoster.loading({preserve});
+  const pending={adapter};maidPending=pending;
+  pending.promise=(async()=>{
+    let timeout;
+    try{const data=await Promise.race([repository.load(),new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('MAID took too long to load. Check your connection and reload MAID.')),30000);})]);if(version===maidLoad){maidSnapshot=data;maidRoster.setPatients(data.roster.patients);}}
+    catch(error){if(version===maidLoad){const needsAccess=adapter.mode==='cloud'&&[401,403,404].includes(error.status);if(needsAccess)intake?.offerConnection?.();maidRoster.error(needsAccess?'Connect patient records to load or renew access to the existing MAID roster, then reload MAID. You can also use the laptop app.':error.message);}}
+    finally{clearTimeout(timeout);if(maidPending===pending)maidPending=null;}
+  })();
+  return pending.promise;
 }
 const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
@@ -103,6 +112,7 @@ async function start(){
   document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{
     session.message='';
     if(['patients','maid','oat-fh'].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
+    if(b.dataset.section==='maid')void refreshMaid();
     status();
   });
   $('patients-print-close').onclick=()=>$('patients-print-dialog').close();
