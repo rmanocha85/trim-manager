@@ -1,4 +1,4 @@
-import {assessmentPlanningText} from './maid-assessment.mjs';
+import {assessmentPlanningText,assessmentDateLabel,assessmentToday} from './maid-assessment.mjs?v=20261109-calendar1';
 import {avaChartUrl} from './patient-links.mjs';
 import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
@@ -16,21 +16,38 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   if(onReload){const reload=document.createElement('button');reload.textContent=maid?'Reload MAID':'Reload OAT FH';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
   const dialog=document.createElement('dialog');dialog.className='clinic-remove-dialog';dialog.innerHTML='<form method="dialog"><h2>Remove patient from MAID?</h2><p class="remove-name"></p><p>This deletes all of their tracking information from Active and History. Their original documents and folders stay in place.</p><div class="actions"><button value="cancel">Cancel</button><button value="remove" class="danger">Remove patient</button></div></form>';if(maid)host.append(dialog);
   const planningDialog=document.createElement('dialog');planningDialog.className='clinic-planning-dialog';
-  planningDialog.innerHTML='<form><h2>1634 assessment planning</h2><p class="planning-name"></p><label>Assessment date<input name="date" type="date"></label><label>Assessment time (optional)<input name="time" type="time"></label><p class="planning-help">Pacific time. This records the appointment; it does not create a calendar event.</p><label>Request urgency<select name="urgency" aria-label="Request urgency"><option value="unknown">Not specified</option><option value="routine">Routine / non-urgent</option><option value="semi-urgent">Semi-urgent</option><option value="urgent">Urgent</option></select></label><p class="planning-error" role="alert"></p><div class="actions"><button type="button" data-cancel>Cancel</button><button type="button" data-clear>Clear date</button><button type="submit">Save planning</button></div></form>';
+  planningDialog.innerHTML='<form><h2>1634 assessment planning</h2><p class="planning-name"></p><input name="date" type="hidden"><section class="planning-calendar" aria-label="Assessment date calendar"><div class="planning-calendar-nav"><button type="button" data-month="-1" aria-label="Previous month">‹</button><h3 aria-live="polite"></h3><button type="button" data-month="1" aria-label="Next month">›</button></div><div class="planning-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="planning-days"></div><button type="button" data-today>Current month</button><p class="planning-selected" aria-live="polite"></p></section><label>Request urgency<select name="urgency" aria-label="Request urgency"><option value="unknown">Not specified</option><option value="routine">Routine / non-urgent</option><option value="semi-urgent">Semi-urgent</option><option value="urgent">Urgent</option></select></label><p class="planning-error" role="alert"></p><div class="actions"><button type="button" data-cancel>Cancel</button><button type="button" data-clear>Clear date</button><button type="submit">Save planning</button></div></form>';
   if(maid)host.append(planningDialog);
-  const planningForm=planningDialog.querySelector('form'),dateInput=planningForm.elements.namedItem('date'),timeInput=planningForm.elements.namedItem('time'),urgencyInput=planningForm.elements.namedItem('urgency');
+  const planningForm=planningDialog.querySelector('form'),dateInput=planningForm.elements.namedItem('date'),urgencyInput=planningForm.elements.namedItem('urgency');
+  let calendarMonth=assessmentToday().slice(0,7);
+  function renderCalendar(){
+    const first=new Date(calendarMonth+'-01T12:00:00Z'),year=first.getUTCFullYear(),month=first.getUTCMonth();
+    planningDialog.querySelector('.planning-calendar h3').textContent=new Intl.DateTimeFormat('en-CA',{month:'long',year:'numeric',timeZone:'UTC'}).format(first);
+    planningDialog.querySelector('.planning-selected').textContent=dateInput.value?`Selected: ${assessmentDateLabel(dateInput.value)}`:'No date selected';
+    const days=planningDialog.querySelector('.planning-days');days.replaceChildren();
+    for(let i=0;i<first.getUTCDay();i++)days.append(document.createElement('span'));
+    const last=new Date(Date.UTC(year,month+1,0)).getUTCDate(),today=assessmentToday();
+    for(let day=1;day<=last;day++){
+      const date=`${calendarMonth}-${String(day).padStart(2,'0')}`,button=document.createElement('button');button.type='button';button.textContent=String(day);button.dataset.date=date;
+      button.setAttribute('aria-label',assessmentDateLabel(date));button.setAttribute('aria-pressed',String(dateInput.value===date));if(date===today)button.setAttribute('aria-current','date');
+      button.onclick=()=>{dateInput.value=date;renderCalendar();days.querySelector(`[data-date="${date}"]`).focus();};days.append(button);
+    }
+  }
+  planningDialog.querySelectorAll('[data-month]').forEach(button=>button.onclick=()=>{
+    const month=new Date(calendarMonth+'-01T12:00:00Z');month.setUTCMonth(month.getUTCMonth()+Number(button.dataset.month));calendarMonth=month.toISOString().slice(0,7);renderCalendar();
+  });
+  planningDialog.querySelector('[data-today]').onclick=()=>{calendarMonth=assessmentToday().slice(0,7);renderCalendar();};
   planningDialog.querySelector('[data-cancel]').onclick=()=>planningDialog.close();
-  planningDialog.querySelector('[data-clear]').onclick=()=>{dateInput.value='';timeInput.value='';};
+  planningDialog.querySelector('[data-clear]').onclick=()=>{dateInput.value='';renderCalendar();};
   planningDialog.addEventListener('close',()=>{render();onChange();});
   function editPlanning(p){
     if(busy||!ready||planningDialog.open)return;
-    dateInput.value=p.assessmentSchedule?.date||'';timeInput.value=p.assessmentSchedule?.time||'';urgencyInput.value=p.assessmentUrgency?.level||'unknown';
+    dateInput.value=p.assessmentSchedule?.date||'';calendarMonth=assessmentToday().slice(0,7);renderCalendar();urgencyInput.value=p.assessmentUrgency?.level||'unknown';
     planningDialog.querySelector('.planning-name').textContent=p.name;planningDialog.querySelector('.planning-error').textContent='';
     planningForm.onsubmit=async event=>{
       event.preventDefault();
-      if(timeInput.value&&!dateInput.value){planningDialog.querySelector('.planning-error').textContent='Choose a date for this time, or clear both fields.';return;}
       const action={type:'assessment-planning',patientId:p.id};
-      if(dateInput.value!==(p.assessmentSchedule?.date||'')||timeInput.value!==(p.assessmentSchedule?.time||''))action.schedule={date:dateInput.value||null,time:timeInput.value||null,source:'Physician edit in MAID app'};
+      if(dateInput.value!==(p.assessmentSchedule?.date||''))action.schedule={date:dateInput.value||null,time:null,source:'Physician edit in MAID app'};
       if(urgencyInput.value!==(p.assessmentUrgency?.level||'unknown'))action.urgency={level:urgencyInput.value,source:'Physician edit in MAID app'};
       planningDialog.close();if(action.schedule||action.urgency)await act(action);
     };
@@ -134,7 +151,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
         const contacts=document.createElement('div');contacts.className='clinic-contact-sources';
         if(appContacts(p.contacts).length)for(const c of appContacts(p.contacts))contacts.append(contactCard(c,{source:true}));else contacts.textContent='No contacts recorded';
         if(p.contactSourceNotes){const note=document.createElement('p');note.textContent=p.contactSourceNotes;contacts.append(note);}
-        disclosure.append(contacts);detail.append(disclosure);
+        disclosure.append(contacts);detail.append(disclosure);smoothDisclosure(disclosure,summary);
         const status=document.createElement('small');status.textContent=isProvisionPending(p)?`Provision ${p.provisionDate} — closeout pending`:p.status==='active'?'Active':'History';
         if(isProvisionPending(p))status.title=`Outstanding: ${closeoutOutstanding(p).join(', ')}`;detail.append(status);
         if(onAction){const actions=document.createElement('div');actions.className='clinic-row-actions';const move=document.createElement('button'),remove=document.createElement('button');
@@ -154,4 +171,19 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
     loading({preserve=true}={}){ready=false;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
     error(message){ready=false;loadState='error';loadMessage=message;render();}
   };
+}
+
+// Animate the actual height so the table row moves with the disclosure in both directions.
+function smoothDisclosure(details,summary){
+  let animation=null,expanded=false;
+  summary.addEventListener('click',event=>{
+    event.preventDefault();expanded=!expanded;
+    const start=details.getBoundingClientRect().height;
+    if(animation){animation.onfinish=null;animation.cancel();animation=null;}
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches){details.style.overflow='';details.open=expanded;return;}
+    details.style.overflow='hidden';details.open=true;
+    const end=expanded?details.getBoundingClientRect().height:summary.getBoundingClientRect().height;
+    animation=details.animate({height:[`${start}px`,`${end}px`]},{duration:220,easing:'ease-in-out'});
+    animation.onfinish=()=>{details.open=expanded;details.style.overflow='';animation=null;};
+  });
 }

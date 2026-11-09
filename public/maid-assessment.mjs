@@ -7,11 +7,17 @@ export function validateAssessmentPlanning(patient){
   if(s&&((s.date!==null&&!validDate(s.date))||(s.time!==null&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(s.time))||(!s.date&&s.time)||s.timeZone!==assessmentTimeZone||!hasText(s.source)))throw new Error('Invalid 1634 schedule: use a valid date, optional time and source.');
   if(u&&(!urgencyLevels.includes(u.level)||!hasText(u.source)))throw new Error('Invalid assessment urgency or missing source.');
 }
+export function assessmentDateLabel(date){
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric',year:'numeric'}).formatToParts(new Date(date+'T12:00:00Z')).map(p=>[p.type,p.value]));
+  return `${parts.weekday}, ${parts.month.toUpperCase()} ${parts.day}, ${parts.year}`;
+}
+export function assessmentToday(now=new Date()){
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:assessmentTimeZone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
 export function assessmentPlanningText(patient,now=new Date()){
   const s=patient.assessmentSchedule;
-  if(patient.assessmentDate&&(!s?.date||patient.assessmentDate>=s.date))return {label:`Completed ${patient.assessmentDate}`,past:false};
+  if(patient.assessmentDate&&(!s?.date||patient.assessmentDate>=s.date))return {label:`Completed ${assessmentDateLabel(patient.assessmentDate)}`,past:false};
   if(!s?.date)return {label:'Not scheduled',past:false};
-  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:assessmentTimeZone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now).map(p=>[p.type,p.value]));
-  const today=`${parts.year}-${parts.month}-${parts.day}`;
-  return {label:`${s.date} · ${s.time?`${s.time} Pacific`:'Time not set'}`,past:s.date<today};
+  return {label:assessmentDateLabel(s.date),past:s.date<assessmentToday(now)};
 }
