@@ -1,3 +1,4 @@
+import {closeoutSteps,checkpointDone,isProvisionClosed} from './maid-lifecycle.mjs';
 const V2='https://www.googleapis.com/drive/v2/files';
 const conflict=()=>Object.assign(new Error('MAID changed elsewhere. Reload the MAID list and review before trying again.'),{status:409});
 export function validateClinicRoster(data){
@@ -5,6 +6,7 @@ export function validateClinicRoster(data){
   const ids=new Set(),phns=new Set(),avas=new Set();
   for(const p of data.patients){
     if(!p||typeof p.id!=='string'||!p.id||typeof p.name!=='string'||!p.name.trim()||!['active','history'].includes(p.status)||ids.has(p.id)||p.phn&&(!/^\d{10}$/.test(p.phn)||phns.has(p.phn))||p.ava&&(!/^\d{6,10}$/.test(p.ava)||avas.has(p.ava))||p.contacts&&!Array.isArray(p.contacts)||p.statusHistory&&!Array.isArray(p.statusHistory))throw new Error('Invalid or duplicate clinic patient.');
+    if(p.postProvision&&(!['pending','complete'].includes(p.postProvision.status)||p.postProvision.status==='complete'&&!isProvisionClosed(p)))throw new Error('Invalid provision closeout.');
     ids.add(p.id);if(p.phn)phns.add(p.phn);if(p.ava)avas.add(p.ava);
   }
   return data;
@@ -23,14 +25,26 @@ export function applyMaidAction(data,action,now=new Date().toISOString()){
     if(!p)throw conflict();
     if(action.type==='remove')next.patients=next.patients.filter(x=>x.id!==p.id);
     else if(action.type==='status'){
+      if(isProvisionClosed(p))throw new Error('Completed provisions are no longer in the app.');
       if(!['active','history'].includes(action.status))throw new Error('Invalid MAID status.');
       if(p.status===action.status)return data;
       p.statusHistory=[...(p.statusHistory||[]),{from:p.status,to:action.status,at:now}];p.status=action.status;p.updatedAt=now;
     }else if(action.type==='update'){
-      if(!action.changes||Object.keys(action.changes).some(k=>['id','phn','statusHistory'].includes(k)))throw new Error('Identity or status history cannot be overwritten.');
+      if(!action.changes||Object.keys(action.changes).some(k=>['id','phn','statusHistory','postProvision'].includes(k)))throw new Error('Identity, status history or closeout cannot be overwritten. Use the closeout action for checkpoints.');
       const updated=mergeFacts(p,action.changes);
+      if(action.changes.currentLocation)updated.location=updated.currentLocation.display_name||updated.currentLocation.label||updated.location;
       if(updated.status!==p.status)updated.statusHistory=[...(p.statusHistory||[]),{from:p.status,to:updated.status,at:now}];
       updated.updatedAt=now;next.patients[next.patients.indexOf(p)]=updated;
+    }else if(action.type==='closeout'){
+      if(isProvisionClosed(p))return data; // A retry cannot reopen or duplicate completed work.
+      const checkpoints=action.checkpoints||{};
+      for(const [step,value] of Object.entries(checkpoints))if(!closeoutSteps.includes(step)||!checkpointDone(step,value))throw new Error('Closeout checkpoints require verified evidence or an explicit physician exclusion.');
+      p.postProvision={...p.postProvision,status:'pending',checkpoints:{...p.postProvision?.checkpoints,...structuredClone(checkpoints)}};
+      if(action.complete===true){
+        p.postProvision.status='complete';p.postProvision.completedAt=now;
+        if(!isProvisionClosed(p))throw new Error('Closeout is incomplete. Verify the actual provision date, source and every required checkpoint.');
+      }
+      p.updatedAt=now;
     }else throw new Error('Unknown MAID action.');
   }
   next.updatedAt=now;return validateClinicRoster(next);

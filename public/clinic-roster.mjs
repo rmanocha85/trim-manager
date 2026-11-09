@@ -1,5 +1,6 @@
 import {avaChartUrl} from './patient-links.mjs';
-import {contactGroups,contactRole,phoneLink} from './clinic-contacts.mjs?v=20261108-contacts1';
+import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts.mjs?v=20261108-closeout1';
+import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.
 export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
@@ -53,18 +54,19 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
     body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading');
     const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!maid||!['loading','error'].includes(loadState);
     loadStatus.textContent=loadState==='error'?loadMessage+(loaded?' Showing the last loaded list; changes are disabled until reload succeeds.':''):loaded?'Refreshing MAID patients…':'Loading MAID patients…';
-    const inView=patients.map((patient,index)=>({patient,index})).filter(({patient})=>!maid||view==='all'||patient.status===view);
-    const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,p.location,...(p.contacts||[]).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
+    const appPatients=maid?maidAppPatients(patients):patients;
+    const inView=appPatients.map((patient,index)=>({patient,index})).filter(({patient})=>!maid||view==='all'||(isProvisionPending(patient)?'active':patient.status)===view);
+    const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,patientLocation(p),...appContacts(p.contacts).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
     count.textContent=maid&&!loaded?(loadState==='loading'?'Loading patients…':loadState==='error'?'Patient list unavailable':'Patient list not loaded'):`${visible.length} of ${inView.length} patients`;
     empty.hidden=visible.length>0;
     if(!visible.length){
-      empty.querySelector('h2').textContent=patients.length?'No patients match this view':'Waiting for your patient list';
-      empty.querySelector('p').textContent=patients.length?'Try another search or patient view.':`${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.`;
+      empty.querySelector('h2').textContent=appPatients.length?'No patients match this view':'Waiting for your patient list';
+      empty.querySelector('p').textContent=appPatients.length?'Try another search or patient view.':`${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.`;
       if(maid){
         if(loadState==='loading'){empty.querySelector('h2').textContent='Loading MAID patients…';empty.querySelector('p').textContent='Reading the existing patient list.';}
         else if(loadState==='error'){empty.querySelector('h2').textContent='MAID roster could not load';empty.querySelector('p').textContent=loadMessage;}
         else if(!loaded){empty.querySelector('h2').textContent='MAID patient list not loaded';empty.querySelector('p').textContent='Connect your workspace, then reload MAID.';}
-        else if(!patients.length){empty.querySelector('h2').textContent='No MAID patients';empty.querySelector('p').textContent='The saved MAID roster is empty.';}
+        else if(!appPatients.length){empty.querySelector('h2').textContent='No MAID patients';empty.querySelector('p').textContent='There are no patients to show. Completed provisions are removed automatically after closeout.';}
       }
     }
     for(const {patient:p,index} of visible){
@@ -79,7 +81,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
         copy.onclick=async()=>{try{await navigator.clipboard.writeText(digits);feedback.textContent='PHN copied.';}catch{feedback.textContent='Could not copy. Select the displayed PHN to copy it.';}};phn.append(copy);
       }else phn.textContent='Not recorded';
       if(maid)renderContacts(row,p);
-      cell(row,p.location||'Not recorded');
+      cell(row,patientLocation(p));
       if(maid){
         cell(row,p.assessmentDate||'Not recorded');cell(row,p.form1645===true?'Yes':p.form1645===false?'No':'Not verified');
         const detail=cell(row,'');const disclosure=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Details';disclosure.append(summary);
@@ -89,12 +91,13 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
         }
         disclosure.append(list);
         const contacts=document.createElement('div');contacts.className='clinic-contact-sources';
-        if(p.contacts?.length)for(const c of p.contacts)contacts.append(contactCard(c,{source:true}));else contacts.textContent='No contacts recorded';
+        if(appContacts(p.contacts).length)for(const c of appContacts(p.contacts))contacts.append(contactCard(c,{source:true}));else contacts.textContent='No contacts recorded';
         if(p.contactSourceNotes){const note=document.createElement('p');note.textContent=p.contactSourceNotes;contacts.append(note);}
         disclosure.append(contacts);detail.append(disclosure);
-        const status=document.createElement('small');status.textContent=p.status==='active'?'Active':'History';detail.append(status);
+        const status=document.createElement('small');status.textContent=isProvisionPending(p)?`Provision ${p.provisionDate} — closeout pending`:p.status==='active'?'Active':'History';
+        if(isProvisionPending(p))status.title=`Outstanding: ${closeoutOutstanding(p).join(', ')}`;detail.append(status);
         if(onAction){const actions=document.createElement('div');actions.className='clinic-row-actions';const move=document.createElement('button'),remove=document.createElement('button');
-          move.textContent=p.status==='active'?'Move to History':'Move to Active';move.disabled=busy||!ready;move.onclick=()=>act({type:'status',patientId:p.id,status:p.status==='active'?'history':'active'});
+          move.textContent=p.status==='active'?'Move to History':'Move to Active';move.disabled=busy||!ready||isProvisionPending(p);move.onclick=()=>act({type:'status',patientId:p.id,status:p.status==='active'?'history':'active'});
           remove.textContent='Remove';remove.className='text-button danger';remove.setAttribute('aria-label','Remove '+p.name);remove.disabled=busy||!ready;remove.onclick=()=>confirmRemove(p);actions.append(move,remove);detail.append(actions);
         }
       }

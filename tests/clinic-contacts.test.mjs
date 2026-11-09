@@ -17,7 +17,7 @@ test('patient preferred contact stays separate from family, clinical primary con
   const original=structuredClone(contacts),groups=contactGroups(contacts);
   assert.deepEqual(groups.patient,[contacts[0]]);
   assert.deepEqual(groups.family,[contacts[1],contacts[2],contacts[8]]);
-  assert.deepEqual(groups.care,contacts.slice(3,6));
+  assert.deepEqual(groups.care,[contacts[5]]);
   assert.deepEqual(groups.other,contacts.slice(6,8));
   assert.deepEqual(contacts,original);
   assert.equal(contactGroup({role:'Self'}),'patient');

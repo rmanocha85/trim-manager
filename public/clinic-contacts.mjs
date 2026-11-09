@@ -10,9 +10,12 @@ export function contactGroup(contact) {
   return 'other';
 }
 
+export function appContacts(contacts=[]) {
+  return (contacts||[]).filter(c=>c&&typeof c==='object'&&!/\b(family (?:doctor|physician)|general practitioner|primary (?:health\s*care provider|care (?:provider|physician|doctor))|GP|social work(?:er)?)\b/i.test([c.role,c.relationship,c.type].filter(Boolean).join(' ')));
+}
 export function contactGroups(contacts=[]) {
   const groups={patient:[],family:[],care:[],other:[]};
-  for(const contact of contacts||[])if(contact&&typeof contact==='object')groups[contactGroup(contact)].push(contact);
+  for(const contact of appContacts(contacts))groups[contactGroup(contact)].push(contact);
   return groups;
 }
 

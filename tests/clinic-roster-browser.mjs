@@ -5,6 +5,8 @@ import os from 'node:os';import path from 'node:path';
 import {chromium} from 'playwright';
 import {createServer} from './server-fixture.mjs';
 import {blankLedger} from '../public/core.mjs';
+import {MaidStore} from '../maid-storage.mjs';
+import {closeoutSteps} from '../public/maid-lifecycle.mjs';
 const dir=await mkdtemp(path.join(os.tmpdir(),'trim-clinic-'));
 const rosterPath=path.join(dir,'roster.json'),billingPath=path.join(dir,'billing.json'),maidPath=path.join(dir,'maid-roster.json');
 const panel={id:'synthetic',name:'SYNTHETIC, Panel',phn:'0000000001',ava:'123456',unit:'cedar',room:'1',codes:'401'};
@@ -15,6 +17,8 @@ people[0].contacts=[
  {name:'Zulu Synthetic',role:'Patient - preferred contact on 1632',phone:'604-555-0101',primary:true,source:'Synthetic 1632 patient/contact sections',sourceDate:'2026-10-01',verifiedDate:'2026-11-08'},
  {name:'Family Synthetic',role:'Son - MAID referral contact',phone:'604-555-0102',primary:false,source:'Synthetic referral',verifiedDate:'2026-11-08'},
  {name:'Team Synthetic',role:'Inpatient team',phone:'604-555-0103',extension:'42',facility:'Synthetic hospital',unit:'Unit A',source:'Synthetic referral'},
+ {name:'Hidden Doctor Synthetic',role:'Family doctor',phone:'604-555-0106'},
+ {name:'Hidden Social Synthetic',role:'Social worker',phone:'604-555-0107'},
  {name:'Witness Synthetic',role:'Witness',phone:null,source:'Synthetic 1632 witness section'}
 ];
 people[2].contacts=[{name:'History Synthetic',role:'Patient',phone:'604-555-0104'},{name:'Contact Synthetic',role:'Preferred contact',relationship:'Daughter',primary:true,phone:'604-555-0105',source:'Synthetic 1632',verifiedDate:'2026-11-08'}];
@@ -40,6 +44,7 @@ try{
  assert.equal(await first.locator('.clinic-phn-copy').innerText(),'');assert.equal(await first.locator('.clinic-phn-copy svg').count(),1);
  await first.locator('summary').click();assert.match(await first.locator('.clinic-contact-sources').innerText(),/Synthetic 1632 patient\/contact sections · Source date: 2026-10-01 · Verified: 2026-11-08/);await first.locator('summary').click();
  assert.equal(await m.locator('tbody tr').nth(1).locator('.clinic-patient-phone').innerText(),'Not recorded');
+ assert.doesNotMatch(await first.textContent(),/Hidden Doctor Synthetic|Hidden Social Synthetic/);
  // Inspect links only: no protocol navigation and no external call is permitted in this test.
  await m.getByRole('button',{name:'Copy PHN for Zulu Synthetic',exact:true}).click();
  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'0000000002');
@@ -78,6 +83,22 @@ try{
  await m.getByRole('button',{name:'Move to History',exact:true}).click();await m.locator('.clinic-feedback').filter({hasText:'changed elsewhere'}).waitFor();
  assert.deepEqual(JSON.parse(await readFile(maidPath,'utf8')).patients,external.patients);
  await m.getByRole('button',{name:'Reload MAID',exact:true}).click();await m.locator('.clinic-empty').filter({hasText:'No patients match'}).waitFor();
+ assert.deepEqual(errors,[]);
+ // An external workflow writes the same private roster; reload removes completed cases in every view.
+ const lifecycle={schemaVersion:1,patients:[{id:'done',name:'Completed Synthetic',status:'history',provisionDate:'2026-11-08',provisionSource:'Synthetic physician confirmation'},{id:'pending',name:'Pending Synthetic',status:'history',provisionDate:'2026-11-08',provisionSource:'Synthetic physician confirmation',currentLocation:{display_name:'Synthetic ward'}}]};
+ await writeFile(maidPath,JSON.stringify(lifecycle));
+ await m.getByRole('button',{name:'Reload MAID',exact:true}).click();
+ await m.locator('tbody tr').filter({hasText:'Pending Synthetic'}).waitFor();
+ assert.equal(await m.locator('tbody tr').count(),2);assert.match(await m.innerText(),/closeout pending/);assert.match(await m.innerText(),/Synthetic ward/);
+ const store=new MaidStore(maidPath),before=await store.load();
+ await store.mutate({type:'closeout',patientId:'done',complete:true,checkpoints:Object.fromEntries(closeoutSteps.map(step=>[step,{status:'verified',verifiedAt:'2026-11-08T19:00:00Z',source:'Synthetic verification'}]))},before.etag);
+ await m.getByRole('button',{name:'Reload MAID',exact:true}).click();
+ await m.locator('.clinic-count').filter({hasText:'1 of 1 patients'}).waitFor();
+ for(const view of ['Active','History','All']){
+   await m.getByRole('button',{name:view,exact:true}).click();assert.doesNotMatch(await m.innerText(),/Completed Synthetic/);
+   assert.equal(await m.locator('tbody tr').count(),view==='History'?0:1);
+ }
+ assert.equal((await store.load()).roster.patients.length,2);
  assert.deepEqual(errors,[]);
  console.log('PASS clinic navigation, private read access, Ava links, PHN clipboard, search, stable order, history, OAT placeholder, responsive layout, persisted status, confirmed removal, stale-tab rejection, unchanged TRIM files.');
 }finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));await rm(dir,{recursive:true,force:true});}
