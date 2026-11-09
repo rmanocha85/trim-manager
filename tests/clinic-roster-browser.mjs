@@ -35,7 +35,7 @@ try{
  await page.goto(origin+'/?section=maid');const m=page.locator('#maid-workspace');await m.locator('tbody tr').first().waitFor();
  assert.deepEqual(await m.locator('tbody a[target="_blank"]').allTextContents(),['Zulu Synthetic','Alpha Synthetic']);
  assert.equal(await m.locator('tbody a[target="_blank"]').first().getAttribute('href'),'https://www.avaemr.ca/patients/123457');
- assert.deepEqual(await m.locator('thead th').allTextContents(),['#','Patient','PHN','Patient phone','Primary / family contact','Location','Assessment','1645','Details / actions']);
+ assert.deepEqual(await m.locator('thead th').allTextContents(),['#','Patient','PHN','Patient phone','Primary / family contact','Location','1634 scheduling','Assessment completed','1645','Details / actions']);
  const first=m.locator('tbody tr').first(),own=first.locator('.clinic-patient-phone'),family=first.locator('.clinic-contacts');
  assert.match(await own.innerText(),/^604-555-0101\nPatient - preferred contact/);assert.doesNotMatch(await own.innerText(),/on 1632/);assert.doesNotMatch(await own.innerText(),/Family Synthetic/);
  assert.equal(await own.locator('a').getAttribute('href'),'tel:6045550101');
@@ -68,6 +68,25 @@ try{
  await page.locator('[data-section="maid"]').click();await page.screenshot({path:'work/maid-roster-synthetic.png',fullPage:true});
  for(const width of [390,1024,1440,1920]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Page overflow at ${width}`);}
  assert.deepEqual(errors,[]);assert.equal(await readFile(rosterPath,'utf8'),roster);assert.equal(await readFile(billingPath,'utf8'),ledger);assert.equal(await readFile(maidPath,'utf8'),maid);
+
+ // Planning edits preserve completed assessment facts and survive reload.
+ await m.getByRole('button',{name:'Active',exact:true}).click();
+ await m.getByRole('button',{name:'Edit 1634 planning for Zulu Synthetic',exact:true}).click();
+ const planning=m.locator('.clinic-planning-dialog');
+ await planning.getByLabel('Assessment date',{exact:true}).fill('2099-06-01');await planning.getByRole('button',{name:'Cancel',exact:true}).click();
+ assert.equal(await readFile(maidPath,'utf8'),maid);
+ await m.getByRole('button',{name:'Edit 1634 planning for Zulu Synthetic',exact:true}).click();
+ await planning.getByLabel('Assessment date',{exact:true}).fill('2099-06-01');await planning.getByLabel('Assessment time (optional)',{exact:true}).fill('09:30');await planning.getByLabel('Request urgency',{exact:true}).selectOption('urgent');
+ await planning.getByRole('button',{name:'Save planning',exact:true}).click();await m.locator('.clinic-feedback').filter({hasText:'Assessment planning saved.'}).waitFor();
+ let planned=JSON.parse(await readFile(maidPath,'utf8')).patients[0];assert.equal(planned.assessmentSchedule.date,'2099-06-01');assert.equal(planned.assessmentSchedule.time,'09:30');assert.equal(planned.assessmentUrgency.level,'urgent');assert.equal(planned.assessmentDate,undefined);assert.equal(planned.status,'active');
+ await page.reload();await m.locator('tbody tr').first().waitFor();assert.match(await m.innerText(),/2099-06-01 · 09:30 Pacific/);
+ await m.getByRole('button',{name:'Clear urgent for Zulu Synthetic',exact:true}).click();await m.locator('.clinic-feedback').filter({hasText:'Assessment planning saved.'}).waitFor();
+ planned=JSON.parse(await readFile(maidPath,'utf8')).patients[0];assert.equal(planned.assessmentUrgency.level,'routine');assert.equal(planned.assessmentSchedule.time,'09:30');
+ await m.getByRole('button',{name:'Edit 1634 planning for Zulu Synthetic',exact:true}).click();await planning.getByRole('button',{name:'Clear date',exact:true}).click();await planning.getByRole('button',{name:'Save planning',exact:true}).click();await m.locator('.clinic-feedback').filter({hasText:'Assessment planning saved.'}).waitFor();
+ planned=JSON.parse(await readFile(maidPath,'utf8')).patients[0];assert.equal(planned.assessmentSchedule.date,null);assert.equal(planned.assessmentSchedule.time,null);
+ await m.getByRole('button',{name:'Edit 1634 planning for Zulu Synthetic',exact:true}).click();await planning.getByLabel('Assessment date',{exact:true}).fill('2000-01-01');await planning.getByLabel('Request urgency',{exact:true}).selectOption('semi-urgent');await planning.getByRole('button',{name:'Save planning',exact:true}).click();await m.locator('.clinic-feedback').filter({hasText:'Assessment planning saved.'}).waitFor();assert.match(await m.innerText(),/Past date — confirm outcome/);assert.match(await m.innerText(),/Semi-urgent/);
+ await page.screenshot({path:'work/maid-planning-synthetic.png',fullPage:true});
+ await m.getByRole('button',{name:'History',exact:true}).click();assert.equal(await m.locator('.clinic-planning-heading').isVisible(),false);
 
  // Persist status transitions, cancel removal, then remove all metadata and reject a stale tab.
  await m.getByRole('button',{name:'Active',exact:true}).click();

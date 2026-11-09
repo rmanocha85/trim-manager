@@ -1,4 +1,5 @@
 import {closeoutSteps,checkpointDone,isProvisionClosed} from './maid-lifecycle.mjs';
+import {assessmentTimeZone,validateAssessmentPlanning} from './maid-assessment.mjs';
 const V2='https://www.googleapis.com/drive/v2/files';
 const conflict=()=>Object.assign(new Error('MAID changed elsewhere. Reload the MAID list and review before trying again.'),{status:409});
 export function validateClinicRoster(data){
@@ -7,6 +8,7 @@ export function validateClinicRoster(data){
   for(const p of data.patients){
     if(!p||typeof p.id!=='string'||!p.id||typeof p.name!=='string'||!p.name.trim()||!['active','history'].includes(p.status)||ids.has(p.id)||p.phn&&(!/^\d{10}$/.test(p.phn)||phns.has(p.phn))||p.ava&&(!/^\d{6,10}$/.test(p.ava)||avas.has(p.ava))||p.contacts&&!Array.isArray(p.contacts)||p.statusHistory&&!Array.isArray(p.statusHistory))throw new Error('Invalid or duplicate clinic patient.');
     if(p.postProvision&&(!['pending','complete'].includes(p.postProvision.status)||p.postProvision.status==='complete'&&!isProvisionClosed(p)))throw new Error('Invalid provision closeout.');
+    validateAssessmentPlanning(p);
     ids.add(p.id);if(p.phn)phns.add(p.phn);if(p.ava)avas.add(p.ava);
   }
   return data;
@@ -35,6 +37,15 @@ export function applyMaidAction(data,action,now=new Date().toISOString()){
       if(action.changes.currentLocation)updated.location=updated.currentLocation.display_name||updated.currentLocation.label||updated.location;
       if(updated.status!==p.status)updated.statusHistory=[...(p.statusHistory||[]),{from:p.status,to:updated.status,at:now}];
       updated.updatedAt=now;next.patients[next.patients.indexOf(p)]=updated;
+    }else if(action.type==='assessment-planning'){
+      if(isProvisionClosed(p))throw new Error('Completed provisions are no longer in the app.');
+      if(!action.schedule&&!action.urgency)throw new Error('No assessment planning change supplied.');
+      if(action.schedule){
+        const s=action.schedule;
+        p.assessmentSchedule={...p.assessmentSchedule,date:s.date??null,time:s.time??null,timeZone:assessmentTimeZone,source:s.source,updatedAt:now};
+      }
+      if(action.urgency)p.assessmentUrgency={...p.assessmentUrgency,level:action.urgency.level,source:action.urgency.source,updatedAt:now};
+      p.updatedAt=now;
     }else if(action.type==='closeout'){
       if(isProvisionClosed(p))return data; // A retry cannot reopen or duplicate completed work.
       const checkpoints=action.checkpoints||{};

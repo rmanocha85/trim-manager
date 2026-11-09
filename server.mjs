@@ -40,6 +40,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('context-refresh.mjs');
   allowed.add('clinic-roster.mjs');
   allowed.add('maid-lifecycle.mjs');
+  allowed.add('maid-assessment.mjs');
   allowed.add('clinic-contacts.mjs');
   allowed.add('clinic-roster.css');
   allowed.add('clinic-roster-repository.mjs');
@@ -75,7 +76,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         if(url.pathname==='/api/maid/roster'){
           if(req.method==='GET')return json(200,await maidStore.load());
           if(req.method==='POST'){
-            const action=await readJSON();if(!['status','remove'].includes(action.type))return json(400,{error:'Unsupported MAID app action.'});
+            const action=await readJSON();if(!['status','remove','assessment-planning'].includes(action.type))return json(400,{error:'Unsupported MAID app action.'});
             return json(200,await maidStore.mutate(action,req.headers['if-match']));
           }
         }
