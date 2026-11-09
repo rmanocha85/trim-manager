@@ -58,7 +58,7 @@ try{
  await m.getByRole('searchbox').fill('');await m.getByRole('button',{name:'History',exact:true}).click();assert.equal(await m.locator('tbody a[target="_blank"]').count(),0);assert.match(await m.innerText(),/Ava number needed/);
  assert.equal(await m.locator('.clinic-patient-phone a').getAttribute('href'),'tel:6045550104');assert.match(await m.locator('.clinic-contacts').innerText(),/Preferred contact · Daughter/);assert.equal(await m.locator('.clinic-contacts a').getAttribute('href'),'tel:6045550105');
  await m.getByRole('button',{name:'All',exact:true}).click();assert.equal(await m.locator('tbody tr').count(),3);
- await page.locator('[data-section="oat-fh"]').click();const oat=page.locator('#oat-fh-workspace');await oat.getByRole('heading',{name:'OAT Fraser Health roster could not load'}).waitFor();
+ await page.locator('[data-section="oat-fh"]').click();const oat=page.locator('#oat-fh-workspace');await oat.getByRole('button',{name:'All patients',exact:true}).click();await oat.getByRole('heading',{name:'OAT Fraser Health roster could not load'}).waitFor();
  // Exercise the same ordered renderer with synthetic OAT data; it never saves.
  await page.evaluate(async data=>{const {clinicRosterUI}=await import('./clinic-roster.mjs');clinicRosterUI({host:document.querySelector('#oat-fh-workspace'),kind:'oat-fh'}).setPatients(data);},people.slice(0,2));
  assert.deepEqual(await oat.locator('tbody a').allTextContents(),['Zulu Synthetic','Alpha Synthetic']);

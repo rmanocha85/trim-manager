@@ -3,7 +3,8 @@ import {documentIntakeUI} from './intake-ui.mjs?v=20261108-oat1';
 import {billingUI} from './billing-ui.mjs?v=20261107-workflow1';
 import {patientsUI} from './patients-ui.mjs?v=20261107-workflow1';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-oat1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-raac1';
+import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261108-raac1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261108-planning1';
 import {OatRepository} from './oat-roster-repository.mjs?v=20261108-oat1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
@@ -22,7 +23,7 @@ async function refreshOat(){
     let timeout;
     try{
       const data=await Promise.race([repository.load(),new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('OAT FH took too long to load. Check your connection and reload OAT FH.')),30000);})]);
-      if(version===oatLoad)oatRoster.setPatients(data.roster.patients);
+      if(version===oatLoad)oatRoster.setRoster(data.roster);
     }catch(error){
       if(version===oatLoad){
         const needsAccess=adapter.mode==='cloud'&&[401,403,404].includes(error.status);
@@ -112,7 +113,7 @@ async function start(){
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
     return {patients:saved.roster.patients,local:maidRepository.adapter.mode==='local'};
   }});
-  oatRoster=clinicRosterUI({host:$('oat-fh-workspace'),kind:'oat-fh',onReload:refreshOat});
+  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onReload:refreshOat});
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261108-units1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();

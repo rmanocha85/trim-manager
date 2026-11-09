@@ -1,9 +1,11 @@
 import {validateClinicRoster} from './clinic-roster-repository.mjs';
+import {validateClinicDays} from './oat-schedule.mjs';
 const V2='https://www.googleapis.com/drive/v2/files';
 const FOLDER='1d90SEhco30YL0AAE20gt11pzFBjOOJUn';
 export function validateOatRoster(data){
   validateClinicRoster(data);
   if(data.clinic!=='oat-fh')throw new Error('The selected file is not the OAT Fraser Health roster.');
+  validateClinicDays(data.clinicDays??[],data.patients);
   return data;
 }
 // Read the canonical private JSON only. Never create, upload or cache patient records.
