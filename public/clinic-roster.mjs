@@ -100,7 +100,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
       const row=document.createElement('tr');cell(row,String(index+1));
       const name=cell(row,'');const url=avaChartUrl(p);
       if(url){const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=p.name;link.title='Open Ava chart';name.append(link);}
-      else {name.textContent=p.name;const hint=document.createElement('small');hint.textContent='Ava number needed';name.append(hint);}
+      else {name.textContent=p.name;const hint=document.createElement('small');hint.textContent=maid?'Ava number needed':'Ava number pending';name.append(hint);}
       const phn=cell(row,'');const digits=String(p.phn||'').replace(/\D/g,'');
       if(/^\d{10}$/.test(digits)){
         const value=document.createElement('span');value.textContent=digits;phn.append(value);

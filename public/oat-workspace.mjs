@@ -1,4 +1,4 @@
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-raac1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261108-oatfh1';
 import {avaChartUrl} from './patient-links.mjs';
 import {appointmentsForDate,upcomingFriday} from './oat-schedule.mjs';
 import {enhanceDateInputs} from './dates.mjs';
@@ -26,6 +26,7 @@ export function oatWorkspaceUI({host,onReload}){
       const url=slot.patient&&avaChartUrl(slot.patient),label=slot.patient?.name||slot.sourceName||slot.label;
       if(url){const link=document.createElement('a');link.textContent=label;link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.title='Open Ava chart';name.append(link);}else name.textContent=label;
       if(slot.sourceName&&!slot.patient){const hint=document.createElement('small');hint.textContent='Patient match needed';name.append(hint);}
+      if(slot.patient&&!url){const hint=document.createElement('small');hint.textContent='Ava number pending';name.append(hint);}
       note.textContent=slot.note||'';row.append(time,name,note);rows.append(row);
     }
   }

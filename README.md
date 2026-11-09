@@ -107,3 +107,11 @@ October 22, 2026 update (`20261022-fixes1`, cloud commit `ca9d35a`, laptop integ
 ## OAT FH RAAC schedules — November 8, 2026
 
 OAT FH opens to Schedule, with an upcoming-Friday Pacific date selector, ordered appointment times, patient names linked by exact roster ID to Ava, supplied notes and explicit unmatched-patient labels. All patients retains the full roster without a Location column. Schedules live in optional clinicDays in the same private oat-fh-roster.json: each day has date and appointments; each slot has id, time, verified patientId and optional note. Unmatched names use sourceName without a patientId; breaks use label. Missing schedule data is shown explicitly and no slots are invented. The app remains read-only. Synthetic schedule, identity-link, date, empty-state, mobile, roster and MAID regression checks cover this display. No real November 13 appointments have been supplied yet.
+
+## OATFH import workflow — November 8, 2026
+
+The maintained physician-triggered OATFH skill is in the private OAT AI/skills/oatfh folder and is installed through a local skill junction. Its private instructions own source-email/PDF retention, registration-recipient resolution and the authorized office email. No patient data or recipient contact record is bundled in this repository.
+
+The local scripts/oatfh.mjs helper imports reviewed clinic-day JSON, adds patients with stable generated IDs and null Ava numbers, records verified Sent receipts and later fills physician-supplied Ava numbers without changing schedule references. OatStore serializes writes, rejects stale revisions and verifies readback. Registration requests already recorded as sent are omitted from later packets. OAT browser routes remain read-only. The roster and schedule show Ava number pending until the number is supplied, then link names automatically. Ava registration itself is deferred.
+
+Synthetic tests cover duplicate/revised imports, new patients without Ava, identity conflicts, pending email packets, sent-receipt deduplication, atomic writes, CLI import/receipt/number updates and later chart-link activation. A real schedule import and registration email remain untested until a physician-triggered run.
