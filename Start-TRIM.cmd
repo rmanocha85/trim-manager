@@ -1,2 +1,2 @@
 @echo off
-powershell.exe -NoProfile -File "%~dp0Start-TRIM.ps1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0Start-TRIM.ps1"

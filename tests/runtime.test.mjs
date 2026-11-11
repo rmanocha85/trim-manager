@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {laptopRuntime,LAPTOP_URL} from '../public/runtime.mjs';
+import {laptopRuntime,LAPTOP_URL,NOTES_LAUNCH_URL} from '../public/runtime.mjs';
 import {DriveAdapter} from '../public/adapters.mjs';
 import {sameRosterContent} from '../public/patients-core.mjs';
 test('Notes runs only at the local service entry points, never a hosted or static preview path',()=>{
@@ -13,3 +13,5 @@ test('connection switching compares complete roster content including unknown fi
  const a={patients:[],units:[],extra:{kept:1},removedPatients:[]},b={extra:{kept:1},units:[],patients:[],otherPatients:[],billingDates:[]};
  assert.equal(sameRosterContent(a,b),true);b.extra.kept=2;assert.equal(sameRosterContent(a,b),false);
 });
+
+test('native Notes launch carries only the fixed action, without identity or workspace parameters',()=>{const u=new URL(NOTES_LAUNCH_URL);assert.equal(u.protocol,'trim-notes:');assert.equal(u.hostname,'open');assert.equal(u.search,'');assert.equal(u.hash,'');assert.equal(u.username,'');assert.equal(u.password,'');});

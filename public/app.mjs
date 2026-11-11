@@ -7,7 +7,7 @@ import {clinicRosterUI} from './clinic-roster.mjs?v=20261109-calendar1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261108-oatfh1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261108-planning1';
 import {OatRepository} from './oat-roster-repository.mjs?v=20261108-oat1';
-import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs?v=20261111-on-demand1';
+import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
 
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
@@ -134,10 +134,14 @@ async function start(){
   if(!laptop)document.querySelector('[data-section="notes"]').title='Notes runs on your laptop';
   const switcher=document.createElement('button');switcher.id='switch-version';switcher.textContent=laptop?'Open cloud app':'Open laptop app';switcher.className='text-button';
   const switching=document.createElement('dialog');switching.id='switch-version-dialog';switching.innerHTML='<div class="dialog-body"><h2>Switch TRIM versions</h2><p id="switch-version-message"></p><a id="switch-version-link" target="_blank" rel="noopener">'+(laptop?'Open cloud TRIM ↗':'Open laptop TRIM ↗')+'</a><button id="switch-version-connect" hidden>Connect through Google</button><button id="switch-version-close">Close</button></div>';document.body.append(switching);document.querySelector('.header-actions').append(switcher);
-  switcher.onclick=()=>{const dirty=session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft,folder=laptop&&billing.state().adapter?.mode==='local';$('switch-version-message').textContent=dirty?'Save your session to Drive before switching. Your local drafts stay here.':folder?'This connection saves to the laptop’s Drive folder. Connect through Google and verify the saved version before switching.':'Your session is saved. Connect through Google in the other version to load the latest Drive records. Local drafts stay in this browser.';const link=$('switch-version-link');link.hidden=dirty||folder;link.href=laptop?CLOUD_URL:LAPTOP_URL;$('switch-version-connect').hidden=dirty||!folder;switching.showModal();};$('switch-version-close').onclick=()=>switching.close();$('switch-version-connect').onclick=()=>{switching.close();billing.chooseConnection();};
+  switcher.onclick=()=>{const dirty=session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft,folder=laptop&&billing.state().adapter?.mode==='local';$('switch-version-message').textContent=dirty?'Save your session to Drive before switching. Your local drafts stay here.':folder?'This connection saves to the laptop’s Drive folder. Connect through Google and verify the saved version before switching.':laptop?'Your session is saved. Connect through Google in the other version to load the latest Drive records. Local drafts stay in this browser.':'Your session is saved. Approve Open TRIM Notes in the browser prompt. Local drafts stay in this browser.';const link=$('switch-version-link');link.hidden=dirty||folder;link.href=laptop?CLOUD_URL:NOTES_LAUNCH_URL;link.target=laptop?'_blank':'';$('switch-version-connect').hidden=dirty||!folder;switching.showModal();};$('switch-version-close').onclick=()=>switching.close();$('switch-version-connect').onclick=()=>{switching.close();billing.chooseConnection();};
   if(!laptop)$('open-laptop-notes').onclick=e=>{if(session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft){e.preventDefault();switcher.click();}};
   document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{
     session.message='';
+    if(!laptop&&b.dataset.section==='notes'){
+      if(session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft){switcher.click();return;}
+      billing.switchTab(lastTab.notes);$('open-laptop-notes').click();status();return;
+    }
     if(['patients','maid','oat-fh'].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
     if(b.dataset.section==='maid')void refreshMaid();
     if(b.dataset.section==='oat-fh')void refreshOat();
