@@ -112,3 +112,10 @@ body:has(#connection-dialog[open]) #gate .gate-card{visibility:hidden}
 .app-utility button{min-width:0;flex-shrink:1;line-height:1.2}
 
 .intake-history{display:grid;gap:6px;margin:16px 0}.intake-history textarea{width:100%;min-height:140px;resize:vertical}.intake-drop:focus{outline:2px solid #227854;outline-offset:2px}.intake-preview{width:110px;height:80px;object-fit:contain;border:1px solid #d5ddd8;border-radius:6px}[data-intake-files]{padding:0;list-style:none}[data-intake-files] li{display:flex;align-items:center;gap:10px;margin:8px 0;overflow-wrap:anywhere}
+
+/* Intake problems remain labelled as well as red, including on hover. */
+#document-intake-queue.intake-attention{color:#a12622;background:#fff0ee;box-shadow:inset 0 0 0 1px #c65046;font-weight:700}
+#document-intake-queue.intake-attention:hover{color:#8b1e1a;background:#ffe2de}
+.document-intake .intake-job[data-intake-attention=true],.document-intake [data-intake-message].error{color:#a12622;background:#fff0ee;border:1px solid #c65046;border-left-width:4px;border-radius:7px;padding:12px;overflow-wrap:anywhere}
+.document-intake .intake-job[data-intake-attention=true] :is(p,small,summary){color:inherit}
+.document-intake .intake-status{font-weight:700}
