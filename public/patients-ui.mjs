@@ -2,12 +2,12 @@ import {flagIcon,patientFlagsHTML,nameHTML,demographicsHTML,newPatient,bindIdent
 import {updateHospitalStay,hospitalAt,latestHospitalStay} from './hospital.mjs?v=20261105-return1';
 import {returnFromHospitalToday,canUndoHospitalReturn,undoHospitalReturn} from './hospital.mjs?v=20261105-return1';
 import {hospitalEditor} from './hospital-entry.mjs?v=20261105-return1';
-import {formatDate} from './dates.mjs';
+import {formatDate,formatTimestamp} from './dates.mjs';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
-import * as TrimRoster from './patients-core.mjs?v=20261111-roster1';
+import * as TrimRoster from './patients-core.mjs?v=20261111-active-issue1';
 import {rosterPrintPages} from './roster-print.mjs';
 import {RosterRepository} from './roster-repository.mjs';
-import {mergeRoster} from './roster-merge.mjs';
+import {mergeRoster} from './roster-merge.mjs?v=20261111-active-issue1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 export async function patientsUI({host,onChange=()=>{},onRoster=()=>{},onSaved=async()=>{},onUpload=()=>{},onHistory=()=>{}}){
 
@@ -32,7 +32,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261111-roster1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261111-active-issue1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   const identityCSS=await fetch('./patient-identity.css?v=20261111-roster1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
@@ -41,7 +41,8 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   let rosterDocument=null,loadedRosterJSON=null,repository,etag,key,ready=false,dirty=false,writeBlocked=false,pendingSaves=0,saving=false,localError='',message='',serial=Promise.resolve();
   const newPatientFields=['in-name','in-phn','in-room','in-codes','in-ava','in-dob','in-most','in-doctor'];
   let rosterChoices={},rosterConflicts=[],refreshing=false,activeRosterTab='all-patients';
-  let hospitalReturns={};
+  let hospitalReturns={},issueDraft=null,issueSaving=false;
+  const issueDialog=document.createElement('dialog');issueDialog.id='active-issue-dialog';issueDialog.setAttribute('aria-labelledby','active-issue-title');root.append(issueDialog);
   const review=document.createElement('dialog');review.id='roster-conflict-dialog';root.append(review);
   function showRosterConflicts(){
     const detail=value=>value===undefined?'Removed / not present':typeof value==='object'?JSON.stringify(value,null,2):String(value);
@@ -72,16 +73,16 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   function updateStatus(){
     setSS(localError?'Local recovery failed — keep this tab open':writeBlocked?'Conflict — local changes retained':pendingSaves?'Saving locally…':dirty?'Saved locally · not yet in Drive':ready?(repository.mode==='local'?'Saved in Drive folder · sync unverified':'Saved in Drive'):'Open the workspace to load patients',!dirty&&!writeBlocked&&!localError);
     g('btn-connect').disabled=saving||pendingSaves>0;g('btn-connect').dataset.state=writeBlocked?'error':'ok';
-    root.querySelectorAll('[data-hospital-roster-action],[data-patient-flag-action],[data-roster-edit-action],[data-med-reconciliation],[data-pmhx-uploaded]').forEach(button=>button.disabled=!hospitalEditable());
+    root.querySelectorAll('[data-active-issue-action],[data-hospital-roster-action],[data-patient-flag-action],[data-roster-edit-action],[data-med-reconciliation],[data-pmhx-uploaded]').forEach(button=>button.disabled=!hospitalEditable());
     for(const id of ['roster-search','other-doctor-filter'])g(id).disabled=editId!==null;
     onChange();
   }
   function liveRoster(){return inHistoryView&&liveStateBackup?{...currentRoster(),...liveStateBackup}:currentRoster();}
   const isForm=el=>/^(in-|en-|ep-|eu-|er-|ec-|ea-|edob-|emost-|epf-|epal-)/.test(el.id||'');
   function formValues(){return Object.fromEntries([...root.querySelectorAll('input[id],select[id]')].filter(isForm).map(el=>[el.id,el.type==='checkbox'?el.checked:el.value]));}
-  function hasForm(){return editId!==null||newPatientFields.some(id=>g(id).value.trim())||g('in-pflag').checked||g('in-palliative').checked;}
+  function hasForm(){return issueDraft!==null||editId!==null||newPatientFields.some(id=>g(id).value.trim())||g('in-pflag').checked||g('in-palliative').checked;}
   function persist(){
-    if(!ready)return Promise.resolve();pruneHospitalReturns();const snapshot={roster:structuredClone(liveRoster()),etag,base:loadedRosterJSON,dirty,editId,activeRosterTab,form:formValues(),hospitalReturns:structuredClone(hospitalReturns)};pendingSaves++;
+    if(!ready)return Promise.resolve();pruneHospitalReturns();const snapshot={roster:structuredClone(liveRoster()),etag,base:loadedRosterJSON,dirty,editId,activeRosterTab,form:formValues(),hospitalReturns:structuredClone(hospitalReturns),issueDraft:issueDraft?structuredClone(issueDraft):null};pendingSaves++;
     serial=serial.catch(()=>{}).then(()=>saveRecovery(key,snapshot)).then(()=>{pendingSaves--;localError='';updateStatus();}).catch(e=>{pendingSaves--;localError=e.message;updateStatus();throw e;});updateStatus();return serial;
   }
   function stageRoster(){dirty=true;onRoster(liveRoster());return persist();}
@@ -98,7 +99,8 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
       showTab(tab,root.querySelector('[data-click="showTab(\''+tab+'\',this)"]'));editId=recovered.editId;render();
     }
     if(recovered?.form)for(const [id,value]of Object.entries(recovered.form)){const el=g(id);if(el){if(el.type==='checkbox')el.checked=value===true;else el.value=String(value);}}
-    if(hasForm()){if(editId===null)g('add-patient').open=true;updateToolbar();}updateStatus();onRoster(liveRoster());
+    if(recovered?.issueDraft&&[...state.patients,...otherPatients()].some(p=>String(p.id)===String(recovered.issueDraft.patientId))){issueDraft=recovered.issueDraft;if(!host.hidden)renderIssueEditor();}
+    if(hasForm()){if(editId===null&&!issueDraft)g('add-patient').open=true;updateToolbar();}updateStatus();onRoster(liveRoster());
   }
   async function save(){
     if(!ready)throw new Error('TRIM Patients is not loaded.');await serial;if(localError)throw new Error('TRIM Patients local recovery needs attention.');await refresh(true);if(writeBlocked)throw new Error('Review the patient details changed on both computers, then save again.');
@@ -113,7 +115,8 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     if(!ready||saving||refreshing)return;
     if((dirty||hasForm())&&!confirm('Discard local roster edits and reload the saved roster? A recovery copy will remain on this device.'))return;
     await serial;const saved=await repository.load();
-    if(dirty||hasForm())await saveRecovery(key+':discarded',{roster:liveRoster(),etag,dirty:true,base:loadedRosterJSON,editId,form:formValues()});
+    if(dirty||hasForm())await saveRecovery(key+':discarded',{roster:liveRoster(),etag,dirty:true,base:loadedRosterJSON,editId,form:formValues(),issueDraft});
+    issueDraft=null;if(issueDialog.open)issueDialog.close();
     inHistoryView=false;liveStateBackup=null;host.classList.remove('history-mode');g('history-banner').style.display='none';editId=null;
     applyRoster(saved.roster);etag=saved.etag;loadedRosterJSON=JSON.stringify(saved.roster);dirty=false;writeBlocked=false;newPatientFields.forEach(id=>g(id).value='');g('in-pflag').checked=false;g('in-palliative').checked=false;
     rosterChoices={};rosterConflicts=[];hospitalReturns={};if(review.open)review.close();render();renderCal();await persist();onRoster(saved.roster);updateStatus();
@@ -127,7 +130,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261105-flags1',location.href).href+'"><style>'+identityCSS+'body{background:white}.patient-flag{width:14px;height:14px;font-size:13px}.patient-flag svg{width:12px;height:12px}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
     dialog.showModal();
   }
-  const actions={updateToolbar,openBillingHistory,togglePmhxUploaded,toggleMedReconciliation,togglePatientFlag,returnToday,undoReturn,editHospitalDates,showPatientActions,renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
+  const actions={openActiveIssue,updateToolbar,openBillingHistory,togglePmhxUploaded,toggleMedReconciliation,togglePatientFlag,returnToday,undoReturn,editHospitalDates,showPatientActions,renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
   function argumentsFor(text,element){
     if(!text.trim())return [];const parts=text.match(/'(?:[^']*)'|\bthis\b|\d+/g)||[];
     if(parts.join(',').replace(/\s/g,'')!==text.replace(/\s/g,''))throw new Error('Invalid patient action.');
@@ -147,11 +150,52 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     if(!p||JSON.stringify(p.hospitalStays||[])!==expected)throw new Error('Hospital dates changed. Reopen the hospital form before saving.');
     applyRoster(updateHospitalStay(raw,key,fields,TrimRoster.today()));await stageRoster();render();updateStatus();
   }
-  const api={activate:()=>{if(!hasForm())showTab('all-patients');},render,setHospitalStay,connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
+  const api={activate:()=>{if(issueDraft)renderIssueEditor();else if(!hasForm())showTab('all-patients');},render,setHospitalStay,connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
   const rosterHospitalEditor=hospitalEditor({patients:api,guard:guardHospitalEdit,notify:text=>setSS(text,true),host:root,dialogId:'roster-hospital-dialog'});
   function hospitalEditable(){return ready&&!inHistoryView&&!writeBlocked&&!saving&&!refreshing&&!pendingSaves&&!localError&&!hasForm();}
   function guardHospitalEdit(){if(!hospitalEditable())throw new Error('Finish or resolve the current Patient edit before changing hospital dates.');}
   function hospitalPatient(id){const p=[...state.patients,...otherPatients()].find(p=>String(p.id)===String(id));if(!p)throw new Error('Patient no longer present in the active roster.');return p;}
+  function openActiveIssue(id){
+    if(!hospitalEditable())throw new Error('Finish or resolve the current roster edit first.');
+    const p=hospitalPatient(id);
+    issueDraft={patientId:String(p.id),description:TrimRoster.hasActiveIssue(p)?p.activeIssue.description:'',expected:JSON.stringify(p.activeIssue||null)};
+    renderIssueEditor();void persist().catch(()=>{});updateStatus();
+  }
+  function renderIssueEditor(){
+    const p=hospitalPatient(issueDraft.patientId),active=TrimRoster.hasActiveIssue(p),past=[...(p.activeIssue?.history||[]),...(!active&&p.activeIssue?[p.activeIssue]:[])];
+    issueDialog.innerHTML='<form><h2 id="active-issue-title">Active issue</h2><p class="issue-patient-name">'+esc(p.name)+'</p><label for="issue-description">Issue and follow-up needed</label><textarea id="issue-description" maxlength="500" rows="4" required placeholder="For example: respiratory illness — reassess symptoms and recovery."></textarea><p class="issue-save-hint">Updates are saved with your roster using Save to Drive.</p><p data-issue-error role="alert"></p><div class="issue-actions"><button class="btn btn-green" type="submit">'+(active?'Update issue':'Add active issue')+'</button>'+(active?'<button class="btn btn-ghost" type="button" data-resolve-issue>Mark resolved</button>':'')+'<button class="btn btn-ghost" type="button" data-close-issue>Cancel</button></div>'+(past.length?'<details class="resolved-issues"><summary>Resolved issues ('+past.length+')</summary>'+[...past].reverse().map(i=>'<article><strong>Resolved '+esc(formatTimestamp(i.resolvedAt))+'</strong><p>'+esc(i.description)+'</p></article>').join('')+'</details>':'')+'</form>';
+    const input=issueDialog.querySelector('textarea');input.value=issueDraft.description;
+    input.oninput=()=>{issueDraft.description=input.value;void persist().catch(()=>{});};
+    issueDialog.querySelector('form').onsubmit=e=>{e.preventDefault();void finishActiveIssue(false);};
+    const resolve=issueDialog.querySelector('[data-resolve-issue]');if(resolve)resolve.onclick=()=>void finishActiveIssue(true);
+    issueDialog.querySelector('[data-close-issue]').onclick=()=>void closeActiveIssue().catch(e=>setSS(e.message,false));
+    issueDialog.oncancel=e=>{e.preventDefault();void closeActiveIssue().catch(e=>setSS(e.message,false));};
+    if(!issueDialog.open)issueDialog.showModal();input.focus();
+  }
+  async function closeActiveIssue(){
+    if(issueSaving)return;
+    const p=hospitalPatient(issueDraft.patientId),original=TrimRoster.hasActiveIssue(p)?p.activeIssue.description:'';
+    if(issueDraft.description!==original&&!confirm('Discard the unsaved follow-up description?'))return;
+    issueDraft=null;issueDialog.close();await persist();updateStatus();
+  }
+  async function finishActiveIssue(resolve){
+    if(issueSaving)return;issueSaving=true;issueDialog.querySelectorAll('button,textarea').forEach(el=>el.disabled=true);
+    try{
+      await serial;
+      if(!ready||inHistoryView||writeBlocked||saving||refreshing||localError)throw new Error('Resolve the current roster operation before updating this issue.');
+      const p=hospitalPatient(issueDraft.patientId);
+      if(JSON.stringify(p.activeIssue||null)!==issueDraft.expected)throw new Error('This issue changed. Cancel and reopen it before editing.');
+      // Retain any revised wording when resolving the issue.
+      let next=TrimRoster.saveActiveIssue(liveRoster(),p.id,issueDraft.description);
+      if(resolve)next=TrimRoster.resolveActiveIssue(next,p.id);
+      applyRoster(next);issueDraft=null;issueDialog.close();await stagePatientChange();
+    }catch(e){if(issueDraft)issueDialog.querySelector('[data-issue-error]').textContent=e.message;else{render();setSS(e.message,false);}}
+    finally{issueSaving=false;issueDialog.querySelectorAll('button,textarea').forEach(el=>el.disabled=false);}
+  }
+  function activeIssueSummary(p){
+    if(!TrimRoster.hasActiveIssue(p))return '';
+    return '<div class="active-issue-summary">'+(inHistoryView?'<strong>Active issue</strong>':'<button class="active-issue-badge btn btn-ghost btn-sm" data-active-issue-action data-click="openActiveIssue(\''+esc(p.id)+'\')" '+(hospitalEditable()?'':'disabled')+'>Active issue</button>')+'<p>'+esc(p.activeIssue.description)+'</p></div>';
+  }
   function hospitalKey(p){return 'phn:'+String(p.phn||'').replace(/\D/g,'');}
   function pruneHospitalReturns(){
     const saved=loadedRosterJSON?JSON.parse(loadedRosterJSON):null;
@@ -469,7 +513,7 @@ function rosterDemographics(p){
  return demographicsHTML(p)+(newPatient(p)?[['medReconciliationDate','med-reconciliation','toggleMedReconciliation','Med reconciliation done'],['pmhxUploadedDate','pmhx-uploaded','togglePmhxUploaded','PMHx uploaded']].map(([field,attr,action,label])=>`<label class="med-reconciliation" title="${p[field]?'Completed '+esc(formatDate(p[field])):'Not yet marked complete'}"><input type="checkbox" data-${attr}="${esc(p.id)}" data-change="${action}('${esc(p.id)}')" aria-label="${label} for ${esc(p.name)}" ${p[field]?'checked':''} ${hospitalEditable()?'':'disabled'}><span>${label}</span></label>`).join(''):'');
 }
 function rosterColumns(other=false){return `<colgroup><col class="col-room"><col class="col-name"><col class="col-phn"><col class="col-hospital"><col class="col-code"><col class="col-profile"><col class="col-actions"></colgroup><thead><tr><th>Room</th><th>Name</th><th>PHN</th><th>Hospital status</th><th>${activeRosterTab==='all-patients'?'ICD / Doctor':other?'Doctor':'ICD codes'}</th><th><span class="roster-demographic-head"><span>Age</span><span>MOST</span></span></th><th aria-label="Actions"></th></tr></thead>`;}
-function rosterRow(p,other=false,pinned=false){return `<tr data-roster-patient="${esc(p.id)}"><td>${pinned?'<small class="pinned-unit">'+esc(state.units.find(u=>u.id===p.unit)?.name||p.unit||'—')+'</small>':''}<span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm roster-name">${nameHTML(p)}</div>${activeRosterTab==='all-patients'?'<small class="roster-ownership">'+(other?'Other patient':'My patient')+'</small>':''}</td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td class="roster-hospital">${rosterHospital(p)}</td><td>${other?`<select class="sel doctor-select" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" title="${esc(p.doctor||'Unassigned')}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select>`:`<span class="pcd">${esc(p.codes)||'—'}</span>`}</td><td class="roster-profile">${rosterDemographics(p)}</td><td class="roster-actions-cell"><button class="btn btn-ghost btn-sm roster-billing-history" data-click="openBillingHistory('${esc(p.id)}')">Billing history</button><button class="btn btn-ghost btn-sm patient-actions-toggle" aria-label="Actions for ${esc(p.name)}" data-click="showPatientActions('${esc(p.id)}',this)">⋯</button><div popover id="patient-actions-${esc(p.id)}" class="patient-actions-menu">${['pFlag','palliativeFlag'].map(flag=>`<button class="btn btn-ghost flag-toggle" role="menuitemcheckbox" aria-checked="${p[flag]===true}" data-patient-flag-action data-flag="${flag}" ${hospitalEditable()?'':'disabled'} data-click="togglePatientFlag('${esc(p.id)}','${flag}')">${flagIcon(flag)}<span>${flag==='pFlag'?'Psychiatric consult':'Palliative protocol'}</span><span class="flag-check" aria-hidden="true">${p[flag]?'✓':''}</span></button>`).join('')}<button class="btn btn-ghost" data-hospital-roster-action ${hospitalEditable()?'':'disabled'} data-click="editHospitalDates('${esc(p.id)}')">Edit hospital dates…</button><button class="btn btn-ghost upload-documents" data-click="uploadDocuments('${esc(p.id)}')">Documents</button><button class="btn btn-ghost needs-connect" data-roster-edit-action ${hospitalEditable()?'':'disabled'} data-click="startEdit('${esc(p.id)}')">${other?'Edit unit & room':'Edit'}</button><button class="btn btn-danger needs-connect" data-click="promptDel('${esc(p.id)}')">Remove from roster</button></div></td></tr>`;}
+function rosterRow(p,other=false,pinned=false){return `<tr data-roster-patient="${esc(p.id)}"><td>${pinned?'<small class="pinned-unit">'+esc(state.units.find(u=>u.id===p.unit)?.name||p.unit||'—')+'</small>':''}<span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm roster-name">${nameHTML(p)}</div>${activeIssueSummary(p)}${activeRosterTab==='all-patients'?'<small class="roster-ownership">'+(other?'Other patient':'My patient')+'</small>':''}</td><td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td class="roster-hospital">${rosterHospital(p)}</td><td>${other?`<select class="sel doctor-select" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" title="${esc(p.doctor||'Unassigned')}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select>`:`<span class="pcd">${esc(p.codes)||'—'}</span>`}</td><td class="roster-profile">${rosterDemographics(p)}</td><td class="roster-actions-cell"><button class="btn btn-ghost btn-sm roster-billing-history" data-click="openBillingHistory('${esc(p.id)}')">Billing history</button><button class="btn btn-ghost btn-sm patient-actions-toggle" aria-label="Actions for ${esc(p.name)}" data-click="showPatientActions('${esc(p.id)}',this)">⋯</button><div popover id="patient-actions-${esc(p.id)}" class="patient-actions-menu"><button class="btn btn-ghost flag-toggle" data-active-issue-action ${hospitalEditable()?'':'disabled'} data-click="openActiveIssue('${esc(p.id)}')"><span>Active issue…</span><span class="flag-check" aria-hidden="true">${TrimRoster.hasActiveIssue(p)?'✓':''}</span></button>${['pFlag','palliativeFlag'].map(flag=>`<button class="btn btn-ghost flag-toggle" role="menuitemcheckbox" aria-checked="${p[flag]===true}" data-patient-flag-action data-flag="${flag}" ${hospitalEditable()?'':'disabled'} data-click="togglePatientFlag('${esc(p.id)}','${flag}')">${flagIcon(flag)}<span>${flag==='pFlag'?'Psychiatric consult':'Palliative protocol'}</span><span class="flag-check" aria-hidden="true">${p[flag]?'✓':''}</span></button>`).join('')}<button class="btn btn-ghost" data-hospital-roster-action ${hospitalEditable()?'':'disabled'} data-click="editHospitalDates('${esc(p.id)}')">Edit hospital dates…</button><button class="btn btn-ghost upload-documents" data-click="uploadDocuments('${esc(p.id)}')">Documents</button><button class="btn btn-ghost needs-connect" data-roster-edit-action ${hospitalEditable()?'':'disabled'} data-click="startEdit('${esc(p.id)}')">${other?'Edit unit & room':'Edit'}</button><button class="btn btn-danger needs-connect" data-click="promptDel('${esc(p.id)}')">Remove from roster</button></div></td></tr>`;}
 function rosterEditRow(p,other=false){
  if(other){const unknown=p.unit&&!state.units.some(u=>u.id===p.unit);return `<tr data-location-edit="${esc(p.id)}"><td colspan="7"><div class="roster-edit location-edit"><strong>${esc(p.name)}</strong><label>Unit<select class="sel" id="eu-${esc(p.id)}"><option value=""${!p.unit?' selected':''}>Unit not recorded</option>${unknown?'<option value="'+esc(p.unit)+'" selected>Unit not recorded · '+esc(p.unit)+'</option>':''}${state.units.map(u=>'<option value="'+esc(u.id)+'"'+(p.unit===u.id?' selected':'')+'>'+esc(u.name)+'</option>').join('')}</select></label><label>Room<input class="einp" id="er-${esc(p.id)}" value="${esc(p.room||'')}" placeholder="Not recorded"></label><div class="pact"><button class="btn btn-green btn-sm" data-click="saveEdit('${esc(p.id)}')">Save</button><button class="btn btn-ghost btn-sm" data-click="cancelEdit()">Cancel</button></div></div></td></tr>`;}
  return `<tr><td colspan="7"><div class="roster-edit">
@@ -501,16 +545,18 @@ function renderUList(){
   g('roster-search').placeholder=all?'Search all patients · name, PHN, room or New':otherOnly?'Search other patients':'Search my patients';
   const otherIds=new Set(otherPatients().map(p=>p.id));
   const source=otherOnly?otherPatients():all?[...state.patients,...otherPatients()]:state.patients;
-  const visible=source.filter(p=>(!query||[p.name,p.phn,p.room,p.ava,p.doctor,p.mostStatus,newPatient(p)?'new patient':'',p.palliativeFlag?'palliative':'',p.pFlag?'psychiatric':'',state.units.find(u=>u.id===p.unit)?.name].join(' ').toLowerCase().includes(query)||(digits&&[p.phn,p.ava].some(v=>String(v||'').replace(/\D/g,'').includes(digits))))&&(!otherOnly||!selectedDoctor||(selectedDoctor==='__unassigned'?!p.doctor:p.doctor===selectedDoctor)));
+  const visible=source.filter(p=>(!query||[p.name,p.phn,p.room,p.ava,p.doctor,p.mostStatus,newPatient(p)?'new patient':'',p.palliativeFlag?'palliative':'',TrimRoster.hasActiveIssue(p)?'active issue '+p.activeIssue.description:'',p.pFlag?'psychiatric':'',state.units.find(u=>u.id===p.unit)?.name].join(' ').toLowerCase().includes(query)||(digits&&[p.phn,p.ava].some(v=>String(v||'').replace(/\D/g,'').includes(digits))))&&(!otherOnly||!selectedDoctor||(selectedDoctor==='__unassigned'?!p.doctor:p.doctor===selectedDoctor)));
   const priority=p=>newPatient(p)&&!p.medReconciliationDate;
   const sort=(a,b)=>String(a.room||'').localeCompare(String(b.room||''),undefined,{numeric:true})||a.name.localeCompare(b.name);
   const row=(p,pinned)=>editId===p.id?rosterEditRow(p,otherIds.has(p.id)):rosterRow(p,otherIds.has(p.id),pinned);
-  const section=(rows,title,key,pinned=false)=>!rows.length?'':`<section class="usec ${key==='reconciliation'?'reconciliation-priority':key==='palliative'?'palliative-section':''}" aria-label="${esc(title)}"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(title)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl roster-table">${rosterColumns(otherOnly)}<tbody>${rows.sort(sort).map(p=>row(p,pinned)).join('')}</tbody></table></div></section>`;
-  let html=section(visible.filter(priority),'Medication reconciliation outstanding','reconciliation',true);
-  html+=section(visible.filter(p=>!priority(p)&&p.palliativeFlag),'Palliative patients','palliative',true);
+  const section=(rows,title,key,pinned=false)=>!rows.length?'':`<section class="usec ${key==='active-issues'?'active-issue-priority':key==='reconciliation'?'reconciliation-priority':key==='palliative'?'palliative-section':''}" aria-label="${esc(title)}"><div class="uhdr" data-click="toggleU('${key}')"><div class="uhdr-l"><span class="unm">${esc(title)}</span><span class="ucnt">${rows.length} patients</span></div><span class="uchev open" id="chev-${key}">▶</span></div><div id="ub-${key}" style="overflow-x:auto"><table class="ptbl roster-table">${rosterColumns(otherOnly)}<tbody>${rows.sort(sort).map(p=>row(p,pinned)).join('')}</tbody></table></div></section>`;
+  const active=TrimRoster.hasActiveIssue;
+  let html=section(visible.filter(active),'Active issues','active-issues',true);
+  html+=section(visible.filter(p=>!active(p)&&priority(p)),'Medication reconciliation outstanding','reconciliation',true);
+  html+=section(visible.filter(p=>!active(p)&&!priority(p)&&p.palliativeFlag),'Palliative patients','palliative',true);
   const known=new Set(state.units.map(u=>u.id));
   for(const [index,unit] of [...state.units,{id:'__unknown',name:'Unit not recorded'}].entries()){
-    const pts=visible.filter(p=>!priority(p)&&!p.palliativeFlag&&(unit.id==='__unknown'?!known.has(p.unit):p.unit===unit.id));
+    const pts=visible.filter(p=>!active(p)&&!priority(p)&&!p.palliativeFlag&&(unit.id==='__unknown'?!known.has(p.unit):p.unit===unit.id));
     html+=section(pts,unit.name,otherOnly?'other-'+index:unit.id);
   }
   const target=g(otherOnly?'other-list':'ulist'),unused=g(otherOnly?'ulist':'other-list');unused.innerHTML='';unused.hidden=true;target.hidden=false;

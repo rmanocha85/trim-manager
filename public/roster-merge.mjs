@@ -1,4 +1,4 @@
-import {normalize,validate} from './patients-core.mjs';
+import {normalize,validate} from './patients-core.mjs?v=20261111-active-issue1';
 const stable=value=>JSON.stringify(value,(_k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
 const equal=(a,b)=>stable(a)===stable(b);
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -11,7 +11,8 @@ export function mergeRoster(base,local,remote,choices={}){
   function pick(path,b,l,r,label=path){
     if(equal(l,b)||equal(l,r))return structuredClone(r);
     if(equal(r,b))return structuredClone(l);
-    if(object(b)&&object(l)&&object(r)){
+    // Resolving an issue must not silently resolve a concurrently revised follow-up.
+    if(object(b)&&object(l)&&object(r)&&!path.endsWith('.activeIssue')){
       const out={};for(const k of new Set([...Object.keys(r),...Object.keys(l),...Object.keys(b)])){
         const v=pick(path+'.'+k,b[k],l[k],r[k],label+' · '+k);if(v!==undefined)out[k]=v;
       }return out;

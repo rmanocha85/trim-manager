@@ -26,6 +26,7 @@ export function validate(raw){
     for(const p of [...raw.patients,...(raw.removedPatients||[]),...(raw.otherPatients||[])]){
       if(!p||['id','name'].some(k=>!Object.hasOwn(p,k))||!String(p.id)||!String(p.name))throw new Error('Incomplete roster identity.');
       validateHospitalStays(p);
+      validateActiveIssue(p.activeIssue);
       for(const key of ['id','phn','ava']){
         const value=key==='id'?String(p[key]):digits(p[key]);
         if(!value)continue;
@@ -100,6 +101,41 @@ export function setPatientFlag(raw,id,flag,value){
  const {collection,patient}=matches[0];
  if(Boolean(patient[flag])===value)return roster;
  return validate({...roster,[collection]:roster[collection].map(p=>p===patient?{...p,[flag]:value}:p)});
+}
+
+export const hasActiveIssue=patient=>patient?.activeIssue?.status==='active';
+export function validateActiveIssue(issue){
+ if(issue===undefined)return;
+ const check=entry=>{
+  if(!entry||!['active','resolved'].includes(entry.status)||typeof entry.description!=='string'||!entry.description.trim()||entry.description.length>500||
+   !Number.isFinite(Date.parse(entry.openedAt))||!Number.isFinite(Date.parse(entry.updatedAt))||Date.parse(entry.updatedAt)<Date.parse(entry.openedAt)||
+   (entry.status==='active'?entry.resolvedAt!==null:!Number.isFinite(Date.parse(entry.resolvedAt))||entry.resolvedAt!==entry.updatedAt))throw new Error('Invalid active issue record.');
+ };
+ check(issue);
+ if(!Array.isArray(issue.history))throw new Error('Invalid active issue history.');
+ for(const entry of issue.history){check(entry);if(entry.status!=='resolved')throw new Error('Issue history must contain resolved issues.');}
+}
+function changeActiveIssue(raw,id,change){
+ const roster=normalize(raw),matches=['patients','otherPatients'].flatMap(collection=>roster[collection].filter(p=>String(p.id)===String(id)).map(patient=>({collection,patient})));
+ if(matches.length!==1)throw new Error('Choose one active roster patient.');
+ const {collection,patient}=matches[0],activeIssue=change(patient.activeIssue);
+ return validate({...roster,[collection]:roster[collection].map(p=>p===patient?{...p,activeIssue}:p)});
+}
+export function saveActiveIssue(raw,id,description,now=new Date().toISOString()){
+ if(typeof description!=='string'||!description.trim()||description.trim().length>500)throw new Error('Enter a brief follow-up description, up to 500 characters.');
+ description=description.trim();
+ return changeActiveIssue(raw,id,previous=>{
+  if(previous?.status==='active')return previous.description===description?previous:{...previous,description,updatedAt:now};
+  let history=[];
+  if(previous){const {history:past,...entry}=previous;history=[...past,entry];}
+  return {status:'active',description,openedAt:now,updatedAt:now,resolvedAt:null,history};
+ });
+}
+export function resolveActiveIssue(raw,id,now=new Date().toISOString()){
+ return changeActiveIssue(raw,id,previous=>{
+  if(!previous)throw new Error('This patient has no active issue.');
+  return previous.status==='resolved'?previous:{...previous,status:'resolved',updatedAt:now,resolvedAt:now};
+ });
 }
 
 // Completion is retained after the temporary new-patient controls expire.

@@ -1,7 +1,7 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261105-flags1';
 import {documentIntakeUI} from './intake-ui.mjs?v=20261111-clean-layout1';
 import {billingUI} from './billing-ui.mjs?v=20261111-clean-layout1';
-import {patientsUI} from './patients-ui.mjs?v=20261111-roster1';
+import {patientsUI} from './patients-ui.mjs?v=20261111-active-issue1';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261109-calendar1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261108-oatfh1';
@@ -57,8 +57,9 @@ const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
   section=value;
   const clinic=['maid','oat-fh'].includes(value);
-  if(value==='patients'&&$('patients-workspace').hidden)patients?.activate();
+  const enteringPatients=value==='patients'&&$('patients-workspace').hidden;
   $('patients-workspace').hidden=value!=='patients';
+  if(enteringPatients)patients?.activate();
   $('maid-workspace').hidden=value!=='maid';
   $('oat-fh-workspace').hidden=value!=='oat-fh';
   document.querySelector('.shell').hidden=value==='patients'||clinic;

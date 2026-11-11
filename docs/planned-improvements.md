@@ -1,11 +1,12 @@
 # Planned improvements
 
-## Active issue tracking — requested November 11, 2026
+## Active issue tracking — implemented November 11, 2026
 
-Future work; not implemented in the current layout update.
+Available in **My Patients**, **Other Patients**, and **All**.
 
-- Add an **Active issue** control, similar to the existing palliative control.
-- Allow a short description of the acute issue and the follow-up needed, such as a respiratory illness that needs reassessment.
-- Keep the issue visibly active until marked resolved.
-- Automatically prioritize patients with an active issue at the top of both **My Patients** and **Other Patients**, following the existing palliative prioritization pattern.
-- The relative ordering of patients who have active issues versus palliative patients has not yet been specified.
+- Open a patient's **⋯ → Active issue…**, enter a brief description (up to 500 characters), then choose **Add active issue**. The description appears beneath the patient name and can be searched.
+- Active issues appear first, followed by outstanding medication reconciliation, palliative patients, and the usual unit groups. Each patient appears once; existing palliative and other flags are preserved.
+- Click the **Active issue** badge to edit the description or **Mark resolved**. Resolved patients return to their appropriate priority or unit group. Resolution retains the description and timestamp; starting another issue preserves previous resolved episodes.
+- Changes follow the existing **Save to Drive** workflow. Unfinished descriptions and staged edits have encrypted local recovery; they do not upload automatically.
+- The roster record owns `activeIssue`, including status, description, opening/update/resolution timestamps and resolved history. Concurrent changes to the same issue require one whole-record choice so that resolving an older issue cannot silently resolve newly edited follow-up instructions. Other patient fields still merge independently.
+- Tests use synthetic rosters and cover both collections, reload recovery, explicit saves, priority, resolution/history, responsive layout and unchanged billing.
