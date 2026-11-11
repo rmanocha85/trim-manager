@@ -7,7 +7,8 @@ export function checkIncomingRequest(r){
  const names=new Set();for(const f of r.files){if(!safeFileName(f.name)||!incomingMime(f.name)||appUploadName(f.name)||!Number.isInteger(f.size)||f.size<1||f.size>MAX_UPLOAD_BYTES||!/^[a-f0-9]{64}$/.test(f.sha256)||names.has(f.name.toLowerCase()))throw new Error('Invalid or duplicate Incoming source.');names.add(f.name.toLowerCase());}
  r.retryJobs.forEach(checkJobId);return r;
 }
-export const incomingLabel=status=>({queued:'Waiting for laptop / Drive sync',waiting:'Waiting for Drive sync or ChatGPT',processing:'Processing',completed:'Completed',attention:'Needs attention'}[status]||'Waiting for laptop / Drive sync');
+export const incomingLabel=(status,local=false)=>status==='queued'&&local?'Queued on this laptop':({queued:'Waiting for laptop / Drive sync',waiting:'Waiting for Drive sync or ChatGPT',processing:'Processing',completed:'Completed',attention:'Needs attention'}[status]||'Waiting for laptop / Drive sync');
+export const incomingMessage=(request,local=false)=>request.status==='queued'&&local?'Request saved on this laptop. Processing will start shortly.':request.message;
 export function requestView(request,result){
  checkIncomingRequest(request);
  const valid=result?.app==='trim-incoming-result'&&result.id===request.id&&result.datasetId===request.datasetId&&['waiting','processing','completed','attention'].includes(result.status);
