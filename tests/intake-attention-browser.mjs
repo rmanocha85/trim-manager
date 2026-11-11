@@ -44,7 +44,7 @@ try{
    globalThis.intake=documentIntakeUI({state:()=>({adapter:{mode:mode==='web'?'cloud':'local',request:async(route,options)=>{const r=await fetch(route,options);const data=await r.json();if(!r.ok)throw Error(data.error);return data;}},ledger:{datasetId:'synthetic-intake'},people:[]}),notes:{}});
   },mode);
   const indicator=page.locator('#document-intake-queue');
-  const tick=()=>page.evaluate(async()=>{await [...intakeTimers.values()].find(t=>t.ms===15000).fn();});
+  const tick=()=>page.evaluate(async()=>{await intake.refreshQueue();});
   const attention=async expected=>assert.equal(await indicator.evaluate(el=>el.classList.contains('intake-attention')),expected);
   const red=async el=>{await el.filter({hasText:/\S/}).waitFor();assert.equal(await el.evaluate(el=>getComputedStyle(el).color),'rgb(161, 38, 34)');};
   await tick();await attention(false);assert.equal(await indicator.innerText(),'Document intake');

@@ -119,3 +119,29 @@ body:has(#connection-dialog[open]) #gate .gate-card{visibility:hidden}
 .document-intake .intake-job[data-intake-attention=true],.document-intake [data-intake-message].error{color:#a12622;background:#fff0ee;border:1px solid #c65046;border-left-width:4px;border-radius:7px;padding:12px;overflow-wrap:anywhere}
 .document-intake .intake-job[data-intake-attention=true] :is(p,small,summary){color:inherit}
 .document-intake .intake-status{font-weight:700}
+
+/* One save summary; connection and maintenance actions are available on demand. */
+:root{--billing-header-height:80px}
+#workspace>header{grid-template-areas:"sections date actions";grid-template-columns:auto minmax(0,1fr) auto;gap:16px;min-height:80px;padding:12px 18px}
+#workspace>header .header-actions{display:flex;gap:12px;flex-wrap:nowrap;justify-content:flex-end}
+#workspace>header .header-actions .save-control{width:auto;min-width:0;flex-basis:auto;height:auto;min-height:38px;font-size:13px;padding:9px 12px}
+#workspace>header .save-summary{display:flex;flex-direction:column;align-items:flex-end;min-width:0;max-width:240px}
+#workspace>header #local-changes{border:0;background:transparent;color:#f4faf1;padding:2px 0;min-height:26px;text-align:right;justify-content:flex-end}
+#workspace>header #local-changes[data-state=pending]{color:#ffe6a4}
+#workspace>header #local-changes[data-state=error]{color:#ffe0da;text-decoration:underline;text-underline-offset:3px}
+#workspace>header #saved-time{font-size:11px;line-height:16px;height:auto;max-width:100%;order:0}
+#workspace>header #sync{background:#fff0c7;color:#36452d;border-color:#e3d292;white-space:nowrap}
+#workspace>header #workspace-more{width:40px;min-width:40px;height:38px;font-size:16px;padding:5px}
+#workspace-menu{position:fixed;inset:76px 16px auto auto;margin:0;width:280px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 100px);overflow:auto;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);box-shadow:0 8px 30px #183a2826}
+#workspace-menu button{display:block;width:100%;text-align:left;margin:4px 0;padding:10px 12px;font-size:13px;color:var(--green);background:transparent;border:0}
+#workspace-menu button:hover{background:var(--pale)}
+#workspace-menu #drive-connection{font-size:12px;color:var(--muted)}
+#workspace-menu .hint{margin:5px 12px 12px;font-size:12px}
+#editor .patient-document-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;flex-basis:100%;max-width:330px;margin-top:8px}
+#editor .patient-document-actions button{width:100%;height:40px;min-height:40px;padding:8px 12px;font:600 13px/1.2 var(--sans);display:flex;align-items:center;justify-content:center;margin:0;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--green)}
+#editor .patient-document-actions button:hover{background:var(--pale)}
+.patient-row{grid-template-columns:minmax(0,1fr)}
+.billing-card-actions{display:flex;justify-content:flex-end;padding:0 12px 9px}
+.patient-card-history{white-space:nowrap;text-decoration:underline;text-underline-offset:3px}
+@media(min-width:761px) and (max-width:1199px){:root{--billing-header-height:116px}#workspace>header{grid-template-areas:"sections sections" "date actions";grid-template-columns:minmax(0,1fr) auto;min-height:116px;gap:8px 12px}#workspace>header #header-billing-date{justify-self:start}}
+@media(max-width:760px){#workspace>header{grid-template-areas:"sections" "date" "actions";grid-template-columns:minmax(0,1fr);height:auto;gap:10px;padding:12px 14px}#workspace>header .header-actions{width:100%;flex-wrap:wrap;justify-content:flex-end}#workspace>header .save-summary{margin-right:auto;align-items:flex-start;max-width:100%}#workspace>header #local-changes{text-align:left}#workspace>header .app-sections{justify-content:flex-start;flex-wrap:wrap}#workspace-menu{top:160px;max-height:calc(100dvh - 180px)}}

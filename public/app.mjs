@@ -1,6 +1,6 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261105-flags1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261111-intake-status1';
-import {billingUI} from './billing-ui.mjs?v=20261111-roster1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261111-clean-layout1';
+import {billingUI} from './billing-ui.mjs?v=20261111-clean-layout1';
 import {patientsUI} from './patients-ui.mjs?v=20261111-roster1';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261109-calendar1';
@@ -9,6 +9,7 @@ import {MaidRepository} from './clinic-roster-repository.mjs?v=20261108-planning
 import {OatRepository} from './oat-roster-repository.mjs?v=20261108-oat1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
 
+if(laptopRuntime()){document.title='TRIM Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261111-n1';}
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
 let oatRoster,oatRepository,oatPending,oatLoad=0;
@@ -88,6 +89,7 @@ function status(){
   $('local-changes').title=indicator.detail;
   $('sync').textContent=session.saving?'Saving…':session.lastError?'Retry save':'Save to Drive';
   $('sync').disabled=busy||!pending.length;
+  $('sync').hidden=!pending.length&&!session.saving&&!session.lastError;
   $('sync').dataset.state=session.saving?'busy':pending.length?'pending':'quiet';
   $('changes-save').disabled=$('sync').disabled;
   $('changes-save').textContent=$('sync').textContent;
@@ -118,7 +120,7 @@ async function start(){
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261108-units1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
   intake=documentIntakeUI({state:()=>billing.state(),notes,onRecordsConnected:refreshClinics,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
@@ -126,8 +128,8 @@ async function start(){
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
-  const latest=document.createElement('button');latest.id='load-latest';latest.className='save-control';latest.textContent='Load latest changes';$('drive-connection').after(latest);
-  latest.onclick=async()=>{try{session.message='';await billing.loadLatest();await refreshClinics();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
+  const latest=document.createElement('button');latest.id='load-latest';latest.textContent='Refresh from Drive';$('drive-connection').after(latest);
+  latest.onclick=async()=>{try{$('workspace-menu').hidePopover();session.message='';await billing.loadLatest();await refreshClinics();await intake.refreshQueue();await intake.profiles();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
   const patientReview=document.createElement('div');patientReview.className='actions patient-review-tools';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
   $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};
   $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}status();};
@@ -135,8 +137,8 @@ async function start(){
   // Read-only Drive verification must not prevent opening the separate Notes app.
   const notesLaunchBlocked=()=>session.saving||session.state().some(s=>s.dirty||s.error)||patients.state().draft;
   const switcher=document.createElement('button');switcher.id='switch-version';switcher.textContent=laptop?'Open cloud app':'Open laptop app';switcher.className='text-button';
-  const switching=document.createElement('dialog');switching.id='switch-version-dialog';switching.innerHTML='<div class="dialog-body"><h2>Switch TRIM versions</h2><p id="switch-version-message"></p><a id="switch-version-link" target="_blank" rel="noopener">'+(laptop?'Open cloud TRIM ↗':'Open laptop TRIM ↗')+'</a><button id="switch-version-connect" hidden>Connect through Google</button><button id="switch-version-close">Close</button></div>';document.body.append(switching);document.querySelector('.header-actions').append(switcher);
-  switcher.onclick=()=>{const dirty=laptop?(session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft):notesLaunchBlocked(),folder=laptop&&billing.state().adapter?.mode==='local';$('switch-version-message').textContent=dirty?'Save your session to Drive before switching. Your local drafts stay here.':folder?'This connection saves to the laptop’s Drive folder. Connect through Google and verify the saved version before switching.':laptop?'Your session is saved. Connect through Google in the other version to load the latest Drive records. Local drafts stay in this browser.':'Your session is saved. Approve Open TRIM Notes in the browser prompt. Local drafts stay in this browser.';const link=$('switch-version-link');link.hidden=dirty||folder;link.href=laptop?CLOUD_URL:NOTES_LAUNCH_URL;link.target=laptop?'_blank':'';$('switch-version-connect').hidden=dirty||!folder;switching.showModal();};$('switch-version-close').onclick=()=>switching.close();$('switch-version-connect').onclick=()=>{switching.close();billing.chooseConnection();};
+  const switching=document.createElement('dialog');switching.id='switch-version-dialog';switching.innerHTML='<div class="dialog-body"><h2>Switch TRIM versions</h2><p id="switch-version-message"></p><a id="switch-version-link" target="_blank" rel="noopener">'+(laptop?'Open cloud TRIM ↗':'Open laptop TRIM ↗')+'</a><button id="switch-version-connect" hidden>Connect through Google</button><button id="switch-version-close">Close</button></div>';document.body.append(switching);$('workspace-menu').append(switcher);
+  switcher.onclick=()=>{$('workspace-menu').hidePopover();const dirty=laptop?(session.state().some(s=>s.dirty||s.busy||s.error)||patients.state().draft):notesLaunchBlocked(),folder=laptop&&billing.state().adapter?.mode==='local';$('switch-version-message').textContent=dirty?'Save your session to Drive before switching. Your local drafts stay here.':folder?'This connection saves to the laptop’s Drive folder. Connect through Google and verify the saved version before switching.':laptop?'Your session is saved. Connect through Google in the other version to load the latest Drive records. Local drafts stay in this browser.':'Your session is saved. Approve Open TRIM Notes in the browser prompt. Local drafts stay in this browser.';const link=$('switch-version-link');link.hidden=dirty||folder;link.href=laptop?CLOUD_URL:NOTES_LAUNCH_URL;link.target=laptop?'_blank':'';$('switch-version-connect').hidden=dirty||!folder;switching.showModal();};$('switch-version-close').onclick=()=>switching.close();$('switch-version-connect').onclick=()=>{switching.close();billing.chooseConnection();};
   if(!laptop)$('open-laptop-notes').onclick=e=>{if(notesLaunchBlocked()){e.preventDefault();switcher.click();}};
   document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{
     session.message='';
@@ -145,14 +147,14 @@ async function start(){
       billing.switchTab(lastTab.notes);$('open-laptop-notes').click();status();return;
     }
     if(['patients','maid','oat-fh'].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
-    if(b.dataset.section==='maid')void refreshMaid();
-    if(b.dataset.section==='oat-fh')void refreshOat();
+    if(b.dataset.section==='maid'&&!maidSnapshot)void refreshMaid();
+    if(b.dataset.section==='oat-fh'&&!oatRepository)void refreshOat();
     status();
   });
   $('patients-print-close').onclick=()=>$('patients-print-dialog').close();
   $('patients-print').onclick=()=>{$('patients-print-frame').contentWindow.focus();$('patients-print-frame').contentWindow.print();};
   window.addEventListener('beforeunload',e=>{if(patients.hasChanges()){e.preventDefault();e.returnValue='';}});
-  setInterval(()=>{if(document.visibilityState!=='visible')return;if(section==='maid'&&!maidRoster.state().busy)void refreshMaid();if(section==='oat-fh')void refreshOat();},60000);
+
   if(laptop){
     const {LocalAdapter}=await import('./adapters.mjs?v=20261031-compact1');
     const {keepLaptopService}=await import('./service-lifecycle.mjs?v=20261111-on-demand1');

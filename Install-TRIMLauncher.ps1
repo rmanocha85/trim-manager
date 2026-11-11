@@ -18,7 +18,7 @@ if ($Disable) {
 $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $taskCompiler)) { $taskCompiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
 $taskSource = Join-Path $PSScriptRoot 'launcher\TrimNotesLauncher.cs'
-& $taskCompiler /nologo /target:winexe /optimize+ /reference:System.Windows.Forms.dll ('/out:' + $taskExe) $taskSource
+& $taskCompiler /nologo /target:winexe /optimize+ /reference:System.Windows.Forms.dll ('/win32icon:' + (Join-Path $PSScriptRoot 'launcher\TRIMNotes.ico')) ('/out:' + $taskExe) $taskSource
 if ($LASTEXITCODE -ne 0) { throw 'TRIM launcher compilation failed. Registration was not changed.' }
 $taskValidation = Start-Process -FilePath $taskExe -ArgumentList @('--validate','trim-notes://open') -WindowStyle Hidden -Wait -PassThru
 if ($taskValidation.ExitCode -ne 0) { throw 'TRIM launcher self-check failed.' }
@@ -42,6 +42,7 @@ if (Test-Path -LiteralPath $taskDesktopShortcut) {
         $taskShortcut.Arguments = 'trim-notes://open'
         $taskShortcut.WorkingDirectory = $PSScriptRoot
         $taskShortcut.Description = 'Open TRIM Notes on demand.'
+        $taskShortcut.IconLocation = $taskExe + ',0'
         $taskShortcut.Save()
     }
 }
