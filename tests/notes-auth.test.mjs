@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {generateKeyPair,exportJWK,SignJWT,createLocalJWKSet} from 'jose';
 import {ChatGPTConnection,ProtectedAuthStore,readCompletedStream} from '../notes-auth.mjs';
+import {SOURCE_IDENTITY_INSTRUCTIONS} from '../public/intake-core.mjs';
 const metadata={issuer:'https://auth.openai.com',authorization_endpoint:'https://auth.openai.com/api/accounts/authorize',token_endpoint:'https://auth.openai.com/api/accounts/oauth/token',jwks_uri:'https://auth.openai.com/.well-known/jwks.json',revocation_endpoint:'https://auth.openai.com/revoke'};
 const response=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json'}});
 function store(initial=null){let data=initial;return {load:async()=>structuredClone(data),save:async v=>{data=structuredClone(v);},get:()=>data};}
@@ -39,6 +40,15 @@ test('document intake sends typed history as untrusted UTF-8 text in attachment 
  const c=new ChatGPTConnection({store:store(signedIn()),fetchImpl:async(_url,o)=>{sent=JSON.parse(o.body);return new Response(stream([{type:'response.output_text.delta',delta:JSON.stringify(result)},{type:'response.completed',response:{status:'completed'}}]));}});
  await c.analyzeDocuments({model:'chosen',patient:{phn:'0000000001'},documents:[{name:'history.txt',mime:'text/plain',dataUrl:'data:text/plain;base64,'+Buffer.from('PHN: 0000000001\nHistory: café — surgery').toString('base64')},{name:'image.png',mime:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgo='}]});
  const content=sent.input[0].content;assert.equal(content[1].type,'input_text');assert.match(content[1].text,/café — surgery/);assert.equal(content[2].type,'input_image');assert.match(sent.instructions,/untrusted/);assert.equal(sent.store,false);
+});
+
+test('identification, extraction and audit all receive the same EMR patient-card scope',async()=>{
+ const requests=[],result={documentPhns:[['0000000001']],summaryMarkdown:'Synthetic selected result.',reviewIssues:[],sourceSummary:'Synthetic',safeToSave:true,issues:[]};
+ const c=new ChatGPTConnection({store:store(signedIn()),fetchImpl:async(_url,o)=>{requests.push(JSON.parse(o.body));return new Response(stream([{type:'response.output_text.delta',delta:JSON.stringify(result)},{type:'response.completed',response:{status:'completed'}}]));}});
+ const documents=[{name:'screen.png',mime:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgo='}],args={model:'chosen',patient:{phn:'0000000001'},documents};
+ await c.identifyDocuments({model:args.model,documents});await c.analyzeDocuments(args);await c.verifyDocuments({...args,proposal:result});
+ for(const request of requests){assert.ok(request.instructions.includes(SOURCE_IDENTITY_INSTRUCTIONS));assert.equal(request.input[0].content[1].image_url,documents[0].dataUrl);assert.equal(request.store,false);}
+ assert.deepEqual(JSON.parse(requests[0].input[0].content[0].text),{}); // Identification has no roster identity to copy.
 });
 test('real JWT validation rejects wrong nonce, audience, issuer and expired identity',async()=>{
   const {publicKey,privateKey}=await generateKeyPair('RS256'),jwk=await exportJWK(publicKey),c=new ChatGPTConnection({store:store(),fetchImpl:async()=>response(metadata)});c.jwks=createLocalJWKSet({keys:[{...jwk,kid:'synthetic',alg:'RS256'}]});

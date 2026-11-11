@@ -52,6 +52,17 @@ test('mixed or missing identity and failed extraction audit hold sources without
  for(const ids of [[[]],[['0000000002']],[['0000000001','0000000002']]]){proposal({...result(),documentPhns:ids});const p=payload(JSON.stringify(ids));await intake.submit(p);await settle();const j=await intake.read(p.job.id);assert.equal(j.status,'held');assert.equal(j.files[0].held,true);assert.match(await readFile(intake.source(j,j.files[0]),'utf8'),/%PDF/);}
  proposal(result());verify(async()=>({safeToSave:false,issues:['Important history was omitted.']}));const p=payload('omission');await intake.submit(p);await settle();assert.equal((await intake.read(p.job.id)).status,'held');assert.equal((await notes.load('patient-context.json')).data.patients[key].summaryMarkdown,'Existing important history.');assert.deepEqual(await readdir(path.join(root,'Incoming')),[]);
 }));
+
+test('Incoming identification still blocks absent, conflicting and non-roster PHNs before extraction',()=>fixture(async({root,intake,notes,payload,settle,identity,calls})=>{
+ const before=(await notes.load('patient-context.json')).data;
+ for(const documentPhns of [[[]],[['0000000001','0000000002']],[['0000000002']]]){
+  const id=randomUUID(),raw=Buffer.from(payload().documents[0].split(',')[1],'base64'),name=id+'.pdf';
+  await mkdir(path.join(root,'Incoming'),{recursive:true});await writeFile(path.join(root,'Incoming',name),raw);identity({documentPhns});
+  await intake.requestIncoming({id,datasetId:'synthetic'});await settle();
+  const job=(await intake.list()).find(j=>j.files[0].name===name);assert.equal(job.status,'held');assert.equal(calls(),0);
+ }
+ assert.deepEqual((await notes.load('patient-context.json')).data,before);
+}));
 test('concurrent target edit is preserved and another patient edit does not block import',()=>fixture(async({notes,intake,payload,settle,verify})=>{
  verify(async()=>{const c=await notes.load('patient-context.json');c.data.patients[key].summaryMarkdown='New physician edit';await notes.save('patient-context.json',c.data,c.etag);return {safeToSave:true,issues:[]};});const p=payload();await intake.submit(p);await settle();assert.equal((await intake.read(p.job.id)).status,'held');assert.equal((await notes.load('patient-context.json')).data.patients[key].summaryMarkdown,'New physician edit');
  verify(async()=>{const c=await notes.load('patient-context.json');c.data.patients['phn:0000000002']={patient:{phn:'0000000002',key:'phn:0000000002',name:'Other, Example'},summaryMarkdown:'Keep this edit'};await notes.save('patient-context.json',c.data,c.etag);return {safeToSave:true,issues:[]};});const other=payload('other change');await intake.submit(other);await settle();assert.equal((await intake.read(other.job.id)).status,'accepted');assert.equal((await notes.load('patient-context.json')).data.patients['phn:0000000002'].summaryMarkdown,'Keep this edit');
