@@ -1,11 +1,19 @@
 import {DriveNotesRepository} from './notes-storage.mjs?v=20261031-compact1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 import {checkManifest} from './intake-core.mjs?v=20261111-roster1';
+import {checkIncomingRequest,requestView,incomingMime,appUploadName} from './incoming-request.mjs?v=20261111-incoming1';
+import {safeFileName,MAX_UPLOAD_BYTES} from './intake-core.mjs?v=20261111-roster1';
 const V3='https://www.googleapis.com/drive/v3/files';
 const digest=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 export class DriveIntake{
  constructor(adapter){this.adapter=adapter;this.repo=new DriveNotesRepository(adapter);}
- async folder(create=false,name='Intake jobs'){const root=await this.repo.root(create);return root?this.repo.folder(root,name,create):null;}
+ async folder(create=false,name='Intake jobs'){
+  const root=await this.repo.root(create);if(!root)return null;
+  // Incoming may be shared with the physician's team. Do not change sharing
+  // or relax the private-folder checks for records, requests or extracted files.
+  if(name==='Incoming'){const folders=await this.repo.list(`'${root}' in parents and name = 'Incoming' and mimeType = 'application/vnd.google-apps.folder'`);if(folders.length>1)throw new Error('Multiple Incoming folders need reconciliation.');if(folders.length)return folders[0].id;}
+  return this.repo.folder(root,name,create);
+ }
  async matches(parent,name){const files=await this.repo.list(`'${parent}' in parents and name = '${name}'`);if(files.length>1)throw new Error('Duplicate upload files need reconciliation.');return files[0];}
  async put(parent,name,mime,bytes){
   const expected=await digest(bytes),existing=await this.matches(parent,name);let id=existing?.id;
@@ -24,6 +32,31 @@ export class DriveIntake{
   for(let i=0;i<job.files.length;i++){const f=job.files[i],bytes=Uint8Array.from(atob(documents[i].split(',')[1]),c=>c.charCodeAt(0));await this.put(incoming,f.file,f.mime,bytes);}
   const saved={...job,status:'queued',createdAt:new Date().toISOString(),message:'Uploaded to Drive. Automatic import starts when the laptop receives these files.'};
   await this.put(parent,manifestName,'application/json',new TextEncoder().encode(JSON.stringify(saved,null,2)+'\n'));return saved;
+ }
+ async folderFiles(parent){
+  let page='',files=[];do{const q=encodeURIComponent(`'${parent}' in parents and trashed = false`),r=await this.adapter.request(V3+'?q='+q+'&fields=files(id,name,mimeType,size),nextPageToken&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true'+(page?'&pageToken='+encodeURIComponent(page):''));files.push(...r.files||[]);page=r.nextPageToken||'';}while(page);return files;
+ }
+ async requestIncoming({id,datasetId,retryJobs=[]}){
+  const key='incoming-request:'+datasetId+':'+id,parent=await this.folder(true),name='incoming-request-'+id+'.json';
+  let request=await loadRecovery(key);
+  if(!request){
+   request={app:'trim-incoming-request',schema:1,id,datasetId,createdAt:new Date().toISOString(),files:[],issues:[],retryJobs};
+   if(!retryJobs.length){const incoming=await this.folder(false,'Incoming');if(!incoming)throw new Error('The existing shared Incoming folder was not found.');const files=await this.folderFiles(incoming),names=new Set();
+    for(const f of files){if(f.mimeType==='application/vnd.google-apps.folder'||appUploadName(f.name))continue;if(names.has(f.name.toLowerCase()))throw new Error('Incoming has duplicate filenames. Rename them before processing.');names.add(f.name.toLowerCase());
+     if(!safeFileName(f.name)||!incomingMime(f.name)||Number(f.size)>MAX_UPLOAD_BYTES||f.mimeType==='application/vnd.google-apps.shortcut'){request.issues.push(f.name+': unsupported or larger than 10 MB.');continue;}
+     const bytes=await this.adapter.bytes(V3+'/'+f.id+'?alt=media&supportsAllDrives=true');if(!bytes.length||bytes.length>MAX_UPLOAD_BYTES){request.issues.push(f.name+': empty or larger than 10 MB.');continue;}
+     request.files.push({name:f.name,size:bytes.length,sha256:await digest(bytes)});
+    }
+   }
+   checkIncomingRequest(request);await saveRecovery(key,request);
+  }
+  checkIncomingRequest(request);if(request.datasetId!==datasetId||request.id!==id)throw new Error('Incoming request identity changed.');
+  await this.put(parent,name,'application/json',new TextEncoder().encode(JSON.stringify(request,null,2)+'\n'));return requestView(request,null);
+ }
+ async incomingRequests(){
+  const parent=await this.folder();if(!parent)return [];const files=await this.folderFiles(parent),views=[];
+  for(const f of files.filter(f=>/^incoming-request-[a-f0-9-]+\.json$/.test(f.name))){const request=checkIncomingRequest(await this.adapter.request(V3+'/'+f.id+'?alt=media')),resultFile=files.find(x=>x.name==='incoming-result-'+request.id+'.json'),result=resultFile?await this.adapter.request(V3+'/'+resultFile.id+'?alt=media'):null;views.push(requestView(request,result));}
+  return views.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
  }
  async list(phn){
   const parent=await this.folder();if(!parent)return [];let page='',files=[];

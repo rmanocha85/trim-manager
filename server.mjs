@@ -103,8 +103,9 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
           await backups.ensure(await snapshot(current.ledger));return json(200,await store.save(await readJSON(),current.etag,{restore:true}));
         }
         if(url.pathname==='/api/patient-display'&&req.method==='GET')return json(200,await profiles());
-        if(url.pathname==='/api/intake'&&req.method==='GET')return json(200,{jobs:await intake.list(url.searchParams.get('phn')),service:{...intake.service,running:intake.running}});
+        if(url.pathname==='/api/intake'&&req.method==='GET')return json(200,{jobs:await intake.list(url.searchParams.get('phn')),requests:await intake.incomingRequests(),service:{...intake.service,running:intake.running}});
         if(url.pathname==='/api/intake'&&req.method==='POST')return json(200,await intake.submit(await readJSON()));
+        if(url.pathname==='/api/intake/incoming'&&req.method==='POST')return json(200,await intake.requestIncoming(await readJSON()));
         if(url.pathname==='/api/intake/retry'&&req.method==='POST')return json(200,await intake.retry((await readJSON()).id));
         if(url.pathname==='/api/intake/accept'&&req.method==='POST'){const saved=await intake.accept((await readJSON()).id);await profiles();return json(200,saved);}
         if(url.pathname==='/api/ai/status'&&req.method==='GET')return json(200,await chatgpt.status());
@@ -135,7 +136,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
       if(process.env.TRIM_VERIFICATION==='1'&&['drive-live-check.html','drive-live-check.mjs'].includes(file)){
         res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});return res.end(await readFile(path.join(root,'tests',file)));
       }
-      if(!allowed.has(file)&&!['roster-merge.mjs','merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','patient-links.mjs','patient-identity.mjs','patient-identity.css','profile-display.mjs','most-designations.mjs','intake-core.mjs','intake-sources.mjs','intake-ui.mjs','intake-drive.mjs','roster-print.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs','hospital.mjs','hospital-ui.mjs','hospital-entry.mjs'].includes(file))return json(404,{error:'Not found.'});
+      if(!allowed.has(file)&&!['roster-merge.mjs','merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','patient-links.mjs','patient-identity.mjs','patient-identity.css','profile-display.mjs','most-designations.mjs','intake-core.mjs','intake-sources.mjs','incoming-request.mjs','intake-ui.mjs','intake-drive.mjs','roster-print.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs','hospital.mjs','hospital-ui.mjs','hospital-entry.mjs'].includes(file))return json(404,{error:'Not found.'});
       res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});
       res.end(req.method==='HEAD'?undefined:await readFile(path.join(root,'public',file)));
     } catch(e) {json(e.status||400,{error:e.code==='ENOENT'?'The source file is not available on this laptop. Check Drive sync.':e.message});}

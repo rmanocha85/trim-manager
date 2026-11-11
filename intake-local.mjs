@@ -1,3 +1,4 @@
+import {checkIncomingRequest,requestView,incomingMime,appUploadName} from './public/incoming-request.mjs';
 import {mkdir,readdir,readFile,writeFile,rename,open,unlink,stat,lstat} from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -47,23 +48,83 @@ export class DocumentIntake{
    }
   }
  }
- async discover(){
-  const jobs=await this.list(),claimed=new Set(jobs.filter(j=>j.status!=='accepted').flatMap(j=>j.files.filter(f=>!f.held).map(f=>f.file.toLowerCase()))),names=await readdir(this.incoming),live=new Set(names);
-  for(const name of this.observed.keys())if(!live.has(name))this.observed.delete(name);
-  for(const name of names){if(claimed.has(name.toLowerCase())||/^intake-.*\.json$/.test(name))continue;const file=path.join(this.incoming,name),info=await lstat(file);if(!info.isFile()||info.isSymbolicLink())continue;
-   const mark=info.size+':'+info.mtimeMs,seen=this.observed.get(name);if(!seen||seen.mark!==mark){this.observed.set(name,{mark,since:this.now()});continue;}if(this.now()-seen.since<this.stableMs)continue;
-   // Drive can sync uploaded originals before their manifest.
-   if(/^[a-f0-9-]{36}-\d+\.(pdf|png|jpg|webp|txt)$/i.test(name)&&this.now()-seen.since<15*60*1000)continue;
-   const mime=mimeFor[path.extname(name).toLowerCase()];if(!mime||!safeFileName(name)||!info.size||info.size>MAX_UPLOAD_BYTES){this.service.error='Incoming document needs attention (unsupported type, empty file, or larger than 10 MB): '+name;continue;}
-   const bytes=await readFile(file),after=await stat(file);if(after.size!==info.size||after.mtimeMs!==info.mtimeMs)continue;
-   const {datasetId}=await this.ledger();await this.write({app:'trim-document-intake',schema:2,id:randomUUID(),phn:null,datasetId,status:'queued',createdAt:new Date().toISOString(),message:'New document queued for automatic import.',files:[{name,file:name,mime,size:bytes.length,sha256:hash(bytes)}]});this.observed.delete(name);
+ requestFile(id,result=false){return path.join(this.jobs,`incoming-${result?'result':'request'}-${checkJobId(id)}.json`);}
+ async readIncoming(id){return checkIncomingRequest(JSON.parse(await readFile(this.requestFile(id),'utf8')));}
+ async incomingResult(id){try{return JSON.parse(await readFile(this.requestFile(id,true),'utf8'));}catch(e){if(e.code==='ENOENT')return null;throw e;}}
+ async writeIncomingResult(r){await mkdir(this.jobs,{recursive:true});const file=this.requestFile(r.id,true),text=JSON.stringify(r,null,2)+'\n';try{if(await readFile(file,'utf8')===text)return;}catch(e){if(e.code!=='ENOENT')throw e;}const temp=file+'.'+randomUUID()+'.tmp';await writeFile(temp,text,{mode:0o600});await rename(temp,file);}
+ async incomingRequests(){
+  let names;try{names=await readdir(this.jobs);}catch(e){if(e.code==='ENOENT')return [];throw e;}
+  const results=[];for(const name of names.filter(n=>/^incoming-request-[a-f0-9-]+\.json$/.test(n))){try{const id=name.slice(17,-5);results.push(requestView(await this.readIncoming(id),await this.incomingResult(id)));}catch(e){this.service.error='An Incoming request needs attention: '+e.message;}}
+  return results.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+ }
+ async requestIncoming({id,datasetId,retryJobs=[]}){
+  checkJobId(id);if(datasetId!==(await this.ledger()).datasetId)throw new Error('Incoming request belongs to another workspace.');
+  try{return requestView(await this.readIncoming(id),await this.incomingResult(id));}catch(e){if(e.code!=='ENOENT')throw e;}
+  const request={app:'trim-incoming-request',schema:1,id,datasetId,createdAt:new Date().toISOString(),files:[],issues:[],retryJobs};
+  await mkdir(this.incoming,{recursive:true});
+  if(!retryJobs.length)for(const name of await readdir(this.incoming)){
+   if(appUploadName(name))continue;const file=path.join(this.incoming,name),before=await lstat(file);if(!before.isFile()||before.isSymbolicLink())continue;
+   if(!safeFileName(name)||!incomingMime(name)||!before.size||before.size>MAX_UPLOAD_BYTES){request.issues.push(name+': unsupported, empty, or larger than 10 MB.');continue;}
+   const bytes=await readFile(file),after=await lstat(file);if(after.size!==before.size||after.mtimeMs!==before.mtimeMs){request.issues.push(name+': still changing. Let Drive finish syncing, then click Process Incoming again.');continue;}
+   request.files.push({name,size:bytes.length,sha256:hash(bytes)});
+  }
+  checkIncomingRequest(request);await mkdir(this.jobs,{recursive:true});
+  try{await writeFile(this.requestFile(id),JSON.stringify(request,null,2)+'\n',{flag:'wx',mode:0o600});}catch(e){if(e.code!=='EEXIST')throw e;}
+  const saved=await this.readIncoming(id);if(saved.datasetId!==datasetId)throw new Error('Incoming request identity changed.');void this.tick();return requestView(saved,null);
+ }
+ async prepareIncomingRequests(){
+  for(const view of await this.incomingRequests()){
+   if(['completed','attention'].includes(view.status))continue;
+   const request=await this.readIncoming(view.id);let receipt=await this.incomingResult(view.id);
+   if(!receipt||receipt.app!=='trim-incoming-result'||receipt.datasetId!==request.datasetId)receipt={app:'trim-incoming-result',schema:1,id:request.id,datasetId:request.datasetId,status:'processing',message:'Checking the requested files.',startedAt:this.now(),items:request.files.map(f=>({name:f.name,status:'waiting'}))};
+   if(request.datasetId!==(await this.ledger()).datasetId){receipt.status='attention';receipt.message='This request belongs to another workspace.';await this.writeIncomingResult(receipt);continue;}
+   await this.writeIncomingResult(receipt);
+   const jobs=await this.list();
+   for(const id of request.retryJobs){
+    if(receipt.items.some(i=>i.jobId===id))continue;
+    try{const job=await this.read(id);if(job.datasetId!==request.datasetId)throw new Error('Retry belongs to another workspace.');if(job.status!=='accepted')await this.write({...job,status:'queued',attempts:0,retryAfter:null,message:'Retry requested from Document intake.'});receipt.items.push({name:job.files.map(f=>f.name).join(', '),jobId:id,status:'processing'});}catch(e){receipt.items.push({name:'Requested retry',status:'attention',message:e.message});}
+    await this.writeIncomingResult(receipt);
+   }
+   for(const f of request.files){
+    const item=receipt.items.find(i=>i.name===f.name);if(!item||item.jobId||item.status==='attention')continue;
+    const file=path.join(this.incoming,f.name);let info;try{info=await lstat(file);}catch(e){if(e.code!=='ENOENT')throw e;}
+    const existing=jobs.find(j=>j.datasetId===request.datasetId&&j.files.some(source=>source.file===f.name&&source.sha256===f.sha256)&&(!info||j.status!=='accepted'));
+    if(existing){item.jobId=existing.id;item.status='processing';await this.writeIncomingResult(receipt);continue;}
+    if(!info){item.message='Waiting for this file to sync from Drive.';}
+    else if(!info.isFile()||info.isSymbolicLink()){item.status='attention';item.message='The source is not a regular file.';}
+    else {
+     const bytes=await readFile(file),after=await lstat(file);
+     if(bytes.length!==f.size||hash(bytes)!==f.sha256||after.mtimeMs!==info.mtimeMs){item.message='Waiting for the exact requested file version to sync. Changed versions are not imported.';}
+     else if(!signatureMatches(bytes,incomingMime(f.name))){item.status='attention';item.message='File contents do not match the supported file type.';}
+     else {
+      const digest=hash(request.id+'\n'+f.name+'\n'+f.sha256).slice(0,32).split('');digest[12]='4';digest[16]='8';const hex=digest.join(''),id=`${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+      const claimed=jobs.find(j=>active.has(j.status)&&j.files.some(source=>source.file===f.name&&source.sha256!==f.sha256));
+      if(claimed){item.status='attention';item.message='Another queued upload uses this filename with different contents.';}
+      else {let job;try{job=await this.read(id);}catch(e){if(e.code!=='ENOENT')throw e;job=await this.write({app:'trim-document-intake',schema:2,id,phn:null,datasetId:request.datasetId,status:'queued',createdAt:new Date().toISOString(),message:'Queued by Process Incoming.',files:[{name:f.name,file:f.name,mime:incomingMime(f.name),size:f.size,sha256:f.sha256}]});}jobs.push(job);item.jobId=id;item.status='processing';delete item.message;}
+     }
+    }
+    if(item.status==='waiting'&&this.now()-receipt.startedAt>=15*60*1000){item.status='attention';item.message+=' Check Drive sync, then create a new request.';}
+    await this.writeIncomingResult(receipt);
+   }
   }
  }
+ async updateIncomingResults(){
+  for(const view of await this.incomingRequests()){
+   const receipt=await this.incomingResult(view.id);if(!receipt||receipt.datasetId!==(await this.ledger()).datasetId)continue;
+   for(const item of receipt.items)if(item.jobId){try{const job=await this.read(item.jobId);item.status=job.status==='accepted'?'completed':job.status==='held'?'attention':job.status==='waiting'?'waiting':'processing';item.message=job.message;}catch(e){item.status='attention';item.message=e.message;}}
+   const pending=receipt.items.some(i=>['waiting','processing'].includes(i.status)),problems=view.issues.length+receipt.items.filter(i=>i.status==='attention').length,done=receipt.items.filter(i=>i.status==='completed').length;
+   receipt.status=pending?(receipt.items.some(i=>i.status==='processing')?'processing':'waiting'):problems?'attention':'completed';
+   receipt.message=receipt.items.length?`${done} of ${receipt.items.length} documents completed.${problems?' '+problems+' item(s) need attention.':''}`:view.issues.length?'Incoming contains files needing attention.':'No new documents were in Incoming when you clicked.';
+   await this.writeIncomingResult(receipt);
+  }
+ }
+
  async tick(){
   if(this.running)return;this.running=true;let handle;const lock=path.join(this.lockRoot,hash(path.resolve(this.root))+'.lock');
   try{await mkdir(this.lockRoot,{recursive:true});try{handle=await open(lock,'wx');await handle.writeFile(JSON.stringify({pid:process.pid}));}catch(e){if(e.code!=='EEXIST')throw e;let owner;try{owner=JSON.parse(await readFile(lock,'utf8'));}catch{}let alive=false;if(owner?.pid){try{process.kill(owner.pid,0);alive=true;}catch(e){alive=e.code==='EPERM';}}if(!alive&&(owner?.pid||this.now()-(await stat(lock)).mtimeMs>60000))await unlink(lock);return;}
-   this.service.error=null;await mkdir(this.incoming,{recursive:true});await this.migrate();await this.discover();this.service.lastScan=new Date().toISOString();
+   this.service.error=null;await mkdir(this.incoming,{recursive:true});if(!this.migrated){await this.migrate();this.migrated=true;}await this.prepareIncomingRequests();this.service.lastScan=new Date().toISOString();
    for(const job of await this.list())if(active.has(job.status)&&(!job.retryAfter||job.retryAfter<=this.now()))await this.process(job.id);
+   await this.updateIncomingResults();
   }catch(e){this.service.error=e.message;}finally{if(handle){await handle.close();await unlink(lock).catch(()=>{});}this.running=false;}
  }
  async hold(job,message){
