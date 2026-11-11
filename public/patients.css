@@ -366,7 +366,11 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
 .active-issue-priority .unm,.active-issue-priority .uchev{color:#684100}
 .active-issue-priority .ucnt{background:#f0dcad;color:#684100}
 .active-issue-summary{margin:5px 0;max-width:340px;min-width:180px;white-space:normal}
-.active-issue-summary .active-issue-badge{background:#fff1cf;border-color:#c89538;color:#684100;font-size:11px}
+.active-issue-summary .active-issue-badge{display:inline-flex;align-items:center;gap:5px;background:#fff5f5;border-color:#e3baba;color:#a12626;font-size:11px}
+.active-issue-icon{width:22px;height:22px;flex:none;color:#b42323}
+.patient-actions-menu .flag-toggle .active-issue-icon{color:#b42323}
+.patient-actions-menu .flag-toggle{min-height:42px}
+.active-issue-badge .active-issue-icon{width:16px;height:16px}
 .active-issue-summary p{margin:4px 0 0;line-height:1.4;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 #active-issue-dialog{margin:auto;width:500px;max-width:calc(100vw - 32px);max-height:85dvh;overflow:auto;padding:24px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text)}
 #active-issue-dialog::backdrop{background:#0006}
