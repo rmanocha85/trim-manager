@@ -37,7 +37,7 @@ try{
    await section(name);const footer=await page.locator('.app-utility').boundingBox();assert.equal(footer.y+footer.height,1000);
    await section('settings');assert.equal(await page.locator('#settings').isVisible(),true);assert.equal(await page.locator('#calendar').isVisible(),false);assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),0);
  }
- await section('patients');
+ await section('patients');await p("[data-click=\"showTab('patients',this)\"]").click();
  assert.equal(await p('[data-notes-upload],.notes-upload-help').count(),0);
  assert.equal(await p('#stats').isVisible(),false);assert.equal(await p('.tabs-bar').innerText().then(t=>t.includes('Print dates')),false);
  const name=row.locator('.pnm'),flag=row.locator('.pflag');
@@ -59,7 +59,7 @@ try{
  for(const [id,value] of Object.entries({'in-name':'Added, Coverage','in-phn':'0000000006','in-room':'1406','in-codes':'401','in-ava':'123461','in-dob':'1940-01-01'}))await p('#'+id).fill(value);
  await p('#in-unit').selectOption('cedar');await p('#in-doctor').selectOption('Dr. Adam Siemens');await p('#in-most').selectOption('DNACPR M3');await p('[data-click="addPatient()"]').click();await save();
  const coverage=JSON.parse(await readFile(rosterPath,'utf8'));assert.deepEqual(coverage.patients,panelBefore);assert.equal(coverage.otherPatients.length,2);assert.equal(coverage.otherPatients[1].doctor,'Dr. Adam Siemens');assert.deepEqual(await readBilling(),billingBefore);
- assert.match(await p('#roster-count').innerText(),/2 other patients/);await p('#other-doctor-filter').selectOption('Dr. Adam Siemens');assert.equal(await p('#other-list tbody tr').count(),1);assert.equal(await p('#other-list .identity-most').innerText(),'DNACPR M3');assert.ok((await p('#other-list tbody tr').boundingBox()).height<=44);
+ assert.match(await p('#roster-count').innerText(),/2 other patients/);await p('#other-doctor-filter').selectOption('Dr. Adam Siemens');assert.equal(await p('#other-list tbody tr').count(),1);assert.equal(await p('#other-list .identity-most').innerText(),'DNACPR M3');assert.equal(await p('#other-list [data-med-reconciliation]').count(),1);assert.equal(await p('#other-list [data-pmhx-uploaded]').count(),1);
  const center=async locator=>{const b=await locator.boundingBox();return b.x+b.width/2;};assert.ok(Math.abs(await center(p('#other-list .roster-demographic-head>span').first())-await center(p('#other-list .identity-age')))<1);
  const nameCol=await p('#other-list tbody td').nth(1).boundingBox(),phnCol=await p('#other-list tbody td').nth(2).boundingBox();assert.equal(nameCol.width,220);assert.equal(phnCol.x-nameCol.x,220);assert.equal(await p('#other-list .identity-ava').count(),0);assert.doesNotMatch(await p('#other-list').innerText(),/123461/);
  await page.screenshot({path:'work/compact-other-patients.png',fullPage:true});await page.reload();await page.locator('.patient').first().waitFor();await saved();await section('patients');await p('[data-click="showTab(\'other-patients\',this)"]').click();assert.match(await p('#roster-count').innerText(),/2 other patients/);

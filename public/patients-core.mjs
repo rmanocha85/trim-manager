@@ -79,7 +79,7 @@ export function edit(raw,id,fields,asOf=today()){
   }
 
 export function addOther(raw,fields,asOf=today(),newId=()=>globalThis.crypto.randomUUID()){
- const added=add(raw,fields,asOf,newId),patient={...added.patients.at(-1),newPanelPatient:false};
+ const added=add(raw,fields,asOf,newId),patient=added.patients.at(-1);
  return validate({...added,patients:added.patients.slice(0,-1),otherPatients:[...added.otherPatients,patient]});
 }
 
@@ -104,12 +104,18 @@ export function setPatientFlag(raw,id,flag,value){
 
 // Completion is retained after the temporary new-patient controls expire.
 export function setMedReconciliation(raw,id,completed,asOf=today()){
+ return setNewPatientCompletion(raw,id,'medReconciliationDate',completed,asOf);
+}
+export function setPmhxUploaded(raw,id,completed,asOf=today()){
+ return setNewPatientCompletion(raw,id,'pmhxUploadedDate',completed,asOf);
+}
+function setNewPatientCompletion(raw,id,field,completed,asOf){
  const roster=normalize(raw);dateParts(asOf);
  const collection=['patients','otherPatients'].find(k=>roster[k].some(p=>String(p.id)===String(id)));
  const p=collection&&roster[collection].find(p=>String(p.id)===String(id));
  if(!p||typeof completed!=='boolean')throw new Error('Choose an active new patient.');
  dateParts(p.panelAddedDate);
  const days=(Date.parse(asOf)-Date.parse(p.panelAddedDate))/86400000;
- if(!p.newPanelPatient||days<0||days>=14)throw new Error('Medication reconciliation control is available during the first 14 days.');
- return {...roster,[collection]:roster[collection].map(x=>x===p?{...x,medReconciliationDate:completed?(p.medReconciliationDate||asOf):''}:x)};
+ if(!p.newPanelPatient||days<0||days>=14)throw new Error('New-patient completion controls are available during the first 14 days.');
+ return {...roster,[collection]:roster[collection].map(x=>x===p?{...x,[field]:completed?(p[field]||asOf):''}:x)};
 }

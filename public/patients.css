@@ -363,3 +363,7 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
 .ptbl td{padding:4px 10px;vertical-align:middle}.ptbl .pnm{min-height:28px;flex-wrap:nowrap;white-space:nowrap}.ptbl .hospital-dates{display:inline;font-size:11px;margin:0 0 0 4px;white-space:nowrap;font-weight:400}.ptbl .hospital-flag{height:20px;min-width:20px;font-size:12px;flex-shrink:0;margin-left:3px}.ptbl .btn-sm{min-height:28px;padding:3px 8px}.ptbl .sel{min-height:28px;padding:3px 7px}.uhdr{padding:7px 12px}
 
 .ptbl .pnm .pphn{margin-left:6px;font-weight:400;flex-shrink:0}.edit-phn-wrap{display:flex;align-items:center;gap:8px;margin-top:4px}.edit-phn-wrap .einp{width:140px}.edit-phn-wrap .sel{width:auto}
+
+.roster-ownership{display:block;color:var(--muted);font-size:11px;margin-top:4px}.reconciliation-priority{border:1px solid #c89538}.reconciliation-priority .uhdr{background:#fff5df}.roster-billing-history{white-space:normal;font-size:11px}.roster-profile .med-reconciliation{margin-top:5px}#other-filter-label{display:block;margin:0 0 12px}#other-filter-label[hidden]{display:none}
+
+.roster-table .col-actions{width:148px}.roster-actions-cell{white-space:nowrap}.roster-billing-history{white-space:nowrap!important}.reconciliation-priority .uhdr,.reconciliation-priority .unm{color:#684100}.reconciliation-priority .ucnt{background:#f0dcad;color:#684100}.reconciliation-priority .uchev{color:#684100}

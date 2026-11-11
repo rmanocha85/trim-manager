@@ -20,7 +20,7 @@ test('discussion does not turn a proposed MOST into a current order',()=>{
 test('adding Other Patients preserves panel and data, rejects duplicates, and restores retained identity',()=>{
  const p={id:'one',name:'Example, One',phn:'0000000001',ava:'123456',unit:'test',room:'1',codes:'401'},raw={patients:[p],units:[{id:'test',name:'TEST'}],otherPatients:[],removedPatients:[],billingDates:[],custom:{keep:true}};
  const fields={...p,id:undefined,name:'Example, Two',phn:'0000000002',ava:'123457',doctor:'Dr. Adam Siemens'},before=structuredClone(raw);
- const result=addOther(raw,fields,'2026-10-31',()=> 'two');assert.deepEqual(raw,before);assert.deepEqual(result.patients,raw.patients);assert.deepEqual(result.custom,raw.custom);assert.equal(result.otherPatients[0].doctor,fields.doctor);assert.equal(result.otherPatients[0].newPanelPatient,false);
+ const result=addOther(raw,fields,'2026-10-31',()=> 'two');assert.deepEqual(raw,before);assert.deepEqual(result.patients,raw.patients);assert.deepEqual(result.custom,raw.custom);assert.equal(result.otherPatients[0].doctor,fields.doctor);assert.equal(result.otherPatients[0].newPanelPatient,true);
  assert.throws(()=>addOther(result,fields),/already belongs/);assert.throws(()=>addOther(raw,p),/already belongs/);
  const retained={...fields,id:'retained',removedDate:'2026-10-01',custom:{preserve:true}};const restored=addOther({...raw,removedPatients:[retained]},fields,'2026-10-31');assert.equal(restored.otherPatients[0].id,'retained');assert.deepEqual(restored.otherPatients[0].custom,retained.custom);assert.equal(restored.removedPatients.length,0);
 });

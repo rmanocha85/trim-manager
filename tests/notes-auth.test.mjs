@@ -33,6 +33,13 @@ test('SSE requires completion, rejects late quota errors and handles split CRLF'
 test('generation sends only supported Responses fields; unfinished output does not succeed',async()=>{
   let sent;const text=JSON.stringify({assessment:'Routine note',summaryMarkdown:'Summary'}),c=new ChatGPTConnection({store:store(signedIn()),fetchImpl:async(url,o)=>{assert.equal(url,'https://api.openai.com/v1/responses');sent=JSON.parse(o.body);return new Response(stream([{type:'response.output_text.delta',delta:text},{type:'response.completed',response:{status:'completed'}}]));}});assert.equal((await c.generate({model:'chosen',context:{today:{input:'Synthetic'}}})).assessment,'Routine note');assert.deepEqual(Object.keys(sent).sort(),['input','instructions','model','store','stream']);assert.equal(sent.store,false);assert.equal(sent.stream,true);
 });
+
+test('document intake sends typed history as untrusted UTF-8 text in attachment order',async()=>{
+ let sent;const result={documentPhns:[['0000000001'],['0000000001']],summaryMarkdown:'Synthetic',reviewIssues:[],sourceSummary:'Synthetic'};
+ const c=new ChatGPTConnection({store:store(signedIn()),fetchImpl:async(_url,o)=>{sent=JSON.parse(o.body);return new Response(stream([{type:'response.output_text.delta',delta:JSON.stringify(result)},{type:'response.completed',response:{status:'completed'}}]));}});
+ await c.analyzeDocuments({model:'chosen',patient:{phn:'0000000001'},documents:[{name:'history.txt',mime:'text/plain',dataUrl:'data:text/plain;base64,'+Buffer.from('PHN: 0000000001\nHistory: café — surgery').toString('base64')},{name:'image.png',mime:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgo='}]});
+ const content=sent.input[0].content;assert.equal(content[1].type,'input_text');assert.match(content[1].text,/café — surgery/);assert.equal(content[2].type,'input_image');assert.match(sent.instructions,/untrusted/);assert.equal(sent.store,false);
+});
 test('real JWT validation rejects wrong nonce, audience, issuer and expired identity',async()=>{
   const {publicKey,privateKey}=await generateKeyPair('RS256'),jwk=await exportJWK(publicKey),c=new ChatGPTConnection({store:store(),fetchImpl:async()=>response(metadata)});c.jwks=createLocalJWKSet({keys:[{...jwk,kid:'synthetic',alg:'RS256'}]});
   const token=({nonce='nonce',aud='issued',issuer=metadata.issuer,expiry='5m'}={})=>new SignJWT({sub:'synthetic',nonce}).setProtectedHeader({alg:'RS256',kid:'synthetic'}).setIssuer(issuer).setAudience(aud).setIssuedAt().setExpirationTime(expiry).sign(privateKey);

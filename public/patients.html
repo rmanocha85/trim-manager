@@ -3,8 +3,9 @@
 
 
 <div class="tabs-bar">
-  <button class="tab-btn active" data-click="showTab('patients',this)">Patients</button>
-  <button class="tab-btn" data-click="showTab('other-patients',this)">Other patients</button>
+  <button class="tab-btn active" data-click="showTab('all-patients',this)">All</button>
+  <button class="tab-btn" data-click="showTab('patients',this)">My Patients</button>
+  <button class="tab-btn" data-click="showTab('other-patients',this)">Other Patients</button>
   <button class="tab-btn" data-click="showTab('units',this)">Units</button>
   <button class="tab-btn" data-click="showTab('history',this)">📅 Past Lists</button>
   <button class="tab-btn" data-click="showTab('removed',this)">Removed Patients</button>
@@ -12,7 +13,7 @@
   <div class="roster-toolbar"><span id="roster-count" aria-live="polite"></span>
   <details class="needs-connect add-patient" id="add-patient">
     <summary>Add patient ▾</summary>
-    <div class="add-patient-grid"><strong id="add-patient-title">Add to My Patients</strong><input type="hidden" id="in-target" value="patients"/>
+    <div class="add-patient-grid"><strong id="add-patient-title">Add to My Patients</strong><label class="flbl">Roster<select class="sel" id="in-target" data-change="updateToolbar()"><option value="patients">My Patients</option><option value="otherPatients">Other Patients</option></select></label>
       <div class="fgrp"><label class="flbl">Last, First Name</label><input class="inp" id="in-name" placeholder="e.g. Last, First"/></div>
       <div class="fgrp"><label class="flbl">PHN</label><input class="inp" id="in-phn" placeholder="e.g. 1234567890"/></div>
       <div class="fgrp"><label class="flbl">Unit</label><select class="sel" id="in-unit"></select></div>
@@ -38,24 +39,13 @@
 
 <!-- PATIENTS -->
 <div id="tab-patients" class="panel active">
-  <label class="roster-search" for="roster-search">Find a patient<input type="search" class="inp" id="roster-search" placeholder="Name, PHN, room or New" data-input="renderUList()"></label>
+  <label class="roster-search" for="roster-search">Find a patient<input type="search" class="inp" id="roster-search" placeholder="Search all patients · name, PHN, room or New" data-input="renderUList()"></label>
+  <label id="other-filter-label" hidden>Doctor<select class="sel" id="other-doctor-filter" data-change="renderUList()"><option value="">All doctors</option><option value="__unassigned">Unassigned</option></select></label>
   <div id="stats" hidden></div>
   <div id="lbanner"></div>
   <div class="connect-hint">🔒 Editing is disabled until the roster is loaded.</div>
 
-  <div id="ulist"></div>
-</div>
-
-<!-- OTHER PATIENTS -->
-<div id="tab-other-patients" class="panel">
-  <div id="other-stats" hidden></div>
-  <div class="other-filters">
-    <div class="fg">
-      <div class="fgrp" style="flex:2;min-width:220px"><label class="flbl" for="other-search">Find a patient</label><input class="inp" id="other-search" placeholder="Name, PHN or room" data-input="renderOtherPatients()"/></div>
-      <div class="fgrp" style="flex:1;min-width:220px"><label class="flbl" for="other-doctor-filter">Doctor</label><select class="sel" id="other-doctor-filter" data-change="renderOtherPatients()"><option value="">All doctors</option><option value="__unassigned">Unassigned</option></select></div>
-    </div>
-  </div>
-  <div id="other-list"></div>
+  <div id="ulist"></div><div id="other-list" hidden></div>
 </div>
 
 <!-- BILLING DATES -->

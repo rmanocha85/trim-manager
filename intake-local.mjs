@@ -5,7 +5,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import {checkJobId,checkManifest,signatureMatches,identityMatches,reconciledFields,validateReconciliation,safeFileName,MAX_UPLOAD_BYTES} from './public/intake-core.mjs';
 import {contextRecord,snapshotPatient} from './public/notes-core.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex'),fingerprint=c=>hash(JSON.stringify(c||null));
-const mimeFor={'.pdf':'application/pdf','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp'};
+const mimeFor={'.pdf':'application/pdf','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.txt':'text/plain'};
 const active=new Set(['queued','waiting','identifying','processing','saved','ready','error','identity-review']);
 const exists=async f=>{try{return await stat(f);}catch(e){if(e.code==='ENOENT')return null;throw e;}};
 const stop=message=>Object.assign(new Error(message),{hold:true});
@@ -53,7 +53,7 @@ export class DocumentIntake{
   for(const name of names){if(claimed.has(name.toLowerCase())||/^intake-.*\.json$/.test(name))continue;const file=path.join(this.incoming,name),info=await lstat(file);if(!info.isFile()||info.isSymbolicLink())continue;
    const mark=info.size+':'+info.mtimeMs,seen=this.observed.get(name);if(!seen||seen.mark!==mark){this.observed.set(name,{mark,since:this.now()});continue;}if(this.now()-seen.since<this.stableMs)continue;
    // Drive can sync uploaded originals before their manifest.
-   if(/^[a-f0-9-]{36}-\d+\.(pdf|png|jpg|webp)$/i.test(name)&&this.now()-seen.since<15*60*1000)continue;
+   if(/^[a-f0-9-]{36}-\d+\.(pdf|png|jpg|webp|txt)$/i.test(name)&&this.now()-seen.since<15*60*1000)continue;
    const mime=mimeFor[path.extname(name).toLowerCase()];if(!mime||!safeFileName(name)||!info.size||info.size>MAX_UPLOAD_BYTES){this.service.error='Incoming document needs attention (unsupported type, empty file, or larger than 10 MB): '+name;continue;}
    const bytes=await readFile(file),after=await stat(file);if(after.size!==info.size||after.mtimeMs!==info.mtimeMs)continue;
    const {datasetId}=await this.ledger();await this.write({app:'trim-document-intake',schema:2,id:randomUUID(),phn:null,datasetId,status:'queued',createdAt:new Date().toISOString(),message:'New document queued for automatic import.',files:[{name,file:name,mime,size:bytes.length,sha256:hash(bytes)}]});this.observed.delete(name);
@@ -79,7 +79,7 @@ export class DocumentIntake{
    let loaded=await this.loadContext(job),current=job.phn?loaded.data?.patients?.['phn:'+job.phn]:null;
    // A committed receipt recovers a crash before job status or archival was saved.
    if(current?.sourceDocuments?.some(s=>s.intakeId===id)||(job.status==='saved'&&job.duplicate&&job.files.every(f=>current?.sourceDocuments?.some(s=>s.sha256===f.sha256)))){await this.archive(job);return;}
-   const documents=[];for(const f of job.files){let b;try{b=await readFile(this.source(job,f));}catch(e){if(e.code==='ENOENT'){const missingSince=job.missingSince??this.now();if(this.now()-missingSince<15*60*1000){await this.write({...job,missingSince,status:'waiting',retryAfter:this.now()+15000,message:'Waiting for the original file to finish syncing from Drive.'});return;}throw stop('Original file is missing. Restore it, allow Drive to sync, then retry.');}throw e;}if(hash(b)!==f.sha256||b.length!==f.size||!signatureMatches(b,f.mime))throw stop('Original file is incomplete, changed, or not a supported PDF/image.');documents.push({name:f.name,mime:f.mime,dataUrl:'data:'+f.mime+';base64,'+b.toString('base64')});}
+   const documents=[];for(const f of job.files){let b;try{b=await readFile(this.source(job,f));}catch(e){if(e.code==='ENOENT'){const missingSince=job.missingSince??this.now();if(this.now()-missingSince<15*60*1000){await this.write({...job,missingSince,status:'waiting',retryAfter:this.now()+15000,message:'Waiting for the original file to finish syncing from Drive.'});return;}throw stop('Original file is missing. Restore it, allow Drive to sync, then retry.');}throw e;}if(hash(b)!==f.sha256||b.length!==f.size||!signatureMatches(b,f.mime))throw stop('Original file is incomplete, changed, or not a supported PDF, image or text source.');documents.push({name:f.name,mime:f.mime,dataUrl:'data:'+f.mime+';base64,'+b.toString('base64')});}
    const status=await this.ai.status();if(!status.planEnabled){await this.write({...job,status:'waiting',message:'Waiting for the laptop’s ChatGPT connection. Connect it in Settings; intake resumes automatically.',retryAfter:null});return;}
    const models=await this.ai.models(),model=models.find(m=>m.id===job.model)?.id||models[0]?.id;if(!model)throw new Error('No AI model is available.');
    if(!job.phn){await this.write({...job,status:'identifying',message:'Reading the source PHN…'});const identity=await this.ai.identifyDocuments({model,documents}),phns=[...new Set(identity?.documentPhns?.flat()||[])];if(phns.length!==1||!/^\d{10}$/.test(phns[0])||!identityMatches(identity,phns[0],job.files.length))throw stop('The source PHN is missing, unreadable, or belongs to more than one patient.');job={...job,phn:phns[0]};await this.write(job);}
