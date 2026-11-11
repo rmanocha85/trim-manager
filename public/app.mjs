@@ -7,7 +7,7 @@ import {clinicRosterUI} from './clinic-roster.mjs?v=20261109-calendar1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261108-oatfh1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261108-planning1';
 import {OatRepository} from './oat-roster-repository.mjs?v=20261108-oat1';
-import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs';
+import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,LAPTOP_URL} from './runtime.mjs?v=20261111-on-demand1';
 
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
@@ -147,6 +147,12 @@ async function start(){
   $('patients-print').onclick=()=>{$('patients-print-frame').contentWindow.focus();$('patients-print-frame').contentWindow.print();};
   window.addEventListener('beforeunload',e=>{if(patients.hasChanges()){e.preventDefault();e.returnValue='';}});
   setInterval(()=>{if(document.visibilityState!=='visible')return;if(section==='maid'&&!maidRoster.state().busy)void refreshMaid();if(section==='oat-fh')void refreshOat();},60000);
+  if(laptop){
+    const {LocalAdapter}=await import('./adapters.mjs?v=20261031-compact1');
+    const {keepLaptopService}=await import('./service-lifecycle.mjs?v=20261111-on-demand1');
+    const serviceAdapter=new LocalAdapter();await serviceAdapter.connect();
+    keepLaptopService({api:(...args)=>serviceAdapter.request(...args)});
+  }
   showSection('billing');billing.start();
 }
 start().catch(e=>{$('gate').hidden=false;$('workspace').hidden=true;$('gate').querySelector('h1').textContent='TRIM could not start';const p=document.createElement('p');p.textContent=e.message;$('gate').querySelector('.gate-card').append(p);});

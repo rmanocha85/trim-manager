@@ -1,3 +1,4 @@
+import {ServiceLifecycle} from './service-lifecycle.mjs';
 import {DocumentIntake} from './intake-local.mjs';
 import {refreshProfileDisplay} from './profile-display-local.mjs';
 import http from 'node:http';
@@ -23,7 +24,7 @@ export const defaults={
   roster:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Roster','trim-patients-data.json'),
   billing:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Billing','trim-billing-data-v1.json')
 };
-export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,oatPath,snapshotPaths,chatgpt}={}) {
+export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,oatPath,snapshotPaths,chatgpt,onDemand=false,lifecycleOptions={}}={}) {
   const live=path.resolve(rosterPath)===path.resolve(defaults.roster)&&path.resolve(billingPath)===path.resolve(defaults.billing);
   maidPath ||= live?path.join(home,'My Drive','00. MAID','00. MAID info','MAID AI','maid-roster.json'):path.join(path.dirname(rosterPath),'maid-roster.json');
   const maidStore=new MaidStore(maidPath);
@@ -40,7 +41,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const types={'.js':'text/javascript','.gz':'application/gzip','.txt':'text/plain','.html':'text/html','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};
   const allowed=new Set(['index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
   const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
-  allowed.add('context-refresh.mjs');
+  allowed.add('context-refresh.mjs');allowed.add('service-lifecycle.mjs');
   allowed.add('clinic-roster.mjs');
   allowed.add('maid-lifecycle.mjs');
   allowed.add('maid-assessment.mjs');
@@ -51,7 +52,11 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('oat-workspace.mjs');allowed.add('oat-schedule.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
   const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};
+  const lifecycle=new ServiceLifecycle({...lifecycleOptions,onDemand});let activeRequests=0,closing=false;
+  const busy=()=>activeRequests>0||intake.running||Boolean(chatgpt.aborters?.size);
+  const idleCheck=()=>{if(!closing&&server.listening&&lifecycle.shouldStop(busy())){closing=true;server.close();}};
   const server=http.createServer(async(req,res)=>{
+    activeRequests++;
     res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://accounts.google.com/gsi/client; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob:; worker-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
     const port=req.socket.localPort;const origins=[`http://127.0.0.1:${port}`,`http://localhost:${port}`];
@@ -59,7 +64,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
     try {
       if(!origins.some(o=>o.slice(7)===req.headers.host))return json(403,{error:'Invalid host.'});
       const url=new URL(req.url,origins[0]);
-      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261105-intake1',intakePolicy:'best-effort-v1',intakeRunning:intake.running,aiRunning:chatgpt.aborters?.size||0});
+      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261105-intake1',intakePolicy:'best-effort-v1',service:lifecycle.status(),intakeRunning:intake.running,aiRunning:chatgpt.aborters?.size||0});
       if(url.pathname==='/auth/callback'&&req.method==='GET'){
         let message='ChatGPT connected. Return to TRIM Billing and Notes.',ok=true;
         try{await chatgpt.callback(url.searchParams);}catch(e){ok=false;message=e.message;}
@@ -78,6 +83,11 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         if(!req.headers.cookie?.split(';').some(c=>c.trim()===`trim_session=${session}`)||req.headers['x-trim-session']!==session)return json(401,{error:'Connect this laptop first.'});
         if(!['GET','HEAD'].includes(req.method)&&!origins.includes(req.headers.origin))return json(403,{error:'Origin required.'});
         const readJSON=async()=>{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>20000000)throw Object.assign(new Error('Clinical request is too large.'),{status:413});}return JSON.parse(raw||'{}');};
+        if(url.pathname==='/api/service/heartbeat'&&req.method==='POST'){const value=await readJSON();lifecycle.heartbeat(value.id,value.release===true);return json(200,lifecycle.status());}
+        if(url.pathname==='/api/service/stop'&&req.method==='POST'){
+          if(activeRequests>1||intake.running||chatgpt.aborters?.size)return json(409,{error:'TRIM is still processing or saving. Let it finish, then stop it.'});
+          lifecycle.stopRequested=true;res.once('finish',()=>setImmediate(idleCheck));return json(200,{stopping:true});
+        }
         if(url.pathname==='/api/oat-fh/roster'){
           if(req.method==='GET')return json(200,await oatStore.load());
           return json(405,{error:'OAT FH roster access is read-only.'});
@@ -139,11 +149,11 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
       if(!allowed.has(file)&&!['roster-merge.mjs','merge.mjs','backups.mjs','backup-ui.mjs','notes-core.mjs','notes-storage.mjs','notes-ui.mjs','notes.css','patients-core.mjs','patient-links.mjs','patient-identity.mjs','patient-identity.css','profile-display.mjs','most-designations.mjs','intake-core.mjs','intake-sources.mjs','incoming-request.mjs','intake-ui.mjs','intake-drive.mjs','roster-print.mjs','roster-repository.mjs','patients-ui.mjs','patients.html','patients.css','billing-ui.mjs','session.mjs','shell.css','runtime.mjs','hospital.mjs','hospital-ui.mjs','hospital-entry.mjs'].includes(file))return json(404,{error:'Not found.'});
       res.writeHead(200,{'Content-Type':types[path.extname(file)]+'; charset=utf-8'});
       res.end(req.method==='HEAD'?undefined:await readFile(path.join(root,'public',file)));
-    } catch(e) {json(e.status||400,{error:e.code==='ENOENT'?'The source file is not available on this laptop. Check Drive sync.':e.message});}
+    } catch(e) {json(e.status||400,{error:e.code==='ENOENT'?'The source file is not available on this laptop. Check Drive sync.':e.message});} finally {activeRequests--;}
   });
-  const timer=setInterval(background,15000);timer.unref();server.once('listening',background);server.once('close',()=>clearInterval(timer));return server;
+  const timer=setInterval(background,15000),idleTimer=setInterval(idleCheck,lifecycleOptions.intervalMs||5000);timer.unref();idleTimer.unref();server.once('listening',background);server.once('close',()=>{clearInterval(timer);clearInterval(idleTimer);});return server;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  const port=Number(process.env.PORT||4317);const server=createServer();
+  const port=Number(process.env.PORT||4317);const server=createServer({onDemand:process.argv.includes('--on-demand')});
   server.listen(port,'127.0.0.1',()=>console.log(`TRIM: http://127.0.0.1:${port} (loopback only)`));
 }
