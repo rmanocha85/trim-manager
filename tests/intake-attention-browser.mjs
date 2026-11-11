@@ -35,10 +35,10 @@ try{
   await page.goto('http://127.0.0.1:'+server.address().port+(mode==='web'?'/public/':'/'));
   await page.evaluate(async mode=>{
    globalThis.intakeTimers=new Map();let id=0;globalThis.setInterval=(fn,ms)=>{intakeTimers.set(++id,{fn,ms});return id;};globalThis.clearInterval=id=>intakeTimers.delete(id);
-   const {DriveIntake}=await import('./intake-drive.mjs?v=20261111-incoming1');
+   const {DriveIntake}=await import('./intake-drive.mjs?v=20261111-best-effort1');
    const read=async()=>{const r=await fetch('/api/intake');const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
    DriveIntake.prototype.list=async()=> (await read()).jobs;DriveIntake.prototype.incomingRequests=async()=> (await read()).requests;
-   const {documentIntakeUI}=await import('./intake-ui.mjs?v=20261111-intake-alert1');
+   const {documentIntakeUI}=await import('./intake-ui.mjs?v=20261111-best-effort1');
    globalThis.intake=documentIntakeUI({state:()=>({adapter:{mode:mode==='web'?'cloud':'local'},ledger:{datasetId:'synthetic-intake'},people:[]}),notes:{}});
   },mode);
   const indicator=page.locator('#document-intake-queue');

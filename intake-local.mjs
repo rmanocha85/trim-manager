@@ -152,21 +152,19 @@ export class DocumentIntake{
    job={...job,status:'processing',message:'Reconciling with the saved patient profile…',startedAt:new Date().toISOString(),baseFingerprint:fingerprint(current)};await this.write(job);
    const proposal=validateReconciliation(await this.ai.analyzeDocuments({model,patient,context:current,documents:indices.map(i=>documents[i])}));
    if(!identityMatches(proposal,job.phn,indices.length))throw stop('Every source must contain the selected patient’s exact PHN.');
-   if(proposal.blockingIssues?.length)throw stop(proposal.blockingIssues.join(' '));
    job={...job,proposal};await this.write(job);
    const now=new Date().toISOString(),fields=reconciledFields(current||{},proposal,now);
-   const verification=await this.ai.verifyDocuments({model,patient,context:current,proposal:{...proposal,reconciledFields:fields},documents:indices.map(i=>documents[i])});
-   if(verification?.safeToSave!==true||!Array.isArray(verification.issues)||verification.issues.length)throw stop('Extraction check did not pass. '+(verification?.issues?.filter(x=>typeof x==='string').join(' ')||'Source reconciliation needs review.'));
-   job={...job,verification};await this.write(job);
+   // Interpretation is best effort. Identity, source integrity and conditional-save
+   // checks remain mandatory; an AI content-quality opinion cannot veto an import.
    for(let attempt=0;attempt<4;attempt++){
     const latest=await this.loadContext(job),data=latest.data||contextRecord(job.datasetId),record=data.patients[patient.key]||null;
-    if(fingerprint(record)!==job.baseFingerprint)throw stop('The patient profile changed during analysis. Retry against the newer profile.');
+    if(fingerprint(record)!==job.baseFingerprint)throw Object.assign(new Error('The patient profile changed; reconciling against the newer profile.'),{reconcileAgain:true});
     data.patients[patient.key]={...record,...fields,patient:record?.patient||patient,sourceDocuments:[...(record?.sourceDocuments||[]),...indices.map(i=>({intakeId:id,path:this.relative(this.source(job,job.files[i])),originalName:job.files[i].name,retained:true,sha256:job.files[i].sha256,importedAt:now}))],importStatus:{...(typeof record?.importStatus==='object'?record.importStatus:{}),importedAt:now,clinicalReviewStatus:'pending',sourceDates:[...new Set([...(record?.importStatus?.sourceDates||[]),...proposal.sourceDates])],intakeId:id},updatedAt:now};
     try{await this.notes.save('patient-context.json',data,latest.etag);}catch(e){if(e.status===409&&attempt<3)continue;throw e;}
     const verified=await this.loadContext(job);if(fingerprint(verified.data?.patients?.[patient.key])!==fingerprint(data.patients[patient.key]))throw stop('Patient profile read-back differed. Source retained for recovery.');break;
    }
    job={...job,status:'saved',message:'Patient profile saved; verifying archival…'};await this.write(job);await this.archive(job);
-  }catch(e){if(e.hold){await this.hold(job,e.message);}else{const attempts=(job.attempts||0)+1;if(attempts>=5)await this.hold({...job,attempts},e.message);else await this.write({...job,attempts,status:'waiting',retryAfter:this.now()+Math.min(300000,15000*2**(attempts-1)),message:'Temporary processing problem; retrying automatically. '+e.message});}}
+  }catch(e){if(e.reconcileAgain){await this.write({...job,status:'waiting',attempts:0,retryAfter:this.now()+15000,message:e.message});}else if(e.hold){await this.hold(job,e.message);}else{const attempts=(job.attempts||0)+1;if(attempts>=5)await this.hold({...job,attempts},e.message);else await this.write({...job,attempts,status:'waiting',retryAfter:this.now()+Math.min(300000,15000*2**(attempts-1)),message:'Temporary processing problem; retrying automatically. '+e.message});}}
  }
  async archive(job){
   await this.patient(job);let loaded=await this.loadContext(job),record=loaded.data?.patients?.['phn:'+job.phn];

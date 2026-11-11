@@ -59,7 +59,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
     try {
       if(!origins.some(o=>o.slice(7)===req.headers.host))return json(403,{error:'Invalid host.'});
       const url=new URL(req.url,origins[0]);
-      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261105-intake1',intakeRunning:intake.running});
+      if(url.pathname==='/health'&&req.method==='GET')return json(200,{app:'trim-app',version:'20261105-intake1',intakePolicy:'best-effort-v1',intakeRunning:intake.running,aiRunning:chatgpt.aborters?.size||0});
       if(url.pathname==='/auth/callback'&&req.method==='GET'){
         let message='ChatGPT connected. Return to TRIM Billing and Notes.',ok=true;
         try{await chatgpt.callback(url.searchParams);}catch(e){ok=false;message=e.message;}

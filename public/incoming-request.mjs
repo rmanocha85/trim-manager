@@ -1,4 +1,4 @@
-import {checkJobId,safeFileName,MAX_UPLOAD_BYTES} from './intake-core.mjs?v=20261111-roster1';
+import {checkJobId,safeFileName,MAX_UPLOAD_BYTES} from './intake-core.mjs?v=20261111-best-effort1';
 export const incomingMime=name=>({pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',webp:'image/webp',txt:'text/plain'}[String(name).split('.').at(-1).toLowerCase()]);
 export const appUploadName=name=>/^[a-f0-9-]{36}-\d+\.(pdf|png|jpg|webp|txt)$/i.test(name)||/^intake-.*\.json$/.test(name);
 export function checkIncomingRequest(r){
