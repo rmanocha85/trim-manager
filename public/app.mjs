@@ -3,9 +3,9 @@ import {documentIntakeUI} from './intake-ui.mjs?v=20261111-clean-layout1';
 import {billingUI} from './billing-ui.mjs?v=20261111-clean-layout1';
 import {patientsUI} from './patients-ui.mjs?v=20261111-active-flag2';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261109-calendar1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261112-provision1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261108-oatfh1';
-import {MaidRepository} from './clinic-roster-repository.mjs?v=20261108-planning1';
+import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
 import {OatRepository} from './oat-roster-repository.mjs?v=20261108-oat1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
 

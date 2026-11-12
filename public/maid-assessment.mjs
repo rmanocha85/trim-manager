@@ -17,7 +17,7 @@ export function assessmentToday(now=new Date()){
 }
 export function assessmentPlanningText(patient,now=new Date()){
   const s=patient.assessmentSchedule;
-  if(patient.assessmentDate&&(!s?.date||patient.assessmentDate>=s.date))return {label:`Completed ${assessmentDateLabel(patient.assessmentDate)}`,past:false};
+  if(patient.assessmentDate&&(!s?.date||patient.assessmentDate>=s.date))return {label:`Completed: ${assessmentDateLabel(patient.assessmentDate)}`,past:false};
   if(!s?.date)return {label:'Not scheduled',past:false};
-  return {label:assessmentDateLabel(s.date),past:s.date<assessmentToday(now)};
+  return {label:`Scheduled: ${assessmentDateLabel(s.date)}`,past:s.date<assessmentToday(now)};
 }
