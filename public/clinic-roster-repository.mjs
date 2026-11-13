@@ -1,5 +1,6 @@
 import {closeoutSteps,checkpointDone,isProvisionClosed} from './maid-lifecycle.mjs';
-import {assessmentTimeZone,validateAssessmentPlanning} from './maid-assessment.mjs';
+import {assessmentTimeZone,validateAssessmentPlanning} from './maid-assessment.mjs?v=20261112-provision1';
+import {validateProvisionSchedule,updateProvisionSchedule} from './maid-provision.mjs';
 const V2='https://www.googleapis.com/drive/v2/files';
 const conflict=()=>Object.assign(new Error('MAID changed elsewhere. Reload the MAID list and review before trying again.'),{status:409});
 export function validateClinicRoster(data){
@@ -8,7 +9,7 @@ export function validateClinicRoster(data){
   for(const p of data.patients){
     if(!p||typeof p.id!=='string'||!p.id||typeof p.name!=='string'||!p.name.trim()||!['active','history'].includes(p.status)||ids.has(p.id)||p.phn&&(!/^\d{10}$/.test(p.phn)||phns.has(p.phn))||p.ava&&(!/^\d{6,10}$/.test(p.ava)||avas.has(p.ava))||p.contacts&&!Array.isArray(p.contacts)||p.statusHistory&&!Array.isArray(p.statusHistory))throw new Error('Invalid or duplicate clinic patient.');
     if(p.postProvision&&(!['pending','complete'].includes(p.postProvision.status)||p.postProvision.status==='complete'&&!isProvisionClosed(p)))throw new Error('Invalid provision closeout.');
-    validateAssessmentPlanning(p);
+    validateAssessmentPlanning(p);validateProvisionSchedule(p.plannedProvision);
     ids.add(p.id);if(p.phn)phns.add(p.phn);if(p.ava)avas.add(p.ava);
   }
   return data;
@@ -22,7 +23,7 @@ function mergeFacts(old,changes){
 export function applyMaidAction(data,action,now=new Date().toISOString()){
   validateClinicRoster(data);const next=structuredClone(data),p=next.patients.find(p=>p.id===action.patientId);
   if(action.type==='create'){
-    if(!action.patient)throw new Error('A verified patient is required.');next.patients.push(structuredClone(action.patient));
+    if(!action.patient)throw new Error('A verified patient is required.');validateProvisionSchedule(action.patient.plannedProvision,{strict:true});next.patients.push(structuredClone(action.patient));
   }else{
     if(!p)throw conflict();
     if(action.type==='remove')next.patients=next.patients.filter(x=>x.id!==p.id);
@@ -34,6 +35,7 @@ export function applyMaidAction(data,action,now=new Date().toISOString()){
     }else if(action.type==='update'){
       if(!action.changes||Object.keys(action.changes).some(k=>['id','phn','statusHistory','postProvision'].includes(k)))throw new Error('Identity, status history or closeout cannot be overwritten. Use the closeout action for checkpoints.');
       const updated=mergeFacts(p,action.changes);
+      if(Object.hasOwn(action.changes,'plannedProvision'))validateProvisionSchedule(updated.plannedProvision,{strict:true});
       if(action.changes.currentLocation)updated.location=updated.currentLocation.display_name||updated.currentLocation.label||updated.location;
       if(updated.status!==p.status)updated.statusHistory=[...(p.statusHistory||[]),{from:p.status,to:updated.status,at:now}];
       updated.updatedAt=now;next.patients[next.patients.indexOf(p)]=updated;
@@ -45,6 +47,13 @@ export function applyMaidAction(data,action,now=new Date().toISOString()){
         p.assessmentSchedule={...p.assessmentSchedule,date:s.date??null,time:s.time??null,timeZone:assessmentTimeZone,source:s.source,updatedAt:now};
       }
       if(action.urgency)p.assessmentUrgency={...p.assessmentUrgency,level:action.urgency.level,source:action.urgency.source,updatedAt:now};
+      p.updatedAt=now;
+    }else if(action.type==='provision-planning'){
+      if(isProvisionClosed(p)||p.provisionDate)throw new Error('Actual provision is already recorded; scheduling cannot change closeout.');
+      p.plannedProvision=updateProvisionSchedule(p.plannedProvision,action,now);
+      if(!action.cancel&&p.status!=='active'){
+        p.statusHistory=[...(p.statusHistory||[]),{from:p.status,to:'active',at:now}];p.status='active';
+      }
       p.updatedAt=now;
     }else if(action.type==='closeout'){
       if(isProvisionClosed(p))return data; // A retry cannot reopen or duplicate completed work.

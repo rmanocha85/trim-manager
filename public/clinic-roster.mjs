@@ -1,4 +1,6 @@
-import {assessmentPlanningText,assessmentDateLabel,assessmentToday} from './maid-assessment.mjs?v=20261109-calendar1';
+import {assessmentPlanningText} from './maid-assessment.mjs?v=20261112-provision1';
+import {dateCalendar} from './maid-date-calendar.mjs';
+import {provisionDefaults,provisionPlanningText,provisionMapUrl} from './maid-provision.mjs';
 import {avaChartUrl} from './patient-links.mjs';
 import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
@@ -11,7 +13,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   host.innerHTML=`<div class="clinic-heading"><div><h1>${title}</h1><p>${maid?'Current patients and assessment history.':'Your clinic list, in the order you provide.'}</p></div><span class="clinic-count" role="status" aria-live="polite"></span></div>
     <div class="clinic-toolbar">${maid?'<nav class="clinic-filters" aria-label="MAID patient status"><button data-view="active" aria-pressed="true">Active</button><button data-view="history" aria-pressed="false">History</button><button data-view="all" aria-pressed="false">All</button></nav>':''}<input type="search" aria-label="Search ${title}" placeholder="${maid?'Search name, PHN or location':'Search name, PHN or Ava number'}" autocomplete="off"></div>
     <p class="clinic-load-status" role="status" aria-live="polite" hidden></p>
-    <div class="clinic-table-wrap" role="region" aria-label="${title} patient list" tabindex="0"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient</th><th scope="col">PHN</th>${maid?'<th scope="col">Patient phone</th><th scope="col">Primary / family contact</th>':''}${maid?'<th scope="col">Location</th>':''}${maid?'<th scope="col" class="clinic-planning-heading">1634 scheduling</th><th scope="col">Assessment completed</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
+    <div class="clinic-table-wrap" role="region" aria-label="${title} patient list" tabindex="0"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient</th><th scope="col">PHN</th>${maid?'<th scope="col">Patient phone</th><th scope="col">Primary / family contact</th>':''}${maid?'<th scope="col">Location</th>':''}${maid?'<th scope="col" class="clinic-planning-heading">Assessment</th><th scope="col">Provision</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
     <div class="clinic-empty"><h2>Waiting for your patient list</h2><p>${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.</p></div><p class="clinic-feedback" role="status" aria-live="polite"></p>`;
   if(onReload){const reload=document.createElement('button');reload.textContent=maid?'Reload MAID':'Reload OAT FH';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
   const dialog=document.createElement('dialog');dialog.className='clinic-remove-dialog';dialog.innerHTML='<form method="dialog"><h2>Remove patient from MAID?</h2><p class="remove-name"></p><p>This deletes all of their tracking information from Active and History. Their original documents and folders stay in place.</p><div class="actions"><button value="cancel">Cancel</button><button value="remove" class="danger">Remove patient</button></div></form>';if(maid)host.append(dialog);
@@ -19,30 +21,13 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   planningDialog.innerHTML='<form><h2>1634 assessment planning</h2><p class="planning-name"></p><input name="date" type="hidden"><section class="planning-calendar" aria-label="Assessment date calendar"><div class="planning-calendar-nav"><button type="button" data-month="-1" aria-label="Previous month">‹</button><h3 aria-live="polite"></h3><button type="button" data-month="1" aria-label="Next month">›</button></div><div class="planning-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="planning-days"></div><button type="button" data-today>Current month</button><p class="planning-selected" aria-live="polite"></p></section><label>Request urgency<select name="urgency" aria-label="Request urgency"><option value="unknown">Not specified</option><option value="routine">Routine / non-urgent</option><option value="semi-urgent">Semi-urgent</option><option value="urgent">Urgent</option></select></label><p class="planning-error" role="alert"></p><div class="actions"><button type="button" data-cancel>Cancel</button><button type="button" data-clear>Clear date</button><button type="submit">Save planning</button></div></form>';
   if(maid)host.append(planningDialog);
   const planningForm=planningDialog.querySelector('form'),dateInput=planningForm.elements.namedItem('date'),urgencyInput=planningForm.elements.namedItem('urgency');
-  let calendarMonth=assessmentToday().slice(0,7);
-  function renderCalendar(){
-    const first=new Date(calendarMonth+'-01T12:00:00Z'),year=first.getUTCFullYear(),month=first.getUTCMonth();
-    planningDialog.querySelector('.planning-calendar h3').textContent=new Intl.DateTimeFormat('en-CA',{month:'long',year:'numeric',timeZone:'UTC'}).format(first);
-    planningDialog.querySelector('.planning-selected').textContent=dateInput.value?`Selected: ${assessmentDateLabel(dateInput.value)}`:'No date selected';
-    const days=planningDialog.querySelector('.planning-days');days.replaceChildren();
-    for(let i=0;i<first.getUTCDay();i++)days.append(document.createElement('span'));
-    const last=new Date(Date.UTC(year,month+1,0)).getUTCDate(),today=assessmentToday();
-    for(let day=1;day<=last;day++){
-      const date=`${calendarMonth}-${String(day).padStart(2,'0')}`,button=document.createElement('button');button.type='button';button.textContent=String(day);button.dataset.date=date;
-      button.setAttribute('aria-label',assessmentDateLabel(date));button.setAttribute('aria-pressed',String(dateInput.value===date));if(date===today)button.setAttribute('aria-current','date');
-      button.onclick=()=>{dateInput.value=date;renderCalendar();days.querySelector(`[data-date="${date}"]`).focus();};days.append(button);
-    }
-  }
-  planningDialog.querySelectorAll('[data-month]').forEach(button=>button.onclick=()=>{
-    const month=new Date(calendarMonth+'-01T12:00:00Z');month.setUTCMonth(month.getUTCMonth()+Number(button.dataset.month));calendarMonth=month.toISOString().slice(0,7);renderCalendar();
-  });
-  planningDialog.querySelector('[data-today]').onclick=()=>{calendarMonth=assessmentToday().slice(0,7);renderCalendar();};
+  const calendar=dateCalendar(planningDialog,dateInput);
   planningDialog.querySelector('[data-cancel]').onclick=()=>planningDialog.close();
-  planningDialog.querySelector('[data-clear]').onclick=()=>{dateInput.value='';renderCalendar();};
+  planningDialog.querySelector('[data-clear]').onclick=()=>{dateInput.value='';calendar.render();};
   planningDialog.addEventListener('close',()=>{render();onChange();});
   function editPlanning(p){
     if(busy||!ready||planningDialog.open)return;
-    dateInput.value=p.assessmentSchedule?.date||'';calendarMonth=assessmentToday().slice(0,7);renderCalendar();urgencyInput.value=p.assessmentUrgency?.level||'unknown';
+    dateInput.value=p.assessmentSchedule?.date||'';calendar.reset();urgencyInput.value=p.assessmentUrgency?.level||'unknown';
     planningDialog.querySelector('.planning-name').textContent=p.name;planningDialog.querySelector('.planning-error').textContent='';
     planningForm.onsubmit=async event=>{
       event.preventDefault();
@@ -53,10 +38,43 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
     };
     planningDialog.showModal();render();onChange();
   }
+  const provisionDialog=document.createElement('dialog');provisionDialog.className='clinic-planning-dialog clinic-provision-dialog';provisionDialog.setAttribute('aria-label','Schedule provision');
+  provisionDialog.innerHTML='<form><h2>Schedule provision</h2><p class="planning-name"></p><input name="date" type="hidden"><section class="planning-calendar" aria-label="Provision date calendar"><div class="planning-calendar-nav"><button type="button" data-month="-1" aria-label="Previous month">‹</button><h3 aria-live="polite"></h3><button type="button" data-month="1" aria-label="Next month">›</button></div><div class="planning-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="planning-days"></div><button type="button" data-today>Current month</button><p class="planning-selected" aria-live="polite"></p></section><label>Start time (Pacific)<input name="time" type="time" required></label><label>Venue<input name="location" type="text" placeholder="Home, hospice or facility" required></label><label>Full address<textarea name="address" rows="2" required></textarea></label><p class="planning-help">Confirm the procedure venue and address. Saving updates the patient list; calendar events are managed separately.</p><p class="planning-error" role="alert"></p><div class="actions"><button type="button" data-dismiss>Cancel</button><button type="button" data-cancel-booking>Cancel appointment</button><button type="submit">Save provision</button></div></form>';
+  if(maid)host.append(provisionDialog);
+  const provisionForm=provisionDialog.querySelector('form'),provisionInputs=Object.fromEntries(['date','time','location','address'].map(key=>[key,provisionForm.elements.namedItem(key)]));
+  const provisionCalendar=dateCalendar(provisionDialog,provisionInputs.date);
+  provisionDialog.querySelector('[data-dismiss]').onclick=()=>provisionDialog.close();
+  provisionDialog.addEventListener('close',()=>{render();onChange();});
+  function editProvision(p){
+    if(busy||!ready||provisionDialog.open||isProvisionPending(p))return;
+    const defaults=provisionDefaults(p);for(const key of Object.keys(provisionInputs))provisionInputs[key].value=defaults[key];
+    provisionCalendar.reset();provisionDialog.querySelector('.planning-name').textContent=p.name;provisionDialog.querySelector('.planning-error').textContent='';
+    const cancel=provisionDialog.querySelector('[data-cancel-booking]');cancel.hidden=!p.plannedProvision?.date||p.plannedProvision.status==='cancelled';
+    cancel.onclick=async()=>{provisionDialog.close();await act({type:'provision-planning',patientId:p.id,cancel:true,source:'Physician cancelled appointment in MAID app'});};
+    provisionForm.onsubmit=async event=>{
+      event.preventDefault();
+      if(!provisionInputs.date.value){provisionDialog.querySelector('.planning-error').textContent='Choose the provision date on the calendar.';return;}
+      if(!provisionInputs.location.value.trim()||!provisionInputs.address.value.trim()){provisionDialog.querySelector('.planning-error').textContent='Enter the procedure venue and full address.';return;}
+      const schedule=Object.fromEntries(Object.entries(provisionInputs).map(([key,input])=>[key,input.value.trim()]));schedule.source='Physician confirmed appointment in MAID app';
+      provisionDialog.close();await act({type:'provision-planning',patientId:p.id,schedule});
+    };
+    provisionDialog.showModal();render();onChange();
+  }
+  function renderProvision(row,p){
+    const td=cell(row,'');td.className='clinic-provision-planning';const summary=provisionPlanningText(p),label=document.createElement('span');label.textContent=summary.label;td.append(label);
+    if(p.plannedProvision?.source)label.title=p.plannedProvision.source;
+    if(!p.provisionDate&&p.plannedProvision?.status!=='cancelled'){
+      const venue=p.plannedProvision?.location||p.plannedProvision?.venue;if(venue){const name=document.createElement('small');name.textContent=venue;td.append(name);}
+      const address=p.plannedProvision?.address,url=provisionMapUrl(address);if(url){const link=document.createElement('a');link.className='clinic-provision-address';link.textContent=address+' ↗';link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.referrerPolicy='no-referrer';link.title='Open address in Google Maps';td.append(link);}
+      if(summary.incomplete){const missing=document.createElement('small');missing.textContent='Confirm missing booking details';td.append(missing);}
+      if(summary.past){const past=document.createElement('small');past.className='clinic-planning-overdue';past.textContent='Past date — confirm outcome';td.append(past);}
+    }
+    if(onAction&&!isProvisionPending(p)){const edit=document.createElement('button');edit.type='button';edit.className='clinic-provision-edit';edit.textContent='Edit';edit.setAttribute('aria-label',`Edit provision for ${p.name}`);edit.disabled=busy||!ready;edit.onclick=()=>editProvision(p);td.append(edit);}
+  }
   async function act(action){
     if(busy||!ready||!onAction)return;busy=true;onChange();render();
     let message='';
-    try{const result=await onAction(action);patients=structuredClone(result.patients);message=action.type==='remove'?'Patient removed.':action.type==='assessment-planning'?'Assessment planning saved.':'Patient status saved.';if(result.local)message+=' Saved to the laptop Drive folder; cloud sync is unverified.';}
+    try{const result=await onAction(action);patients=structuredClone(result.patients);message=action.type==='remove'?'Patient removed.':action.type==='assessment-planning'?'Assessment planning saved.':action.type==='provision-planning'?(action.cancel?'Provision cancelled.':'Provision scheduled.'):'Patient status saved.';if(result.local)message+=' Saved to the laptop Drive folder; cloud sync is unverified.';}
     catch(error){patients=[];ready=false;loaded=false;loadState='error';loadMessage=error.message+' Reload MAID to check the saved list before continuing.';message=loadMessage;}
     finally{busy=false;render();feedback.textContent=message;onChange();}
   }
@@ -96,13 +114,13 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
     if(groups.other.length){const heading=document.createElement('small');heading.className='clinic-contact-heading';heading.textContent='Other contacts';others.append(heading);for(const c of groups.other)others.append(contactCard(c));}
   }
   function render(){
-    body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open);
+    body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open||provisionDialog.open);
     const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!['loading','error'].includes(loadState);
     loadStatus.textContent=loadState==='error'?loadMessage+(loaded?(maid?' Showing the last loaded list; changes are disabled until reload succeeds.':' Showing the last loaded list.'): ''):loaded?`Refreshing ${title} patients…`:`Loading ${title} patients…`;
-    const showPlanning=maid&&view==='active';host.querySelector('.clinic-planning-heading')?.toggleAttribute('hidden',!showPlanning);
+    const showPlanning=maid;
     const appPatients=maid?maidAppPatients(patients):patients;
     const inView=appPatients.map((patient,index)=>({patient,index})).filter(({patient})=>!maid||view==='all'||(isProvisionPending(patient)?'active':patient.status)===view);
-    const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,patientLocation(p),...appContacts(p.contacts).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
+    const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,patientLocation(p),p.plannedProvision?.location,p.plannedProvision?.address,...appContacts(p.contacts).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
     count.textContent=!loaded?(loadState==='loading'?'Loading patients…':loadState==='error'?'Patient list unavailable':'Patient list not loaded'):`${visible.length} of ${inView.length} patients`;
     empty.hidden=visible.length>0;
     if(!visible.length){
@@ -134,14 +152,14 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
           if(summary.past){const overdue=document.createElement('small');overdue.className='clinic-planning-overdue';overdue.textContent='Past date — confirm outcome';plan.append(overdue);}
           const level=p.assessmentUrgency?.level||'unknown';
           if(level==='semi-urgent'){const badge=document.createElement('small');badge.className='clinic-urgency-badge';badge.textContent='Semi-urgent';badge.title=p.assessmentUrgency.source;plan.append(badge);}
-          if(onAction&&!isProvisionPending(p)){
+          if(onAction&&view==='active'&&!isProvisionPending(p)){
             const actions=document.createElement('div');actions.className='clinic-planning-actions';
             const edit=document.createElement('button');edit.textContent='Edit';edit.setAttribute('aria-label',`Edit 1634 planning for ${p.name}`);edit.disabled=busy||!ready;edit.onclick=()=>editPlanning(p);
             const urgent=document.createElement('button');urgent.className='clinic-urgent-toggle';urgent.textContent=level==='urgent'?'Urgent':'Mark urgent';urgent.setAttribute('aria-pressed',String(level==='urgent'));urgent.setAttribute('aria-label',`${level==='urgent'?'Clear urgent':'Mark urgent'} for ${p.name}`);urgent.disabled=busy||!ready;urgent.title=p.assessmentUrgency?.source||'Mark this request urgent';urgent.onclick=()=>act({type:'assessment-planning',patientId:p.id,urgency:{level:level==='urgent'?'routine':'urgent',source:'Physician edit in MAID app'}});
             actions.append(edit,urgent);plan.append(actions);
           }else if(level==='urgent'){const badge=document.createElement('small');badge.className='clinic-urgency-badge';badge.textContent='Urgent';plan.append(badge);}
         }
-        cell(row,p.assessmentDate||'Not recorded');cell(row,p.form1645===true?'Yes':p.form1645===false?'No':'Not verified');
+        renderProvision(row,p);cell(row,p.form1645===true?'Yes':p.form1645===false?'No':'Not verified');
         const detail=cell(row,'');const disclosure=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Details';disclosure.append(summary);
         const list=document.createElement('dl');
         for(const [label,value] of [['1632 signed',p.forms?.['1632']?.signedDate],['1633 signed',p.forms?.['1633']?.signedDate],['1633 doctor / NP',p.forms?.['1633']?.practitioner],['1634 completed',p.forms?.['1634']?.completedDate],['1645 signed',p.forms?.['1645']?.signedDate]]){
@@ -166,7 +184,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   host.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{view=button.dataset.view;host.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render();});
   render();
   return {
-    state(){return {busy:busy||planningDialog.open,ready,loading:loadState==='loading',dirty:false};},
+    state(){return {busy:busy||planningDialog.open||provisionDialog.open,ready,loading:loadState==='loading',dirty:false};},
     setPatients(records){if(busy)return;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
     loading({preserve=true}={}){ready=false;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
     error(message){ready=false;loadState='error';loadMessage=message;render();}

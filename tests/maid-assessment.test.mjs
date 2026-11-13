@@ -20,8 +20,8 @@ test('invalid dates, time without date and unsupported urgency are rejected for 
 });
 test('past dates request confirmation without marking assessment complete; date-only plans supported',()=>{
  const now=new Date('2026-11-08T20:00:00Z');const p={assessmentSchedule:{date:'2026-11-07',time:null}};
- assert.deepEqual(assessmentPlanningText(p,now),{label:'Sat, NOV 7, 2026',past:true});assert.equal(p.assessmentDate,undefined);
- assert.equal(assessmentPlanningText({...p,assessmentDate:'2026-11-07'},now).label,'Completed Sat, NOV 7, 2026');
+ assert.deepEqual(assessmentPlanningText(p,now),{label:'Scheduled: Sat, NOV 7, 2026',past:true});assert.equal(p.assessmentDate,undefined);
+ assert.equal(assessmentPlanningText({...p,assessmentDate:'2026-11-07'},now).label,'Completed: Sat, NOV 7, 2026');
  assert.equal(assessmentPlanningText({assessmentSchedule:{date:'2026-11-08',time:'09:30'}},now).past,false);
  assert.equal(assessmentPlanningText({},now).label,'Not scheduled');
 });
