@@ -1,5 +1,12 @@
 # Planned improvements
 
+## PMHx import status and MOST display — implemented November 13, 2026
+
+- PMHx uploaded is checked automatically from a completed, archived, patient- and workspace-matched history import receipt. Existing admission/history imports are recognized from their saved source descriptions; new analyses explicitly classify whether the attached sources supply patient history.
+- The source date/name appear in the checkbox tooltip. An automatic check is read-only; manual completion remains available when no qualifying receipt exists. Lab-only, medication-only, queued, failed, held, or mismatched imports do not check it.
+- Clinical review and medication reconciliation are independent and remain unchanged. The status is a display projection, so no duplicate roster completion field or clinical approval is written.
+- MOST wording such as “M1 (changed from M2)” displays the current M1 designation while retaining M2 as historical evidence. Unresolved competing current designations remain blank for review.
+
 ## Active issue tracking — implemented November 11, 2026
 
 Available in **My Patients**, **Other Patients**, and **All**.
