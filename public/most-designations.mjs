@@ -33,7 +33,7 @@ export function latestDocumentedMost(evidence){
     const proposalAfter=/^\s*(?:was\s+)?(?:propos\w*|recommend\w*|under consideration|not (?:ordered|confirmed)|not an order)\b/i.test(after);
     const blank=/\b(?:unfilled|blank|template alternatives)\b/i.test(before);
     if(prospective||proposalAfter||blank){uncertain=true;continue;}
-    const historical=(transition&&i===0)||(supersedes&&i===1)||/\b(earlier|previous|prior|historical|formerly|initially)\b/i.test(before);
+    const historical=(transition&&i===0)||(supersedes&&i===1)||/\b(earlier|previous|prior|historical|formerly|initially)\b/i.test(before)||/\bchanged?\s+from\s*$/i.test(before);
     const current=(transition&&i===1)||(supersedes&&i===0)||/\b(current|latest documented|review records|retains?|retained|remains?|continues?|continued|left|leave)\b/i.test(before+' '+after);
     candidates.push({status,date:sourceDate(before+' '+after),historical,current});
    }

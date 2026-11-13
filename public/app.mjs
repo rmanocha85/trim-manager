@@ -1,7 +1,7 @@
-import {refreshIdentities} from './patient-identity.mjs?v=20261105-flags1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261111-clean-layout1';
-import {billingUI} from './billing-ui.mjs?v=20261111-clean-layout1';
-import {patientsUI} from './patients-ui.mjs?v=20261111-active-flag2';
+import {refreshIdentities} from './patient-identity.mjs?v=20261113-history1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261113-history1';
+import {billingUI} from './billing-ui.mjs?v=20261113-history1';
+import {patientsUI} from './patients-ui.mjs?v=20261113-history1';
 import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261109-calendar1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261108-oatfh1';
@@ -120,7 +120,7 @@ async function start(){
   oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onReload:refreshOat});
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs?v=20261108-units1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  notes=laptop?(await import('./notes-ui.mjs?v=20261113-history1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
   intake=documentIntakeUI({state:()=>billing.state(),notes,onRecordsConnected:refreshClinics,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([

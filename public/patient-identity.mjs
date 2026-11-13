@@ -1,5 +1,6 @@
-import {withProfile} from './profile-display.mjs?v=20261031-compact1';
+import {withProfile} from './profile-display.mjs?v=20261113-history1';
 import {avaChartUrl} from './patient-links.mjs';
+import {formatTimestamp} from './dates.mjs';
 import {today,dateParts} from './patients-core.mjs?v=20261105-flags1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const MOST_OPTIONS=['','CPR C2','DNACPR C2','DNACPR C1','DNACPR M3','DNACPR M2','DNACPR M1'];
@@ -33,7 +34,19 @@ export function bindIdentity(root){
   });
 }
 
-export function refreshIdentities(root){for(const el of root.querySelectorAll('[data-profile-phn]')){const d=el.dataset;el.outerHTML=demographicsHTML({phn:d.profilePhn,dateOfBirth:d.profileDob,mostStatus:d.profileMost,newPanelPatient:d.profileNew==='yes',panelAddedDate:d.profileAdded});}}
+export function refreshIdentities(root){for(const el of root.querySelectorAll('[data-profile-phn]')){const d=el.dataset;el.outerHTML=demographicsHTML({phn:d.profilePhn,dateOfBirth:d.profileDob,mostStatus:d.profileMost,newPanelPatient:d.profileNew==='yes',panelAddedDate:d.profileAdded});}refreshPmhxUploads(root);}
+export function pmhxUploadedHTML(p,editable){
+ const imported=withProfile(p).historyImport;
+ const title=imported?'Automatically recorded from '+imported.sourceName+' · '+formatTimestamp(imported.importedAt):p.pmhxUploadedDate?'Completed '+p.pmhxUploadedDate:'Not yet marked complete';
+ return `<label class="med-reconciliation" title="${esc(title)}"><input type="checkbox" data-pmhx-uploaded="${esc(p.id)}" data-pmhx-phn="${esc(p.phn)}" data-pmhx-manual="${esc(p.pmhxUploadedDate||'')}" data-pmhx-editable="${editable?'yes':'no'}" data-change="togglePmhxUploaded('${esc(p.id)}')" aria-label="PMHx uploaded for ${esc(p.name)}" ${imported||p.pmhxUploadedDate?'checked':''} ${!editable||imported?'disabled':''}><span>PMHx uploaded</span></label>`;
+}
+export function refreshPmhxUploads(root){
+ for(const input of root.querySelectorAll('[data-pmhx-uploaded]')){
+  const imported=withProfile({phn:input.dataset.pmhxPhn}).historyImport;
+  input.checked=Boolean(imported||input.dataset.pmhxManual);input.disabled=input.dataset.pmhxEditable!=='yes'||Boolean(imported);
+  input.closest('label').title=imported?'Automatically recorded from '+imported.sourceName+' · '+formatTimestamp(imported.importedAt):input.dataset.pmhxManual?'Completed '+input.dataset.pmhxManual:'Not yet marked complete';
+ }
+}
 
 /* Heart-handshake icon: Lucide, https://lucide.dev/icons/heart-handshake
 ISC License
