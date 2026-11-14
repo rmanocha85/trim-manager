@@ -1,0 +1,11 @@
+:root {
+  font-family: Inter, "Segoe UI", sans-serif;
+  color: #242b25;
+  background: #f0ede6;
+  line-height: 1.6;
+}
+body { margin: 0; }
+main { max-width: 42rem; margin: 0 auto; padding: 2.5rem 1.25rem; }
+h1, h2 { color: #183a28; line-height: 1.2; }
+h2 { margin-top: 2rem; font-size: 1.25rem; }
+a { color: #2d5a3d; text-underline-offset: .15em; }

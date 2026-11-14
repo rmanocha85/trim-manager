@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Privacy policy · TRIM Patient Manager</title>
+  <link rel="stylesheet" href="./policy.css">
+</head>
+<body>
+  <main>
+    <a href="./">TRIM Patient Manager</a>
+    <h1>Privacy policy</h1>
+    <p>TRIM Billing is a private workspace for managing a patient roster and recording billable visits. It uses Google Drive to open the workspace files and save the operator’s changes.</p>
+    <h2>Google Drive access</h2>
+    <p>For routine billing, TRIM requests access to files created by or made available to the app. It reads the roster and billing files and can save edits and backups to Drive. Optional patient-record features request broader Drive access separately to find and work with existing records. The billing renewal service uses only the narrower file permission.</p>
+    <h2>Where information is stored</h2>
+    <p>In the hosted billing app, Chrome exchanges record contents directly with Google Drive. Chrome also keeps local recovery data so the operator can recover unfinished work on the same device. The public website on GitHub Pages serves the application code.</p>
+    <p>To renew access, the TRIM service on Google Cloud checks the operator’s Google account email. It stores the email, a Google refresh token, a value that ties the session to the browser, and an expiry time in an encrypted Firestore database. Patient and billing records stay outside that database. The service accepts a session for up to 30 days and schedules expired entries for deletion.</p>
+    <h2>Managing access and stored data</h2>
+    <p>Choose <strong>Lock app</strong> to end this browser’s session. When the renewal service is reachable, locking also removes the server session. To revoke Google access, remove the app from <a href="https://myaccount.google.com/connections">your Google Account connections</a>. Revoking access leaves your Drive files in place.</p>
+    <p>The operator manages workspace files and backups in Drive. Clearing this site’s Chrome data removes local recovery data and can discard unsaved work. Save any pending changes first.</p>
+    <p>For a privacy or data request, use the developer support contact shown on the Google consent screen. Omit patient identifiers from the request.</p>
+    <nav><a href="./terms.html">Terms of use</a></nav>
+  </main>
+</body>
+</html>
