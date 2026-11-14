@@ -18,6 +18,17 @@ export class OatStore {
     try{
       const current=await this.load();if(current.etag!==expected)throw new Error('OAT changed elsewhere. Reload before retrying.');
       const next=validateOatRoster(await mutator(structuredClone(current.roster)));
+      // Imports rebuild the day's rows. Carry a finished visit forward only for
+      // one unambiguous patient at the same time on the same clinic date.
+      for(const day of next.clinicDays||[]){
+        const old=current.roster.clinicDays?.find(d=>d.date===day.date);if(!old)continue;
+        const key=s=>JSON.stringify([s.time,s.patientId?'id':'name',s.patientId||s.sourceName]);
+        for(const slot of day.appointments){
+          if(slot.finished!==undefined||!slot.patientId&&!slot.sourceName)continue;
+          const k=key(slot),matches=old.appointments.filter(s=>key(s)===k);
+          if(matches.length===1&&matches[0].finished===true&&day.appointments.filter(s=>key(s)===k).length===1){slot.finished=true;if(matches[0].finishedAt)slot.finishedAt=matches[0].finishedAt;}
+        }
+      }
       const text=JSON.stringify(next,null,2)+'\n',file=await open(temporary,'wx');try{await file.writeFile(text);await file.sync();}finally{await file.close();}
       if((await this.load()).etag!==expected)throw new Error('OAT changed during preparation. Nothing replaced.');
       await rename(temporary,this.filename);const saved=await this.load();if(saved.etag!==hash(text))throw new Error('OAT readback differed. Reload before continuing.');return saved;

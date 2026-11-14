@@ -1,5 +1,13 @@
 # Planned improvements
 
+## OAT FH clinic day and TRIM visit list — November 13, 2026
+
+- Choose a clinic date on the calendar, or choose Upcoming Friday. Search the selected day by name, PHN or note. Each verified PHN has a copy button.
+- Finished saves only that appointment to the private OAT roster. Show Completed reveals it; uncheck to return it to the active list. A conflicting edit requires a reload. Re-importing a schedule retains completion only for an unambiguous matching visit.
+- Roster → Copy visit list previews Active issue and ADP patients, with unit, room and active issue description. Choose My Patients, Other Patients or All. Patients appear once and roster searches do not limit the list.
+- Drive retries short interruptions on reads. Save and Refresh renew expired access in the user action and verify the account. An uncertain write is never automatically repeated. Tokens remain in memory; unattended renewal is not configured on GitHub Pages.
+
+
 ## PMHx import status and MOST display — implemented November 13, 2026
 
 - PMHx uploaded is checked automatically from a completed, archived, patient- and workspace-matched history import receipt. Existing admission/history imports are recognized from their saved source descriptions; new analyses explicitly classify whether the attached sources supply patient history.

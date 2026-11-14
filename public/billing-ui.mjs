@@ -3,7 +3,7 @@ import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=202610
 import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261107-workflow1';
 import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261107-workflow1';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261107-workflow1';
-import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261031-compact1';
+import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261113-combined1';
 import {avaChartUrl} from './patient-links.mjs';
 import {planNewPatients} from './core.mjs?v=20261107-workflow1';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
@@ -444,7 +444,7 @@ async function syncSession(save=true){
   if(saving||checking)return;checking=true;updateWriteLock();
   try{
     if(!navigator.onLine)throw new Error('Reconnect to the internet. Your local work is retained.');
-    if(!driveReachable)await adapter.connect();
+    await adapter.ensureConnected();
     await recoveryQueue;
     const current=await adapter.load();remoteBilling=clone(current.ledger);checkedDrive();roster=patients.state().ready?normalizeRoster(patients.roster()):await adapter.roster();
     if(!dirty||sameBillingContent(ledger,current.ledger)){await adoptSaved(current);checking=false;applyNewPatientPlans();if(save&&dirty)await flush();renderAll();return;}
@@ -480,7 +480,7 @@ async function discardLocal(){
   checking=true;updateWriteLock();
   try{
     if(!navigator.onLine)throw new Error('Reconnect first. Your local changes have not been discarded.');
-    if(!driveReachable)await adapter.connect();
+    await adapter.ensureConnected();
     await recoveryQueue;
     const current=await adapter.load();validateLedger(current.ledger);
     if(current.ledger.datasetId!==ledger.datasetId)throw new Error('Wrong billing file. Your draft has not been discarded.');
@@ -512,7 +512,7 @@ async function loadLatest(){
   if(saving||checking||loadingLatest)return;
   loadingLatest=true;updateWriteLock();
   try{
-    if(!driveReachable)await adapter.connect();
+    await adapter.ensureConnected();
     await patients.refresh(true);
     if(patients.state().error){onPatientConflict();return;}
     checkedDrive();await syncSession(false);const dateReset=await resetBillingDate();renderAll();
@@ -542,16 +542,22 @@ $('generate').onclick=safe(async()=>{
 $('print-report').onclick=()=>{printedSignature=signature();$('report-frame').contentWindow.focus();$('report-frame').contentWindow.print();};
 $('finalize').onclick=safe(async()=>{guardWrite();if(dirty||blocked||saving)throw new Error('Choose Save to Drive before handoff.');if(printedSignature!==signature())throw new Error('Generate and print/save the current batch first.');if(issuesFor(chosen()).length)throw new Error('Resolve the flagged billing information first.');if(!confirm('Confirm this exact batch was successfully saved/printed, reviewed, and actually given to Suzy. It will leave the next print batch, but its billing history stays saved.'))return;commit(finalizeBatch(ledger,chosen(),{from:$('batch-from').value,to:$('batch-to').value,layout:$('report-layout').value,reviewed:$('rules-reviewed').checked,delivered:true}));notice('Batch marked as given to Suzy locally. Choose Save to Drive to finish.');renderReports();renderHistory();updateWriteLock();});
 window.addEventListener('offline',()=>{driveReachable=false;connectionVerified=false;syncFailed=true;status('Offline — billing locked',true);});
-window.addEventListener('online',()=>{if(!connectionVerified)notice('Back online. Use Refresh from Drive to reconnect.');updateWriteLock();});
+window.addEventListener('online',async()=>{
+  if(!adapter||saving||checking||loadingLatest||adapter.needsRenewal?.()){updateWriteLock();return;}
+  const existing=adapter,revision=etag;
+  try{await existing.verify(revision);if(adapter!==existing||revision!==etag)return;checkedDrive();if(!blocked){connectionVerified=true;syncFailed=false;}notice('Back online. Connection verified.');}
+  catch(e){if(adapter!==existing)return;connectionError(e);notice(e.status===409?'Back online. Drive changed; refresh to reconcile.':e.message);}
+  finally{updateWriteLock();}
+});
 window.addEventListener('beforeunload',e=>{if(dirty||recoveryPending||backups.busy()){e.preventDefault();e.returnValue='';}});
 // Drive revisions are checked on opening, explicit refresh, and conditional saves.
 
 function renderSaveControls(){
   if(!$('drive-connection'))return;
   renderReviewBadge();
-  const offline=!navigator.onLine,connected=driveReachable&&!offline;
+  const offline=!navigator.onLine,connected=driveReachable&&!offline&&!adapter?.authExpired;
   $('drive-connection').dataset.state=connected?'ok':'error';
-  $('drive-connection').textContent=connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):'● Reconnect Drive';
+  $('drive-connection').textContent=connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):offline?'● Offline':adapter?.needsRenewal?.()?'● Renew Google access':'● Retry Drive';
   $('drive-connection').title=lastChecked?'Last checked '+formatTimestamp(lastChecked):'Check your connection without saving billing';
   $('drive-connection').disabled=saving||checking||loadingLatest||!adapter;
   const changes=localChanges(),count=changedBillCount(changes);
@@ -655,7 +661,7 @@ async function openLaptopWorkspace(){
     status:()=>({dirty,busy:saving||checking||loadingLatest||recoveryPending>0,error:localRecoveryFailed||mergeConflicts.length>0,ready:!!ledger,mode:adapter?.mode}),
     showPatientHistory:key=>showPatientHistory(key,true),switchTab,recordRoutine,notify:notice,chooseConnection:openConnectionDialog,loadLatest,
     setRoster:raw=>{roster=normalizeRoster(raw);if(ledger){renderAll();notes.render();applyNewPatientPlans();}},
-    connectionStatus:()=>({mode:adapter?.mode,connected:driveReachable&&navigator.onLine,ready:!!ledger,lastChecked:lastChecked?.toISOString()}),
+    connectionStatus:()=>({mode:adapter?.mode,connected:driveReachable&&navigator.onLine&&!adapter?.authExpired,reason:!navigator.onLine?'offline':adapter?.authExpired?'expired':!driveReachable?'network':null,ready:!!ledger,lastChecked:lastChecked?.toISOString()}),
     localChanges,
   };
 

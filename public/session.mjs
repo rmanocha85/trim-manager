@@ -37,6 +37,6 @@ export function saveIndicator({states,session,unfinished=false,connection={}}){
  if(!connection.ready)return result('Connect to Drive','quiet','Open your workspace to load saved records.');
  if(pending.length)return result('● Changes pending','pending',pending.map(s=>s.name).join(', ')+' changes are on this device and still need Save to Drive.');
  if(unfinished)return result('● Form in progress','pending','Finish the patient form before saving to Drive.');
- if(!connection.connected)return result('⚠ Connection lost','error','Reconnect to verify the latest saved records.');
+ if(!connection.connected){if(connection.reason==='expired')return result('Renew Google access','error','Use Refresh from Drive or Save to renew access.');if(connection.reason==='offline'||connection.reason==='network')return result(connection.reason==='offline'?'Offline':'Drive unreachable','error','Your work stays on this device. Retry when the connection returns.');return result('⚠ Connection lost','error','Reconnect to verify the latest saved records.');}
  return result(local?'✓ Saved to folder':'✓ Saved to Drive','ok',local?'Saved in the laptop Drive folder; cloud sync is unverified.':'No local changes. Matches the verified Drive copy. Click for details.');
 }

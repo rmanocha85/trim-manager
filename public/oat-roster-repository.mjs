@@ -1,5 +1,5 @@
 import {validateClinicRoster} from './clinic-roster-repository.mjs';
-import {validateClinicDays} from './oat-schedule.mjs';
+import {validateClinicDays,finishAppointment} from './oat-schedule.mjs?v=20261113-combined1';
 const V2='https://www.googleapis.com/drive/v2/files';
 const FOLDER='1d90SEhco30YL0AAE20gt11pzFBjOOJUn';
 export function validateOatRoster(data){
@@ -8,9 +8,20 @@ export function validateOatRoster(data){
   validateClinicDays(data.clinicDays??[],data.patients);
   return data;
 }
-// Read the canonical private JSON only. Never create, upload or cache patient records.
+// The only UI write is a conditional, appointment-scoped completion change.
 export class OatRepository {
   constructor(adapter){this.adapter=adapter;}
+  async finish(action){
+    await this.adapter.ensureConnected?.();
+    const current=await this.load();
+    const next=validateOatRoster(finishAppointment(current.roster,action));
+    if(this.adapter.mode==='local')return this.adapter.request('/api/oat-fh/roster',{method:'POST',headers:{'Content-Type':'application/json','If-Match':current.etag},body:JSON.stringify(action)});
+    const id=await this.locate();
+    await this.adapter.request(`https://www.googleapis.com/upload/drive/v2/files/${id}?uploadType=media`,{method:'PUT',headers:{'Content-Type':'application/json','If-Match':current.etag},body:JSON.stringify(next,null,2)+'\n'});
+    const saved=await this.load();
+    if(JSON.stringify(saved.roster)!==JSON.stringify(next))throw new Error('Completion save could not be verified. Reload OAT FH.');
+    return saved;
+  }
   async locate(){
     if(this.fileId)return this.fileId;
     const q=encodeURIComponent(`'${FOLDER}' in parents and title = 'oat-fh-roster.json' and trashed = false`);

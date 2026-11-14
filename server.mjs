@@ -17,6 +17,7 @@ import {LocalBackupStore} from './backup-storage.mjs';
 import {snapshot,hash} from './public/backups.mjs';
 import {MaidStore} from './maid-storage.mjs';
 import {OatStore} from './oat-storage.mjs';
+import {finishAppointment} from './public/oat-schedule.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const home=os.homedir();
 const testRoot=process.env.TRIM_TEST_MODE==='1'?path.join(os.tmpdir(),'trim-isolated-no-live-data'):null;
@@ -52,6 +53,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('clinic-roster-repository.mjs');
   allowed.add('oat-roster-repository.mjs');
   allowed.add('oat-workspace.mjs');allowed.add('oat-schedule.mjs');
+  allowed.add('visit-list.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
   const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};
   const lifecycle=new ServiceLifecycle({...lifecycleOptions,onDemand});let activeRequests=0,closing=false;
@@ -92,7 +94,8 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         }
         if(url.pathname==='/api/oat-fh/roster'){
           if(req.method==='GET')return json(200,await oatStore.load());
-          return json(405,{error:'OAT FH roster access is read-only.'});
+          if(req.method==='POST'){const action=await readJSON();return json(200,await oatStore.update(req.headers['if-match'],roster=>finishAppointment(roster,action)));}
+          return json(405,{error:'Unsupported OAT FH action.'});
         }
         if(url.pathname==='/api/maid/roster'){
           if(req.method==='GET')return json(200,await maidStore.load());

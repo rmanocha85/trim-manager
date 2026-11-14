@@ -6,6 +6,7 @@ import {formatDate,formatTimestamp} from './dates.mjs';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
 import * as TrimRoster from './patients-core.mjs?v=20261111-active-issue1';
 import {rosterPrintPages} from './roster-print.mjs';
+import {visitList} from './visit-list.mjs?v=20261113-combined1';
 import {RosterRepository} from './roster-repository.mjs';
 import {mergeRoster} from './roster-merge.mjs?v=20261111-active-issue1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
@@ -32,7 +33,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261111-active-flag2');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261113-combined1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   const identityCSS=await fetch('./patient-identity.css?v=20261111-roster1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
@@ -43,6 +44,13 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   let rosterChoices={},rosterConflicts=[],refreshing=false,activeRosterTab='all-patients';
   let hospitalReturns={},issueDraft=null,issueSaving=false;
   const issueDialog=document.createElement('dialog');issueDialog.id='active-issue-dialog';issueDialog.setAttribute('aria-labelledby','active-issue-title');root.append(issueDialog);
+  const visitDialog=document.createElement('dialog');visitDialog.id='visit-list-dialog';visitDialog.setAttribute('aria-labelledby','visit-list-title');
+  visitDialog.innerHTML='<h2 id="visit-list-title">Active issues + ADP</h2><label>Include<select id="visit-list-scope"><option value="all">All patients</option><option value="patients">My Patients</option><option value="otherPatients">Other Patients</option></select></label><p class="visit-list-context"></p><textarea readonly aria-label="Patient visit list" rows="14"></textarea><p role="status"></p><div class="actions"><button data-copy-visits>Copy text</button><button data-close-visits>Close</button></div>';root.append(visitDialog);
+  function renderVisitList(){const list=visitList(liveRoster(),visitDialog.querySelector('select').value);visitDialog.querySelector('textarea').value=list.text;visitDialog.querySelector('.visit-list-context').textContent=list.rows.length+' patients · Search filters do not limit this list.'+(dirty?' Includes your unsaved roster changes.':'');visitDialog.querySelector('[data-copy-visits]').disabled=!list.rows.length;visitDialog.querySelector('[role=status]').textContent='';}
+  function openVisitList(){if(!ready||inHistoryView)return;visitDialog.querySelector('select').value=activeRosterTab==='patients'?'patients':activeRosterTab==='other-patients'?'otherPatients':'all';renderVisitList();visitDialog.showModal();}
+  visitDialog.querySelector('select').onchange=renderVisitList;
+  visitDialog.querySelector('[data-close-visits]').onclick=()=>visitDialog.close();
+  visitDialog.querySelector('[data-copy-visits]').onclick=async()=>{const field=visitDialog.querySelector('textarea');try{await navigator.clipboard.writeText(field.value);visitDialog.querySelector('[role=status]').textContent='Copied.';}catch{field.focus();field.select();visitDialog.querySelector('[role=status]').textContent='Select and copy the highlighted text.';}};
   const review=document.createElement('dialog');review.id='roster-conflict-dialog';root.append(review);
   function showRosterConflicts(){
     const detail=value=>value===undefined?'Removed / not present':typeof value==='object'?JSON.stringify(value,null,2):String(value);
@@ -131,7 +139,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261105-flags1',location.href).href+'"><style>'+identityCSS+'body{background:white}.patient-flag{width:14px;height:14px;font-size:13px}.patient-flag svg{width:12px;height:12px}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
     dialog.showModal();
   }
-  const actions={openActiveIssue,updateToolbar,openBillingHistory,togglePmhxUploaded,toggleMedReconciliation,togglePatientFlag,returnToday,undoReturn,editHospitalDates,showPatientActions,renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
+  const actions={openVisitList,openActiveIssue,updateToolbar,openBillingHistory,togglePmhxUploaded,toggleMedReconciliation,togglePatientFlag,returnToday,undoReturn,editHospitalDates,showPatientActions,renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
   function argumentsFor(text,element){
     if(!text.trim())return [];const parts=text.match(/'(?:[^']*)'|\bthis\b|\d+/g)||[];
     if(parts.join(',').replace(/\s/g,'')!==text.replace(/\s/g,''))throw new Error('Invalid patient action.');

@@ -1,12 +1,12 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261113-history1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261113-history1';
-import {billingUI} from './billing-ui.mjs?v=20261113-history1';
-import {patientsUI} from './patients-ui.mjs?v=20261113-history1';
-import {Session,saveIndicator} from './session.mjs?v=20261107-workflow1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261113-combined1';
+import {billingUI} from './billing-ui.mjs?v=20261113-combined1';
+import {patientsUI} from './patients-ui.mjs?v=20261113-combined1';
+import {Session,saveIndicator} from './session.mjs?v=20261113-combined1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261112-provision1';
-import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261108-oatfh1';
+import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261113-combined1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
-import {OatRepository} from './oat-roster-repository.mjs?v=20261108-oat1';
+import {OatRepository} from './oat-roster-repository.mjs?v=20261113-combined1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
 
 if(laptopRuntime()){document.title='TRIM Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261111-n1';}
@@ -14,6 +14,7 @@ const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
 let oatRoster,oatRepository,oatPending,oatLoad=0;
 async function refreshOat(){
+  if(oatRoster?.state().busy)return;
   const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
   if(!adapter){oatRoster.error('Connect your workspace, then reload OAT FH.');return;}
   if(oatPending?.adapter===adapter)return oatPending.promise;
@@ -110,14 +111,18 @@ function status(){
   $('lock').disabled=busy;
   if($('load-latest'))$('load-latest').disabled=busy||!billing.state().adapter||!navigator.onLine;
 }
-async function saveSession(){try{await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');session.lastError=e.message;if(!session.message)session.message=e.message;billing.notify('');}finally{status();}}
+async function saveSession(){try{await billing.state().adapter?.ensureConnected?.();await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');session.lastError=e.message;if(!session.message)session.message=e.message;billing.notify('');}finally{status();}}
 async function start(){
   maidRoster=clinicRosterUI({host:$('maid-workspace'),kind:'maid',onChange:status,onReload:refreshMaid,onAction:async action=>{
     if(!maidSnapshot||!maidRepository)throw new Error('Reload MAID before editing.');
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
     return {patients:saved.roster.patients,local:maidRepository.adapter.mode==='local'};
   }});
-  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onReload:refreshOat});
+  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onFinish:async action=>{
+    if(!oatRepository)throw new Error('Reload OAT FH before editing.');
+    const repository=oatRepository;++oatLoad;
+    const saved=await repository.finish(action);return {...saved,local:repository.adapter.mode==='local'};
+  }});
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261113-history1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
@@ -126,6 +131,7 @@ async function start(){
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
     {name:'MAID',state:maidRoster.state,save:async()=>{}},
+    {name:'OAT FH',state:()=>({busy:oatRoster.state().busy}),save:async()=>{}},
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
@@ -157,7 +163,7 @@ async function start(){
   window.addEventListener('beforeunload',e=>{if(patients.hasChanges()){e.preventDefault();e.returnValue='';}});
 
   if(laptop){
-    const {LocalAdapter}=await import('./adapters.mjs?v=20261031-compact1');
+    const {LocalAdapter}=await import('./adapters.mjs?v=20261113-combined1');
     const {keepLaptopService}=await import('./service-lifecycle.mjs?v=20261111-on-demand1');
     const serviceAdapter=new LocalAdapter();await serviceAdapter.connect();
     keepLaptopService({api:(...args)=>serviceAdapter.request(...args)});

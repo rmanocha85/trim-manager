@@ -14,9 +14,21 @@ export function validateClinicDays(days,patients){
     for(const slot of day.appointments){
       if(!slot||typeof slot.id!=='string'||!slot.id||ids.has(slot.id)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(slot.time)||slot.patientId&&!known.has(slot.patientId)||!slot.patientId&&![slot.sourceName,slot.label].some(v=>typeof v==='string'&&v.trim())||['sourceName','label','note'].some(k=>slot[k]!=null&&typeof slot[k]!=='string'))throw new Error('Invalid OAT appointment or unmatched roster ID.');
       ids.add(slot.id);
+      if(slot.finished!=null&&typeof slot.finished!=='boolean')throw new Error('Invalid OAT completion status.');
     }
   }
   return days;
+}
+// A completion belongs to one appointment, never to the patient or billing record.
+export function finishAppointment(roster,action){
+  const {date,appointmentId,finished,expected}=action||{};
+  if(!validClinicDate(date)||typeof finished!=='boolean'||!expected)throw new Error('Invalid appointment completion.');
+  const next=structuredClone(roster),slot=next.clinicDays?.find(d=>d.date===date)?.appointments.find(s=>s.id===appointmentId);
+  if(!slot||!slot.patientId&&!slot.sourceName)throw new Error('Appointment no longer exists. Reload OAT FH.');
+  if(['patientId','sourceName','time'].some(k=>(slot[k]??null)!==(expected[k]??null))||Boolean(slot.finished)!==Boolean(expected.finished))throw Object.assign(new Error('This appointment changed elsewhere. Reload OAT FH before changing Finished.'),{status:409});
+  slot.finished=finished;
+  slot.finishedAt=finished?new Date().toISOString():null;
+  return next;
 }
 export function appointmentsForDate(roster,date){
   const day=(roster.clinicDays||[]).find(d=>d.date===date),patients=new Map(roster.patients.map(p=>[p.id,p]));

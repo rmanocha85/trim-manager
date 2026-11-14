@@ -7,8 +7,9 @@ export function preferredDriveAccount(){
 }
 export class LocalAdapter {
   mode='local';label='Laptop Drive folder';
+  async ensureConnected(){if(!this.csrf)await this.connect();}
   async connect(){const r=await fetch('/api/connect',{method:'POST',headers:{'X-Trim-Local':'1'}});const j=await r.json();if(!r.ok)throw new Error(j.error);this.csrf=j.csrf;}
-  async request(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,'X-Trim-Session':this.csrf}});const j=await r.json();if(!r.ok){const e=new Error(j.error);e.status=r.status;throw e;}return j;}
+  async request(url,options={}){const r=await fetch(url,{...options,headers:{...options.headers,'X-Trim-Session':this.csrf}});const j=await r.json();if(!r.ok){if(r.status===401)this.csrf=null;const e=new Error(j.error);e.status=r.status;throw e;}return j;}
   roster(){return this.request('/api/roster');}
   load(){return this.request('/api/billing');}
   async verify(etag){const current=await this.load();if(current.etag!==etag){const e=new Error('Billing changed elsewhere. Reload and reconcile your saved draft.');e.status=409;throw e;}}
@@ -18,20 +19,26 @@ export class LocalAdapter {
 export class DriveAdapter {
   mode='cloud';label='Google Drive';
   constructor(fileId,{rosterId=ROSTER}={}){this.fileId=fileId?.trim();this.rosterId=rosterId;if(this.fileId===ROSTER||this.fileId===rosterId)throw new Error('The original roster can never be used as the billing file.');}
-  async connect({selectAccount=false,patientRecords=false}={}){
+  connect(options={}){
+    if(this.connecting)return this.connecting;
+    const pending=this.connectToken(options);this.connecting=pending;
+    return pending.finally(()=>{if(this.connecting===pending)this.connecting=null;});
+  }
+  needsRenewal(){return !this.token||this.authExpired||Boolean(this.expiresAt&&Date.now()>=this.expiresAt-60000);}
+  async ensureConnected(){if(this.connecting)await this.connecting;else if(this.needsRenewal())await this.connect();}
+  async connectToken({selectAccount=false,patientRecords=this.patientRecords||false}={}){
     if(!globalThis.google?.accounts?.oauth2) await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(new Error('Google sign-in could not load.'));document.head.append(s);});
     const previous=this.accountEmail;
     const hint=selectAccount?'':previous||preferredDriveAccount();
     const token=await new Promise((resolve,reject)=>google.accounts.oauth2.initTokenClient({
       client_id:CLIENT,scope:patientRecords?'https://www.googleapis.com/auth/drive':'https://www.googleapis.com/auth/drive.file',
       prompt:hint?'':'select_account',...(hint?{login_hint:hint}:{}),
-      callback:r=>{if(r.error||!r.access_token)return reject(new Error(r.error||'Google did not return a connection.'));resolve(r.access_token);},
+      callback:r=>{if(r.error||!r.access_token)return reject(new Error(r.error||'Google did not return a connection.'));resolve(r);},
       error_callback:()=>reject(new Error('Google sign-in was cancelled or blocked. Try again, or choose “Use another account”.'))
     }).requestAccessToken());
-    this.token=token;
     let email='';
     try{
-      const about=await this.request('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)');
+      const about=await (await this.response('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)',{},token.access_token)).json();
       email=String(about.user?.emailAddress||'').trim();
     }catch{
       // Account metadata is optional on a first connection. On renewal, verify
@@ -41,14 +48,28 @@ export class DriveAdapter {
       this.token=null;
       throw new Error(email?'Google opened a different account. Reconnect with the account already used by this workspace. Your local changes are retained.':'Could not verify your Google account. Reconnect before saving; your local changes are retained.');
     }
+    this.token=token.access_token;this.expiresAt=Number(token.expires_in)>0?Date.now()+Number(token.expires_in)*1000:null;this.authExpired=false;this.patientRecords=patientRecords;
     this.accountEmail=email;
   }
   rememberAccount(){
     // Call only after the roster and billing workspace have connected successfully.
     try{if(this.accountEmail)globalThis.localStorage?.setItem(ACCOUNT_KEY,this.accountEmail);else globalThis.localStorage?.removeItem(ACCOUNT_KEY);}catch{}
   }
-  async request(url,options={}) {const r=await fetch(url,{...options,cache:'no-store',headers:{...options.headers,Authorization:`Bearer ${this.token}`}});if(!r.ok){const e=new Error(r.status===412?'Billing changed elsewhere. Reload and reconcile your saved draft.':r.status===401?'Google connection expired. Your draft stays on this device. Reconnect to save.':`Google Drive request failed (${r.status}).`);e.status=r.status===412?409:r.status;throw e;}return r.json();}
-  async bytes(url){const r=await fetch(url,{cache:'no-store',headers:{Authorization:'Bearer '+this.token}});if(!r.ok)throw new Error('Drive source verification failed ('+r.status+').');return new Uint8Array(await r.arrayBuffer());}
+  async response(url,options={},accessToken=this.token){
+    // Retry reads only. An interrupted write may already have succeeded.
+    const read=['GET','HEAD'].includes((options.method||'GET').toUpperCase());
+    for(let attempt=0;attempt<(read?2:1);attempt++){
+      let r;
+      try{r=await fetch(url,{...options,cache:'no-store',headers:{...options.headers,Authorization:`Bearer ${accessToken}`}});}
+      catch(error){if(error.name==='AbortError')throw error;if(read&&attempt===0&&globalThis.navigator?.onLine!==false){await new Promise(resolve=>setTimeout(resolve,250));continue;}throw Object.assign(new Error('Drive is temporarily unreachable. Your work is retained. Retry when the connection returns.'),{code:'NETWORK'});}
+      if(r.ok)return r;
+      if(read&&attempt===0&&[429,500,502,503,504].includes(r.status)){await new Promise(resolve=>setTimeout(resolve,250));continue;}
+      if(r.status===401&&accessToken===this.token)this.authExpired=true;
+      const e=new Error(r.status===412?'Drive changed elsewhere. Reload and reconcile your saved draft.':r.status===401?'Google access expired. Click Save or Refresh from Drive to renew it. Your draft stays on this device.':r.status===403?'Google Drive access denied. Check this account’s file permission.':`Google Drive request failed (${r.status}). Retry without signing in again.`);e.status=r.status===412?409:r.status;throw e;
+    }
+  }
+  async request(url,options={}){return (await this.response(url,options)).json();}
+  async bytes(url){return new Uint8Array(await (await this.response(url)).arrayBuffer());}
   async roster(){return normalizeRoster(await this.request(`https://www.googleapis.com/drive/v3/files/${this.rosterId}?alt=media`));}
   async locate(){
     if(this.fileId)return;

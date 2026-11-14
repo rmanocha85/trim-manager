@@ -10,7 +10,7 @@
   <button class="tab-btn" data-click="showTab('history',this)">📅 Past Lists</button>
   <button class="tab-btn" data-click="showTab('removed',this)">Removed Patients</button>
 
-  <div class="roster-toolbar"><span id="roster-count" aria-live="polite"></span>
+  <div class="roster-toolbar"><button class="btn btn-ghost needs-connect" data-click="openVisitList()">Copy visit list</button><span id="roster-count" aria-live="polite"></span>
   <details class="needs-connect add-patient" id="add-patient">
     <summary>Add patient ▾</summary>
     <div class="add-patient-grid"><strong id="add-patient-title">Add to My Patients</strong><label class="flbl">Roster<select class="sel" id="in-target" data-change="updateToolbar()"><option value="patients">My Patients</option><option value="otherPatients">Other Patients</option></select></label>
