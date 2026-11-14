@@ -1,0 +1,14 @@
+{
+  "name": "trim-drive-renewal",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.0"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}

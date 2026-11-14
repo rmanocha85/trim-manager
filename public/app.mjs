@@ -1,6 +1,6 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261113-history1';
 import {documentIntakeUI} from './intake-ui.mjs?v=20261113-combined1';
-import {billingUI} from './billing-ui.mjs?v=20261113-combined1';
+import {billingUI} from './billing-ui.mjs?v=20261114-renew1';
 import {patientsUI} from './patients-ui.mjs?v=20261113-combined1';
 import {Session,saveIndicator} from './session.mjs?v=20261113-combined1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261112-provision1';

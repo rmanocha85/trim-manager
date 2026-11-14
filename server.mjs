@@ -54,6 +54,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('oat-roster-repository.mjs');
   allowed.add('oat-workspace.mjs');allowed.add('oat-schedule.mjs');
   allowed.add('visit-list.mjs');
+  allowed.add('hosted-billing-access.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
   const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};
   const lifecycle=new ServiceLifecycle({...lifecycleOptions,onDemand});let activeRequests=0,closing=false;

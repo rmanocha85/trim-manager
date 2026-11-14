@@ -1,4 +1,4 @@
-import {BackupManager,DriveBackups,LocalBackups,snapshot,validateSnapshot,writeLocal} from './backups.mjs?v=20261012-backup1';
+import {BackupManager,DriveBackups,LocalBackups,snapshot,validateSnapshot,writeLocal} from './backups.mjs?v=20261114-renew1';
 import {loadRecovery,saveRecovery,getBackupDirectory,setBackupDirectory} from './recovery.mjs?v=20261012-backup1';
 import {validateLedger,escapeHTML as esc} from './core.mjs?v=20261031-compact1';
 export function backupUI({state,restore,showSettings}){

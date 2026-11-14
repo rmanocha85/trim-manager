@@ -1,4 +1,5 @@
 import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261031-compact1';
+import {hostedBilling,HostedBillingAccess} from './hosted-billing-access.mjs';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 const ACCOUNT_KEY='trim:drive-account';
@@ -27,6 +28,23 @@ export class DriveAdapter {
   needsRenewal(){return !this.token||this.authExpired||Boolean(this.expiresAt&&Date.now()>=this.expiresAt-60000);}
   async ensureConnected(){if(this.connecting)await this.connecting;else if(this.needsRenewal())await this.connect();}
   async connectToken({selectAccount=false,patientRecords=this.patientRecords||false}={}){
+    if (!patientRecords && hostedBilling()) {
+      this.hostedAccess ??= new HostedBillingAccess();
+      let token;
+      if (selectAccount || !this.hostedAccess.saved) {
+        token = await this.hostedAccess.authorize({hint:this.accountEmail || preferredDriveAccount(),selectAccount});
+      } else {
+        token = await this.hostedAccess.renew();
+      }
+      if (this.accountEmail && this.accountEmail.toLowerCase() !== token.email.toLowerCase()) {
+        throw Error('Google opened a different billing account. Your local changes are retained.');
+      }
+      this.accountEmail = token.email;
+      this.token = token.access_token;
+      this.expiresAt = Date.now() + token.expires_in * 1000;
+      this.authExpired = false;
+      return;
+    }
     if(!globalThis.google?.accounts?.oauth2) await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=resolve;s.onerror=()=>reject(new Error('Google sign-in could not load.'));document.head.append(s);});
     const previous=this.accountEmail;
     const hint=selectAccount?'':previous||preferredDriveAccount();
@@ -55,7 +73,25 @@ export class DriveAdapter {
     // Call only after the roster and billing workspace have connected successfully.
     try{if(this.accountEmail)globalThis.localStorage?.setItem(ACCOUNT_KEY,this.accountEmail);else globalThis.localStorage?.removeItem(ACCOUNT_KEY);}catch{}
   }
-  async response(url,options={},accessToken=this.token){
+  async response(url,options={},accessToken){
+    if (accessToken === undefined && this.hostedAccess) {
+      if (this.needsRenewal()) {
+        // Background reads may renew a session, but only a user action may open consent.
+        if (!this.hostedAccess.saved) throw Object.assign(Error('Click Save or Refresh to reconnect Google.'),{status:401});
+        await this.ensureConnected();
+      }
+      const used = this.token;
+      try { return await this.fetchResponse(url,options,used); }
+      catch (error) {
+        const read = ['GET','HEAD'].includes((options.method || 'GET').toUpperCase());
+        if (error.status !== 401 || !read || !this.hostedAccess.saved) throw error;
+        if (this.token === used) await this.ensureConnected();
+        return this.fetchResponse(url,options,this.token);
+      }
+    }
+    return this.fetchResponse(url,options,accessToken ?? this.token);
+  }
+  async fetchResponse(url,options,accessToken){
     // Retry reads only. An interrupted write may already have succeeded.
     const read=['GET','HEAD'].includes((options.method||'GET').toUpperCase());
     for(let attempt=0;attempt<(read?2:1);attempt++){

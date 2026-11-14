@@ -30,7 +30,7 @@ export class LocalBackups {
 export class DriveBackups {
   constructor(adapter){this.adapter=adapter;}
   async request(url,options={}){
-    const r=await fetch(url,{...options,signal:AbortSignal.timeout(30000),cache:'no-store',headers:{...options.headers,Authorization:`Bearer ${this.adapter.token}`}});
+    const r=await this.adapter.response(url,{...options,signal:AbortSignal.timeout(30000)});
     if(!r.ok){const e=new Error(r.status===401?'Reconnect Google Drive, then retry backups.':`Backup request failed (${r.status}). Retry backups.`);e.status=r.status;throw e;}
     return r.status===204?null:r.json();
   }
@@ -71,7 +71,7 @@ export class DriveBackups {
     return files.filter(f=>owned(f,dataset));
   }
   async read(f){
-    const r=await fetch(`${API}/${f.id}?alt=media`,{cache:'no-store',signal:AbortSignal.timeout(30000),headers:{Authorization:`Bearer ${this.adapter.token}`}});
+    const r=await this.adapter.response(`${API}/${f.id}?alt=media`,{signal:AbortSignal.timeout(30000)});
     if(!r.ok)throw new Error('Could not read the backup. Retry backups.');const text=await r.text();await validateSnapshot(text,f.appProperties.dataset,f.appProperties.sha);return text;
   }
   async ensure(s){
