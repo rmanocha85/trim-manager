@@ -3,7 +3,8 @@ import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=202610
 import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261107-workflow1';
 import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261107-workflow1';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261107-workflow1';
-import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261114-renew1';
+import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261114-renew2';
+import {hostedBilling,HostedBillingAccess} from './hosted-billing-access.mjs';
 import {avaChartUrl} from './patient-links.mjs';
 import {planNewPatients} from './core.mjs?v=20261107-workflow1';
 import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
@@ -23,6 +24,7 @@ export function billingUI({notes,patients,onStatus=()=>{},onNavigate=()=>{},onCo
 const $=id=>document.getElementById(id);
 const laptopStartup=['127.0.0.1','localhost'].includes(location.hostname)&&['/','/index.html'].includes(location.pathname)&&!['manual','cloud'].includes(new URLSearchParams(location.search).get('connection'));
 const laptopLockKey='trim-billing:laptop-locked';
+const hostedFileKey='trim:last-connected-billing-file';
 $('search-scope').textContent='All TRIM Patients residents · your panel, other residents and saved coverage patients';
 const headerDate=document.createElement('div');headerDate.id='header-billing-date';headerDate.setAttribute('aria-live','polite');headerDate.innerHTML='<small>Billing for</small><strong id="header-date-value"></strong>';document.querySelector('.app-sections').after(headerDate);
 const routineViews=document.createElement('div');routineViews.id='routine-views';routineViews.className='view-tabs';routineViews.hidden=true;routineViews.innerHTML='<button id="routine-individual" aria-pressed="true">Individual</button><button id="routine-batch" aria-pressed="false">Batch by unit/floor</button>';$('billing-lock').after(routineViews);
@@ -123,7 +125,7 @@ function openConnectionDialog(){
   $('cloud-account').textContent=email?`Continue with ${email}`:'Choose your Google account on the first connection.';
   $('connection-error').textContent='';$('connection-options').open=false;$('connection-dialog').showModal();$('cloud-connect').focus();
 }
-async function connect(mode,create=false,selectAccount=false){
+async function connect(mode,create=false,selectAccount=false,resumeFile=''){
   if(dirty||notes.hasChanges()||patients.hasChanges())return notice('Save or discard your local session before changing connections.');
   if(connecting)return;connecting=true;for(const id of ['cloud-connect','cloud-switch-account','local-connect','create-cloud'])$(id).disabled=true;$('connection-dialog').setAttribute('aria-busy','true');
   let replacedConnection=false;
@@ -131,9 +133,9 @@ async function connect(mode,create=false,selectAccount=false){
   $('setup-import').hidden=true;setupCandidate=create?setupCandidate:null;
   $('connection-error').textContent='Connecting…';$('connection-error').dataset.state='connecting';
   try{
-    const candidate=create?setupCandidate:mode==='local'?new LocalAdapter():new DriveAdapter($('cloud-file-id').value);
+    const candidate=create?setupCandidate:mode==='local'?new LocalAdapter():new DriveAdapter(resumeFile || $('cloud-file-id').value);
     if(!candidate)throw new Error('Connect through Google first.');
-    if(!create)await candidate.connect({selectAccount});
+    if(!create)await candidate.connect({selectAccount,interactive:!resumeFile});
     const r=await candidate.roster();let s;
     try{s=create?await candidate.createEmpty():await candidate.load();if(mode==='local'&&s.etag==='new')throw new Error('The billing file is not available in this laptop’s Drive folder. Check Drive sync, then retry.');}
     catch(e){if(e.code==='MISSING_BILLING'){setupCandidate=candidate;$('create-cloud').hidden=false;$('setup-import').hidden=false;$('setup-note').hidden=false;}throw e;}
@@ -155,6 +157,7 @@ async function connect(mode,create=false,selectAccount=false){
     await patients.refresh();
     await notes.connected();
     candidate.rememberAccount?.();
+    if(candidate.hostedAccess?.saved && candidate.fileId)localStorage.setItem(hostedFileKey,candidate.fileId);
     $('gate').hidden=true;$('workspace').hidden=false;$('connection-dialog').close();
     onConnected();
     return true;
@@ -654,7 +657,18 @@ async function openLaptopWorkspace(){
     return eligible.length+' routine billings added; '+already+' already recorded; '+(keys.length-eligible.length-already)+' require billing review.';
   }
   return {
-    start:()=>{if(laptopStartup)void openLaptopWorkspace();},
+    start:async()=>{
+      if(laptopStartup)return openLaptopWorkspace();
+      if(!hostedBilling() || !new HostedBillingAccess().saved)return;
+      const file=localStorage.getItem(hostedFileKey);
+      if(!file)return;
+      const message=$('gate').querySelector('.gate-card p');
+      message.textContent='Reconnecting to Google Drive…';
+      $('connect').disabled=true;
+      try{
+        if(!await connect('cloud',false,false,file))message.textContent=$('connection-error').textContent;
+      }finally{$('connect').disabled=false;}
+    },
     render:renderAll,
     state:()=>({adapter,ledger,roster,date:date(),people:ledger?people():[]}),
     save:async()=>{await syncSession(true);if(dirty||blocked)throw new Error('Resolve the TRIM Billing conflict before finishing this save.');},

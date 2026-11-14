@@ -27,11 +27,12 @@ export class DriveAdapter {
   }
   needsRenewal(){return !this.token||this.authExpired||Boolean(this.expiresAt&&Date.now()>=this.expiresAt-60000);}
   async ensureConnected(){if(this.connecting)await this.connecting;else if(this.needsRenewal())await this.connect();}
-  async connectToken({selectAccount=false,patientRecords=this.patientRecords||false}={}){
+  async connectToken({selectAccount=false,patientRecords=this.patientRecords||false,interactive=true}={}){
     if (!patientRecords && hostedBilling()) {
       this.hostedAccess ??= new HostedBillingAccess();
       let token;
       if (selectAccount || !this.hostedAccess.saved) {
+        if (!interactive) throw Object.assign(Error('Connect your TRIM billing account again.'), {status:401});
         token = await this.hostedAccess.authorize({hint:this.accountEmail || preferredDriveAccount(),selectAccount});
       } else {
         token = await this.hostedAccess.renew();
