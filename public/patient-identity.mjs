@@ -29,7 +29,7 @@ export function bindIdentity(root){
   if(root.__identityBound)return;root.__identityBound=true;
   root.addEventListener('click',async e=>{const b=e.target.closest?.('[data-copy-value]');if(!b)return;e.preventDefault();e.stopPropagation();
     let status=root.querySelector('.identity-feedback');if(!status){status=document.createElement('span');status.className='identity-feedback';status.setAttribute('role','status');(root.body||root).append(status);}
-    try{await navigator.clipboard.writeText(b.dataset.copyValue);status.textContent=b.classList.contains('name-copy')?'Name copied':'PHN copied';}catch{status.textContent='Could not copy. Select the text and copy manually.';}
+    try{await navigator.clipboard.writeText(b.dataset.copyValue);status.textContent=b.dataset.copyFeedback||(b.classList.contains('name-copy')?'Name copied':'PHN copied');}catch{status.textContent='Could not copy. Select the text and copy manually.';}
     clearTimeout(root.__identityTimer);root.__identityTimer=setTimeout(()=>{status.textContent='';},1800);
   });
 }

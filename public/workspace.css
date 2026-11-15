@@ -19,10 +19,13 @@ header{height:64px;min-height:64px}
 #billing [hidden]{display:none!important}
 #billing[data-mode=concern] .toolbar{display:block}
 #billing[data-mode=concern] #search{width:100%}
-#billing[data-mode=concern] #roster{max-height:clamp(140px,25vh,260px);overflow:auto}
+#billing[data-mode=concern] #roster{max-height:max(230px,calc(100dvh - var(--billing-header-height,72px) - var(--app-utility-height,52px) - 215px));overflow:auto}
 #search-scope{font-size:11px;margin:7px 0}
 #add-patient-section{margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
-#add-patient-section h2{font-size:15px;margin:0 0 10px}
+#add-patient-section summary{width:fit-content;cursor:pointer;color:var(--green);font-weight:600;list-style:none;padding:5px 8px;border:1px solid var(--line);border-radius:5px}
+#add-patient-section summary::-webkit-details-marker{display:none}
+#add-patient-section[open] summary{margin-bottom:10px}
+#billing[data-mode=concern] .roster-area:has(#add-patient-section[open]) #roster{max-height:clamp(140px,25vh,260px)}
 #add-patient-section #paste-patient{padding:11px}
 #add-patient-section #paste-patient strong{font-size:13px}
 #add-patient-section #paste-patient span{font-size:11px;margin-top:4px}

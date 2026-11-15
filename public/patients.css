@@ -9,7 +9,21 @@
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
 #removed-list{overflow-x:auto;margin-top:16px}
 /* The quick return stays beside the admission date in both live rosters. */
-.roster-table.roster-table{min-width:1114px}
+.roster-table.roster-table{min-width:1480px}
+.roster-table .col-contacts{width:210px}
+@media(min-width:1600px){.roster-table .col-contacts{width:270px}}
+.family-contacts .btn{font-size:11px;min-height:24px;padding:2px 5px}
+.family-contacts .contact-edit{border:0;color:var(--accent)}
+.family-contact{overflow-wrap:anywhere;margin-bottom:2px}
+.family-contact + .family-contact{border-top:1px solid var(--border-light);padding-top:4px}
+.contact-number{display:flex;flex-wrap:wrap;align-items:center;gap:3px 5px}
+.contact-number a{text-decoration:none}
+.family-contact-dialog{width:min(360px,90vw);border:1px solid var(--border);border-radius:9px;padding:20px;color:var(--text)}
+.family-contact-dialog::backdrop{background:#0005}
+.family-contact-dialog label{display:grid;gap:4px;margin:10px 0}
+.family-contact-dialog input{font:inherit;padding:7px}
+.family-contact-dialog .actions{display:flex;justify-content:flex-end;gap:8px}
+.family-contact-dialog [role=alert]{color:var(--danger)}
 .roster-table .roster-hospital-status{display:flex;align-items:center;gap:8px;min-width:280px}
 .roster-table .roster-hospital-status .hospital-dates{display:flex;flex-direction:column;flex:0 1 auto;gap:1px;font-size:12px;line-height:14px}
 .roster-table .roster-hospital-status .hospital-dates small{font-size:11px;color:var(--muted)}

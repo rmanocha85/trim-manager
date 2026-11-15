@@ -59,7 +59,7 @@ try{
  // A competing hospital-date correction must require review, never be overwritten.
  await page.setViewportSize({width:1440,height:1000});
  const reopened=await readRoster();reopened.patients[0].hospitalStays[0].returnedDate=null;await writeFile(rosterPath,JSON.stringify(reopened));
- await page.locator('#load-latest').click();await p('.roster-return:visible').waitFor();await saved();await p('.roster-return:visible').click();await ready();
+ await page.locator('#workspace-more').click();await page.locator('#load-latest').click();await p('.roster-return:visible').waitFor();await saved();await p('.roster-return:visible').click();await ready();
  const competing=structuredClone(reopened);competing.patients[0].hospitalStays[0].returnedDate='2026-11-03';competing.patients[0].hospitalStays[0].updatedAt='2026-11-05T12:00:00Z';await writeFile(rosterPath,JSON.stringify(competing));
  await page.locator('#sync').click();await p('#roster-conflict-dialog').waitFor();assert.deepEqual(await readRoster(),competing);assert.deepEqual(await readBilling(),billed);
  assert.deepEqual(errors,[]);assert.deepEqual(dialogs,[]);

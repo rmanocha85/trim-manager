@@ -1,5 +1,13 @@
 # Planned improvements
 
+## Roster and Concern Billing fixes — built locally November 15, 2026
+
+- [x] **Family contacts** shows the name, relationship and full number for each contact. Use **+ Add contact** or **Edit**, then **Save contact** and **Save to Drive**. **Copy number** copies the displayed number. **Call** opens the same phone handler as MAID (ZAC on a configured computer).
+- [x] Unit labels such as **DEWDNEY** fit on one line above the room number.
+- [x] **Open billing** on a roster row opens Concern Billing for that patient on the selected billing date. Selecting a billing code is a separate action.
+- [x] A patient with an active issue and a palliative flag appears once in each section. Both rows use the same patient record.
+- [x] Concern Billing gives the search results the available height. **+ Add patient** opens the existing screenshot and manual entry form.
+
 ## OAT FH clinic day and TRIM visit list — November 13, 2026
 
 - Choose a clinic date on the calendar, or choose Upcoming Friday. Search the selected day by name, PHN or note. Each verified PHN has a copy button.
@@ -20,7 +28,7 @@
 Available in **My Patients**, **Other Patients**, and **All**.
 
 - Open a patient's **⋯ → Active issue…**, enter a brief description (up to 500 characters), then choose **Add active issue**. The description appears beneath the patient name and can be searched.
-- Active issues appear first, followed by outstanding medication reconciliation, palliative patients, and the usual unit groups. Each patient appears once; existing palliative and other flags are preserved.
+- Active issues appear first, followed by outstanding medication reconciliation, palliative patients, and the usual unit groups. The November 15 update also lists active palliative patients in the Palliative patients section.
 - Click the **Active issue** badge to edit the description or **Mark resolved**. Resolved patients return to their appropriate priority or unit group. Resolution retains the description and timestamp; starting another issue preserves previous resolved episodes.
 - Changes follow the existing **Save to Drive** workflow. Unfinished descriptions and staged edits have encrypted local recovery; they do not upload automatically.
 - The roster record owns `activeIssue`, including status, description, opening/update/resolution timestamps and resolved history. Concurrent changes to the same issue require one whole-record choice so that resolving an older issue cannot silently resolve newly edited follow-up instructions. Other patient fields still merge independently.

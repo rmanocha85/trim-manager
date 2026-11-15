@@ -49,6 +49,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('maid-provision.mjs');
   allowed.add('maid-date-calendar.mjs');
   allowed.add('clinic-contacts.mjs');
+  allowed.add('roster-contacts.mjs');
   allowed.add('clinic-roster.css');
   allowed.add('clinic-roster-repository.mjs');
   allowed.add('oat-roster-repository.mjs');

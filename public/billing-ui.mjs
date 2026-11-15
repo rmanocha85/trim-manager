@@ -298,6 +298,16 @@ function historyTable(records){
       '</td></tr>').join('')+'</tbody></table></div>'+(records.length?'':'<div class="empty">No recorded billing.</div>');
 }
 document.addEventListener('click',e=>{if(e.target.closest('#patient-billing-history')&&selected)showPatientHistory(selected,true);});
+function openPatientBilling(key){
+  if(!ledger||!roster||saving||checking||loadingLatest)return notice('Wait for billing to finish loading or saving.');
+  const patient=person(key);
+  if(!patient)return notice('This patient could not be found in billing. Refresh the roster and try again.');
+  selected=key;
+  editingId=null;
+  $('search').value=patient.phn||patient.name;
+  switchTab('billing');
+  $('editor').scrollIntoView({block:'nearest'});
+}
 function showPatientHistory(key,allDates=false){
   const group=patientHistoryGroups(ledger,people()).find(g=>g.keys.has(key));
   if(allDates)historyDate='';historyPatient=group?.patient.key||key;historyView='patient';$('history-search').value=group?.patient.name||person(key)?.name||ledger.patients[key]?.name||'';switchTab('history');
@@ -673,7 +683,7 @@ async function openLaptopWorkspace(){
     state:()=>({adapter,ledger,roster,date:date(),people:ledger?people():[]}),
     save:async()=>{await syncSession(true);if(dirty||blocked)throw new Error('Resolve the TRIM Billing conflict before finishing this save.');},
     status:()=>({dirty,busy:saving||checking||loadingLatest||recoveryPending>0,error:localRecoveryFailed||mergeConflicts.length>0,ready:!!ledger,mode:adapter?.mode}),
-    showPatientHistory:key=>showPatientHistory(key,true),switchTab,recordRoutine,notify:notice,chooseConnection:openConnectionDialog,loadLatest,
+    openPatientBilling,showPatientHistory:key=>showPatientHistory(key,true),switchTab,recordRoutine,notify:notice,chooseConnection:openConnectionDialog,loadLatest,
     setRoster:raw=>{roster=normalizeRoster(raw);if(ledger){renderAll();notes.render();applyNewPatientPlans();}},
     connectionStatus:()=>({mode:adapter?.mode,connected:driveReachable&&navigator.onLine&&!adapter?.authExpired,reason:!navigator.onLine?'offline':adapter?.authExpired?'expired':!driveReachable?'network':null,ready:!!ledger,lastChecked:lastChecked?.toISOString()}),
     localChanges,
