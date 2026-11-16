@@ -24,7 +24,7 @@ async function post(path, binding, body = {}) {
   return data;
 }
 export class HostedBillingAccess {
-  async authorize({hint, selectAccount = false} = {}) {
+  async authorize({hint, selectAccount = false, pickFileId} = {}) {
     const popup = window.open('about:blank','_blank','popup,width=530,height=680');
     if (!popup) throw Error('Allow the Google sign-in popup for TRIM, then connect again.');
     popup.opener = null;
@@ -36,6 +36,10 @@ export class HostedBillingAccess {
         scope:'https://www.googleapis.com/auth/drive.file', include_granted_scopes:'false',
         redirect_uri:APP_ORIGIN+'/trim-manager/public/drive-authorized.html',
         code_challenge_method:'S256', code_challenge:challenge, state, prompt:selectAccount?'select_account consent':'consent'});
+      if (pickFileId) {
+        params.set('trigger_onepick','true');
+        params.set('file_ids',pickFileId);
+      }
       if (hint && !selectAccount) params.set('login_hint',hint);
       const code = await new Promise((resolve,reject)=>{
         const timer = setTimeout(()=>finish(null,'Google connection timed out. Connect again.'),180000);

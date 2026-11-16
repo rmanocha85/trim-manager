@@ -2,6 +2,8 @@ import {validateClinicRoster} from './clinic-roster-repository.mjs';
 import {validateClinicDays,finishAppointment} from './oat-schedule.mjs?v=20261113-combined1';
 const V2='https://www.googleapis.com/drive/v2/files';
 const FOLDER='1d90SEhco30YL0AAE20gt11pzFBjOOJUn';
+// The shared roster's existing Drive ID. Google still enforces account and file access.
+export const OAT_FILE_ID='1dyQnrCSdywVJ8GRktgBLyDj_0m5rN9VR';
 export function validateOatRoster(data){
   validateClinicRoster(data);
   if(data.clinic!=='oat-fh')throw new Error('The selected file is not the OAT Fraser Health roster.');
@@ -26,6 +28,17 @@ export class OatRepository {
     if(this.fileId)return this.fileId;
     const q=encodeURIComponent(`'${FOLDER}' in parents and title = 'oat-fh-roster.json' and trashed = false`);
     const result=await this.adapter.request(`${V2}?q=${q}&fields=items(id),nextPageToken`);
+    if(result.items?.length===0&&!result.nextPageToken&&this.adapter.hostedAccess){
+      // A per-file grant can expose the file without exposing the containing folder.
+      let file;
+      try{
+        file=await this.adapter.request(V2+'/'+OAT_FILE_ID+'?fields=id,title,labels(trashed),parents(id)');
+      }catch(error){
+        if([403,404].includes(error.status))throw Object.assign(new Error('Link the OAT roster to this TRIM account to load it on your computers.'),{code:'LINK_OAT'});
+        throw error;
+      }
+      if(file.id===OAT_FILE_ID&&file.title==='oat-fh-roster.json'&&!file.labels?.trashed&&(!file.parents?.length||file.parents.some(p=>p.id===FOLDER)))return this.fileId=file.id;
+    }
     if(result.nextPageToken||result.items?.length!==1)throw new Error('The OAT AI folder must contain one accessible oat-fh-roster.json. Check Drive sync and patient-record access, then reload OAT FH.');
     return this.fileId=result.items[0].id;
   }

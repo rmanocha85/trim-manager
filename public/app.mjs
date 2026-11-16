@@ -1,12 +1,12 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261115-roster1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261115-intake-icon1';
-import {billingUI} from './billing-ui.mjs?v=20261115-manual1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261116-oatlink1';
+import {billingUI} from './billing-ui.mjs?v=20261116-oatlink1';
 import {patientsUI} from './patients-ui.mjs?v=20261115-roster1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261112-provision1';
-import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261113-combined1';
+import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261116-oatlink1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
-import {OatRepository} from './oat-roster-repository.mjs?v=20261113-combined1';
+import {OatRepository,OAT_FILE_ID} from './oat-roster-repository.mjs?v=20261116-oatlink1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
 
 if(laptopRuntime()){document.title='TRIM Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261111-n1';}
@@ -29,7 +29,11 @@ async function refreshOat(){
     }catch(error){
       if(version===oatLoad){
         const needsAccess=adapter.mode==='cloud'&&[401,403,404].includes(error.status);
-        if(adapter.mode==='cloud')intake?.offerConnection?.();
+        if(error.code==='LINK_OAT'){
+          oatRoster.error(error.message,{link:true});
+          return;
+        }
+        if(needsAccess)intake?.offerConnection?.();
         oatRoster.error(needsAccess?'Connect patient records to load or renew access to the OAT FH roster, then reload OAT FH. You can also use the laptop app.':error.message);
       }
     }finally{clearTimeout(timeout);if(oatPending===pending)oatPending=null;}
@@ -118,7 +122,14 @@ async function start(){
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
     return {patients:saved.roster.patients,local:maidRepository.adapter.mode==='local'};
   }});
-  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onFinish:async action=>{
+  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onLink:async()=>{
+    const adapter=billing.state().adapter;
+    if(!adapter?.hostedAccess)throw new Error('Connect TRIM with Google first.');
+    const access=await adapter.hostedAccess.authorize({hint:adapter.accountEmail,pickFileId:OAT_FILE_ID});
+    if(access.email.toLowerCase()!==adapter.accountEmail.toLowerCase())throw new Error('Choose the same Google account you used for TRIM.');
+    await adapter.connect({interactive:false});
+    await refreshOat();
+  },onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onFinish:async action=>{
     if(!oatRepository)throw new Error('Reload OAT FH before editing.');
     const repository=oatRepository;++oatLoad;
     const saved=await repository.finish(action);return {...saved,local:repository.adapter.mode==='local'};
@@ -163,7 +174,7 @@ async function start(){
   window.addEventListener('beforeunload',e=>{if(patients.hasChanges()){e.preventDefault();e.returnValue='';}});
 
   if(laptop){
-    const {LocalAdapter}=await import('./adapters.mjs?v=20261113-combined1');
+    const {LocalAdapter}=await import('./adapters.mjs?v=20261116-oatlink1');
     const {keepLaptopService}=await import('./service-lifecycle.mjs?v=20261111-on-demand1');
     const serviceAdapter=new LocalAdapter();await serviceAdapter.connect();
     keepLaptopService({api:(...args)=>serviceAdapter.request(...args)});

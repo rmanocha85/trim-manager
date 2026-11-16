@@ -34,3 +34,17 @@ test('missing, duplicate, inaccessible or changing OAT cloud rosters never becom
   await assert.rejects(()=>new OatRepository({mode:'cloud',request:async()=>{throw Object.assign(new Error('denied'),{status:403});}}).load(),e=>e.status===403);
   let version=0;await assert.rejects(()=>new OatRepository({mode:'cloud',request:async url=>url.includes('?q=')?{items:[{id:'a'}]}:url.includes('alt=media')?sample():{etag:String(++version)}}).load(),/changed while loading/);
 });
+test('ordinary hosted login reads the linked OAT file even when the folder is hidden on a new device',async()=>{
+ const {OAT_FILE_ID}=await import('../public/oat-roster-repository.mjs');
+ let linked=false;
+ const adapter=()=>({mode:'cloud',hostedAccess:{},request:async url=>{
+   if(url.includes('?q='))return {items:[]};
+   assert.ok(url.includes('/'+OAT_FILE_ID+'?'));
+   if(!linked)throw Object.assign(new Error('not visible'),{status:404});
+   if(url.includes('labels(trashed)'))return {id:OAT_FILE_ID,title:'oat-fh-roster.json',labels:{trashed:false},parents:[]};
+   return url.includes('alt=media')?sample():{etag:'one'};
+ }});
+ await assert.rejects(()=>new OatRepository(adapter()).load(),e=>e.code==='LINK_OAT');
+ linked=true;
+ for(let device=0;device<2;device++)assert.deepEqual((await new OatRepository(adapter()).load()).roster,sample());
+});

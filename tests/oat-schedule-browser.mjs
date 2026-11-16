@@ -24,7 +24,7 @@ try{
  await host.getByRole('checkbox',{name:'Finished appointment for Sam Patel (sample)'}).click();
  await host.locator('.oat-save-status').filter({hasText:'Saved to laptop'}).waitFor();assert.equal(await host.locator('.oat-schedule-table tbody tr').count(),4);
  assert.equal(JSON.parse(await readFile(oatPath,'utf8')).clinicDays[0].appointments[1].finished,true);
- await page.reload();await host.getByText('4 appointments',{exact:true}).waitFor();
+ await page.reload();await setDate('2026-11-13');await host.getByText('4 appointments',{exact:true}).waitFor();
  assert.equal(await host.locator('.oat-schedule-table tbody tr').count(),4);
  await host.locator('.oat-completed summary').click();assert.match(await host.locator('.oat-completed').innerText(),/Sam Patel/);
  await host.locator('.oat-completed input[type=checkbox]').click();await host.locator('.oat-save-status').filter({hasText:'Saved to laptop'}).waitFor();
