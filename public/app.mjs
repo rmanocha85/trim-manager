@@ -3,7 +3,7 @@ import {documentIntakeUI} from './intake-ui.mjs?v=20261116-oatlink1';
 import {billingUI} from './billing-ui.mjs?v=20261116-oatlink1';
 import {patientsUI} from './patients-ui.mjs?v=20261116-phone1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261116-phone1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261116-maidlink1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261116-phone1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
 import {OatRepository,OAT_FILE_ID} from './oat-roster-repository.mjs?v=20261116-phone1';
@@ -53,13 +53,23 @@ async function refreshMaid(){
   pending.promise=(async()=>{
     let timeout;
     try{const data=await Promise.race([repository.load(),new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('MAID took too long to load. Check your connection and reload MAID.')),30000);})]);if(version===maidLoad){maidSnapshot=data;maidRoster.setPatients(data.roster.patients);}}
-    catch(error){if(version===maidLoad){const needsAccess=adapter.mode==='cloud'&&[401,403,404].includes(error.status);if(needsAccess)intake?.offerConnection?.();maidRoster.error(needsAccess?'Connect patient records to load or renew access to the existing MAID roster, then reload MAID. You can also use the laptop app.':error.message);}}
+    catch(error){
+      if(version!==maidLoad)return;
+      if(adapter.hostedAccess&&[403,404].includes(error.status)){
+        maidRoster.error('Link the MAID roster to your TRIM account once to open it on your computers.',{link:true});
+      }else{
+        const needsAccess=adapter.mode==='cloud'&&[401,403,404].includes(error.status);
+        if(needsAccess)intake?.offerConnection?.();
+        maidRoster.error(needsAccess?'Reconnect patient records and reload MAID.':error.message);
+      }
+    }
     finally{clearTimeout(timeout);if(maidPending===pending)maidPending=null;}
   })();
   return pending.promise;
 }
 const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
+  if(section!==value)$('workspace').scrollTop=0;
   section=value;
   const clinic=['maid','oat-fh'].includes(value);
   const enteringPatients=value==='patients'&&$('patients-workspace').hidden;
@@ -116,20 +126,21 @@ function status(){
   if($('load-latest'))$('load-latest').disabled=busy||!billing.state().adapter||!navigator.onLine;
 }
 async function saveSession(){try{await billing.state().adapter?.ensureConnected?.();await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');session.lastError=e.message;if(!session.message)session.message=e.message;billing.notify('');}finally{status();}}
+async function linkClinicFile(fileId,refresh){
+  const adapter=billing.state().adapter;
+  if(!adapter?.hostedAccess)throw new Error('Connect TRIM with Google first.');
+  const access=await adapter.hostedAccess.authorize({hint:adapter.accountEmail,pickFileId:fileId});
+  if(access.email.toLowerCase()!==adapter.accountEmail.toLowerCase())throw new Error('Choose the same Google account you used for TRIM.');
+  await adapter.connect({interactive:false});
+  await refresh();
+}
 async function start(){
-  maidRoster=clinicRosterUI({host:$('maid-workspace'),kind:'maid',onChange:status,onReload:refreshMaid,onAction:async action=>{
+  maidRoster=clinicRosterUI({host:$('maid-workspace'),kind:'maid',onChange:status,onReload:refreshMaid,onLink:()=>linkClinicFile(maidRepository.fileId,refreshMaid),onAction:async action=>{
     if(!maidSnapshot||!maidRepository)throw new Error('Reload MAID before editing.');
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
     return {patients:saved.roster.patients,local:maidRepository.adapter.mode==='local'};
   }});
-  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onLink:async()=>{
-    const adapter=billing.state().adapter;
-    if(!adapter?.hostedAccess)throw new Error('Connect TRIM with Google first.');
-    const access=await adapter.hostedAccess.authorize({hint:adapter.accountEmail,pickFileId:OAT_FILE_ID});
-    if(access.email.toLowerCase()!==adapter.accountEmail.toLowerCase())throw new Error('Choose the same Google account you used for TRIM.');
-    await adapter.connect({interactive:false});
-    await refreshOat();
-  },onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onSave:async action=>{
+  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onLink:()=>linkClinicFile(OAT_FILE_ID,refreshOat),onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onSave:async action=>{
     if(!oatRepository)throw new Error('Reload OAT FH before editing.');
     const repository=oatRepository;++oatLoad;
     const saved=await repository.save(action);return {...saved,local:repository.adapter.mode==='local'};

@@ -8,7 +8,7 @@ import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.
-export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onChange=()=>{}}) {
+export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onLink,onChange=()=>{}}) {
   const maid=kind==='maid', title=maid?'MAID':'OAT Fraser Health';
   let patients=[],view='active',query='',busy=false,ready=false,loaded=false,loadState='idle',loadMessage='';
   host.classList.add('clinic-workspace');
@@ -20,6 +20,18 @@ export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onChange=()=
   bindIdentity(host);
   const hideTip = bindRosterTips(host);
   if(onReload){const reload=document.createElement('button');reload.textContent=maid?'Reload MAID':'Reload OAT FH';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
+  const linkButton=document.createElement('button');
+  if(onLink){
+    linkButton.hidden=true;
+    linkButton.textContent='Link MAID roster to TRIM';
+    host.querySelector('.clinic-toolbar').append(linkButton);
+    linkButton.onclick=async()=>{
+      linkButton.disabled=true;
+      try{await onLink();}
+      catch(error){loadMessage=error.message;render();}
+      finally{linkButton.disabled=false;}
+    };
+  }
   const dialog=document.createElement('dialog');dialog.className='clinic-remove-dialog';dialog.innerHTML='<form method="dialog"><h2>Remove patient from MAID?</h2><p class="remove-name"></p><p>This deletes all of their tracking information from Active and History. Their original documents and folders stay in place.</p><div class="actions"><button value="cancel">Cancel</button><button value="remove" class="danger">Remove patient</button></div></form>';if(maid)host.append(dialog);
   const planningDialog=document.createElement('dialog');planningDialog.className='clinic-planning-dialog';
   planningDialog.innerHTML='<form><h2>1634 assessment planning</h2><p class="planning-name"></p><input name="date" type="hidden"><section class="planning-calendar" aria-label="Assessment date calendar"><div class="planning-calendar-nav"><button type="button" data-month="-1" aria-label="Previous month">‹</button><h3 aria-live="polite"></h3><button type="button" data-month="1" aria-label="Next month">›</button></div><div class="planning-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="planning-days"></div><button type="button" data-today>Current month</button><p class="planning-selected" aria-live="polite"></p></section><label>Request urgency<select name="urgency" aria-label="Request urgency"><option value="unknown">Not specified</option><option value="routine">Routine / non-urgent</option><option value="semi-urgent">Semi-urgent</option><option value="urgent">Urgent</option></select></label><p class="planning-error" role="alert"></p><div class="actions"><button type="button" data-cancel>Cancel</button><button type="button" data-clear>Clear date</button><button type="submit">Save planning</button></div></form>';
@@ -248,9 +260,9 @@ export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onChange=()=
   render();
   return {
     state(){return {busy:busy||phoneDialog.open||planningDialog.open||provisionDialog.open,ready,loading:loadState==='loading',dirty:false};},
-    setPatients(records){if(busy)return;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
-    loading({preserve=true}={}){ready=false;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
-    error(message){ready=false;loadState='error';loadMessage=message;render();}
+    setPatients(records){if(busy)return;linkButton.hidden=true;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
+    loading({preserve=true}={}){ready=false;linkButton.hidden=true;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
+    error(message,{link=false}={}){ready=false;linkButton.hidden=!link;loadState='error';loadMessage=message;render();}
   };
 }
 

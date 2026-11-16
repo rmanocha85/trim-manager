@@ -37,10 +37,15 @@ try {
   assert.match(await root.locator('.roster-tip:popover-open').innerText(),/Sam Example · Son/);
   const search=root.locator('#roster-search');
   await page.setViewportSize({width:1440,height:600});
-  await page.evaluate(()=>scrollTo(0,500));
+  const workspace=page.locator('#workspace');
+  await page.mouse.move(650,400);
+  await page.mouse.wheel(0,500);
+  await page.waitForFunction(()=>document.querySelector('#workspace').scrollTop>200);
   const header=await page.locator('#workspace>header').boundingBox(),box=await search.boundingBox();
-  assert.ok(await page.evaluate(()=>scrollY)>200 && box.y>=header.y+header.height-1 && box.y<header.y+header.height+35,'Search pinned below header');
-  await page.evaluate(()=>scrollTo(0,0));await page.setViewportSize({width:1440,height:1000});
+  assert.ok(box.y>=header.y+header.height-1 && box.y<header.y+header.height+35,'Search pinned below header');
+  await page.mouse.wheel(0,100000);
+  await page.waitForFunction(()=>{const el=document.querySelector('#workspace');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
+  await workspace.evaluate(el=>el.scrollTop=0);await page.setViewportSize({width:1440,height:1000});
   await number.getByRole('button',{name:'Copy number'}).click();
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),contacts[0].phone);
   assert.equal(await number.getByRole('link').getAttribute('href'),'tel:6045550142');

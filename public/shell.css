@@ -1,6 +1,15 @@
 [hidden]{display:none!important}
 :root{--billing-header-height:72px;--app-utility-height:52px}
 #workspace{padding-bottom:var(--app-utility-height)}
+@media screen {
+  #workspace:has(> :is(#patients-workspace,#maid-workspace,#oat-fh-workspace):not([hidden])) {
+    box-sizing:border-box;
+    height:100dvh;
+    overflow:auto;
+    scrollbar-gutter:stable;
+    scroll-padding-block:var(--billing-header-height) var(--app-utility-height);
+  }
+}
 .app-utility{position:fixed;bottom:0;left:0;right:0;z-index:11;height:var(--app-utility-height);display:flex;align-items:center;padding:4px 24px;background:#fff;border-top:1px solid var(--line)}
 .app-utility button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px;border:0;background:transparent;color:#586853;font-size:12px}
 .app-utility button:hover,.app-utility button[aria-pressed=true]{background:#eaf3e9;color:#235b36}
