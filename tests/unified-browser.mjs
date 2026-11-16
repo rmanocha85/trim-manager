@@ -70,7 +70,7 @@ try{
  await assert.rejects(access(path.join(notesPath,'patients','0000000004.json')));
  await page.locator('#sync').click();await saved();
  const initialized=JSON.parse(await readFile(path.join(notesPath,'patients','0000000004.json'),'utf8'));
- assert.equal(initialized.context.patient.name,'SYNTHETIC, New intake');assert.equal(initialized.context.summaryMarkdown,'');assert.equal(initialized.context.importStatus,undefined);
+ assert.equal(initialized.context.patient.name,'Synthetic, New Intake');assert.equal(initialized.context.summaryMarkdown,'');assert.equal(initialized.context.importStatus,undefined);
  assert.equal(await readFile(path.join(notesPath,'patients',person.phn+'.json'),'utf8'),existingContext);
  assert.equal(JSON.parse(await readFile(path.join(notesPath,'index.json'),'utf8')).patients['phn:0000000004'].path,'patients/0000000004.json');
  assert.deepEqual(errors,[]);assert.equal(dialogs.some(d=>d.includes('Invalid patient action')||d.includes('Unknown patient')),false);

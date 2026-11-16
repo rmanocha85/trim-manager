@@ -13,6 +13,14 @@ import {visitList} from './visit-list.mjs?v=20261113-combined1';
 import {RosterRepository} from './roster-repository.mjs';
 import {mergeRoster} from './roster-merge.mjs?v=20261111-active-issue1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
+
+function formatRosterName(value) {
+  return value.replace(/\p{L}[\p{L}\p{M}]*/gu, word => {
+    const [first] = word;
+    return first.toUpperCase() + word.slice(first.length).toLowerCase();
+  }).replace(/\s*,\s*/gu, ', ');
+}
+
 export async function patientsUI({host,onChange=()=>{},onRoster=()=>{},onSaved=async()=>{},onUpload=()=>{},onHistory=()=>{},onBilling=()=>{}}){
 
 const MAX_D=17;
@@ -169,6 +177,14 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   }
   for(const type of ['click','input','change'])root.addEventListener(type,async event=>{
     const target=event.target,element=target.closest(`[data-${type}]`);
+    if ((event.inputType==='insertFromPaste' || type==='change') && target.matches('#in-name, input[id^="en-"]')) {
+      const value=target.value, formatted=formatRosterName(value);
+      if (formatted!==value) {
+        const caret=formatRosterName(value.slice(0,target.selectionEnd)).length;
+        target.value=formatted;
+        target.setSelectionRange(caret,caret);
+      }
+    }
     try{if(element){if(type==='click'){element.closest('[popover]')?.hidePopover();g('roster-more').open=false;}const match=/^(\w+)\((.*)\)$/.exec(element.getAttribute('data-'+type));if(!match||!actions[match[1]])throw new Error('Unknown patient action.');await actions[match[1]](...argumentsFor(match[2],element));}
       if(type!=='click'&&ready&&!inHistoryView&&isForm(target))void persist().catch(()=>{});
     }catch(e){setSS(e.message,false);alert(e.message);}
@@ -370,7 +386,7 @@ function uploadDocuments(id){const p=[...state.patients,...otherPatients()].find
 // ── PATIENTS ──
 function addPatient(){
   if(!canEdit())return;
-  const name=g('in-name').value.trim();
+  const name=formatRosterName(g('in-name').value).trim();
   const phn=g('in-phn').value.trim();
   const unit=g('in-unit').value;
   const room=g('in-room').value.trim();
@@ -396,8 +412,9 @@ function saveEdit(id){
     editId=null;stageRoster();render();return;
   }
   const p=state.patients.find(x=>x.id===id);if(!p)return;
+  const enteredName=g(`en-${id}`).value.trim();
   try{applyRoster(TrimRoster.edit(currentRoster(),id,validateDemographics({
-    name:g(`en-${id}`).value.trim()||p.name,phn:g(`ep-${id}`).value.trim(),unit:g(`eu-${id}`).value,
+    name:enteredName && enteredName!==p.name ? formatRosterName(enteredName).trim() : p.name,phn:g(`ep-${id}`).value.trim(),unit:g(`eu-${id}`).value,
     room:g(`er-${id}`).value.trim(),codes:g(`ec-${id}`).value.trim(),ava:g(`ea-${id}`).value.trim(),pFlag:g(`epf-${id}`).checked,palliativeFlag:g(`epal-${id}`).checked,dateOfBirth:g(`edob-${id}`).value,mostStatus:g(`emost-${id}`).value
   })));}catch(e){alert(e.message);return;}
   editId=null;stageRoster();render();

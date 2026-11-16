@@ -84,6 +84,27 @@ try {
     await tab.click();
   }
   assert.deepEqual(JSON.parse(await readFile(billingPath,'utf8')),ledger);
+  await root.locator('#add-patient > summary').click();
+  const name=root.locator('#in-name');
+  await page.evaluate(()=>navigator.clipboard.writeText('O’NEIL,ÉLISE-MARIE'));
+  await name.focus();await name.press('Control+v');
+  assert.equal(await name.inputValue(),'O’Neil, Élise-Marie');
+  for(const [field,value] of Object.entries({'in-phn':'0000000999','in-ava':'123999','in-room':'221','in-codes':'401'})){
+    await root.locator('#'+field).fill(value);
+  }
+  await root.locator('#in-unit').selectOption('unit');
+  await root.getByRole('button',{name:'Add',exact:true}).click();
+  const added=root.locator('[data-roster-patient]').filter({hasText:'O’Neil, Élise-Marie'});
+  await added.locator('.patient-actions-toggle').click();
+  await added.getByRole('button',{name:'Edit',exact:true}).click();
+  const editName=root.locator('.roster-edit').getByLabel('Name',{exact:true});
+  await editName.fill('dE vERA, aNNE-mARIE');
+  await editName.press('Tab');assert.equal(await editName.inputValue(),'De Vera, Anne-Marie');
+  await root.locator('.roster-edit').getByRole('button',{name:'Save',exact:true}).click();
+  await page.locator('#sync:not([disabled])').click();
+  await page.locator('#local-changes').filter({hasText:'Saved to folder'}).waitFor();
+  const savedRoster=JSON.parse(await readFile(rosterPath,'utf8'));
+  assert.equal(savedRoster.patients.find(p=>p.phn==='0000000999').name,'De Vera, Anne-Marie');
   console.log('PASS visible family contacts, clipboard, ZAC call target, edit/save/reload, unit label, space for results and same-name billing navigation for both roster types.');
 } finally {
   await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));await rm(dir,{recursive:true,force:true});
