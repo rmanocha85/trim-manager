@@ -1,3 +1,4 @@
+import {RENEWAL_ORIGIN} from '../public/hosted-billing-access.mjs';
 import {DocumentIntake} from '../intake-local.mjs';
 import {LocalNotesStore} from '../notes-local.mjs';
 import assert from 'node:assert/strict';
@@ -28,6 +29,20 @@ files.get('incoming').permissions.push({role:'writer',type:'user'});
 let n=0,failNextBilling=false,failUpload=true,recordsGranted=false,rejectMaid=false;const writes=[],errors=[];
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000}});
+if(process.env.TRIM_HOSTED_BASE){
+ // Exercise the published page using synthetic consent and renewal responses.
+ await context.route('https://accounts.google.com/o/oauth2/v2/auth?**',route=>{
+  const params=new URL(route.request().url()).searchParams,callback=new URL(params.get('redirect_uri'));
+  assert.equal(callback.origin,new URL(cloudURL).origin);
+  callback.searchParams.set('state',params.get('state'));callback.searchParams.set('code','synthetic');
+  return route.fulfill({status:302,headers:{Location:callback.href},body:''});
+ });
+ await context.route(RENEWAL_ORIGIN+'/**',route=>{
+  const headers={'Access-Control-Allow-Origin':new URL(cloudURL).origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,x-trim-binding','Access-Control-Allow-Methods':'POST'};
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers,body:''});
+  return route.fulfill({headers,json:{access_token:'synthetic',email:'synthetic@example.test',expires_in:3600}});
+ });
+}
 await context.route('https://accounts.google.com/gsi/client',r=>r.fulfill({contentType:'text/javascript',body:'globalThis.google={accounts:{oauth2:{initTokenClient:config=>({requestAccessToken:()=>{globalThis.oauthRequest={scope:config.scope,prompt:config.prompt,login_hint:config.login_hint};config.callback({access_token:config.scope.endsWith("/drive")?"synthetic-records":"synthetic"});}})}}};'}));
 await context.route('https://www.googleapis.com/**',async route=>{
  const req=route.request(),u=new URL(req.url()),method=req.method(),id=u.pathname.split('/').at(-1);let data={},status=200;

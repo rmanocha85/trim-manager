@@ -57,6 +57,10 @@ try{
  const launchesBefore=await page.evaluate(()=>window.syntheticLaunches.length);await page.locator('[data-section=notes]').click();await page.locator('#switch-version-dialog').waitFor();assert.equal(await page.evaluate(()=>window.syntheticLaunches.length),launchesBefore);assert.equal(await page.locator('#switch-version-link').isVisible(),false);await page.locator('#switch-version-close').click();
  await page.locator('[data-section=billing]').click();await page.locator('.patient').first().click();await page.locator('[data-code="00114"]').click();await page.locator('[data-reason-preset="0"]').click();await page.waitForFunction(()=>!document.querySelector('#sync').disabled);
  await page.reload();await page.locator('#connect').click();await page.locator('#cloud-connect').click();await page.locator('#workspace').waitFor({state:'visible'});await page.waitForFunction(()=>!document.querySelector('#sync').disabled);assert.match(await page.locator('#local-changes').innerText(),/Changes pending/);
+ // Roster edits recover after reload. New billing edits last only for the open tab.
+ await page.locator('[data-section=billing]').click();await page.locator('.patient').first().click();
+ const code=page.locator('[data-code="00114"]');assert.equal(await code.evaluate(b=>b.classList.contains('on')),false);
+ await code.click();await page.locator('[data-reason-preset="0"]').click();
  failNextBilling=true;await page.locator('#sync').click();await page.locator('#session-status').filter({hasText:'Roster saved.'}).waitFor({state:'attached'});assert.equal(files.get('ledger').data.entries.length,0);assert.match(await page.locator('#session-status').innerText(),/Remaining changes/);await page.locator('#sync').click();await saved(page);assert.equal(files.get('ledger').data.entries.length,1);
  assert.deepEqual(files.get('1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3').data.extra,roster.extra);
  // The laptop uses the same real adapter contract, not its potentially stale sync folder.
