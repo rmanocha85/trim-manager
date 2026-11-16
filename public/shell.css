@@ -145,3 +145,8 @@ body:has(#connection-dialog[open]) #gate .gate-card{visibility:hidden}
 .patient-card-history{white-space:nowrap;text-decoration:underline;text-underline-offset:3px}
 @media(min-width:761px) and (max-width:1199px){:root{--billing-header-height:116px}#workspace>header{grid-template-areas:"sections sections" "date actions";grid-template-columns:minmax(0,1fr) auto;min-height:116px;gap:8px 12px}#workspace>header #header-billing-date{justify-self:start}}
 @media(max-width:760px){#workspace>header{grid-template-areas:"sections" "date" "actions";grid-template-columns:minmax(0,1fr);height:auto;gap:10px;padding:12px 14px}#workspace>header .header-actions{width:100%;flex-wrap:wrap;justify-content:flex-end}#workspace>header .save-summary{margin-right:auto;align-items:flex-start;max-width:100%}#workspace>header #local-changes{text-align:left}#workspace>header .app-sections{justify-content:flex-start;flex-wrap:wrap}#workspace-menu{top:160px;max-height:calc(100dvh - 180px)}}
+
+#document-intake-queue[aria-label]{width:40px;justify-content:center;position:relative}
+#document-intake-queue[aria-label] svg{width:20px;height:20px}
+#document-intake-queue[aria-label]:is(:hover,:focus-visible)::after{content:attr(aria-label);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);width:max-content;max-width:14rem;padding:6px 9px;border-radius:5px;background:#243d2d;color:#fff;font-size:13px;line-height:1.35;pointer-events:none}
+@media(max-width:520px){#document-intake-queue[aria-label]:is(:hover,:focus-visible)::after{left:auto;right:0;transform:none}}

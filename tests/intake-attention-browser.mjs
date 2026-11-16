@@ -79,7 +79,14 @@ try{
   if(mode==='laptop'){
    queue.service.error='Synthetic service issue';await tick();await attention(true);await indicator.click();await red(page.locator('[data-intake-message]'));queue.service={};await page.locator('[data-refresh-incoming]').click();await page.waitForFunction(()=>!document.querySelector('[data-intake-message]').classList.contains('error'));await attention(false);await page.locator('[data-intake-close]').click();
   }
-  offline=true;await tick();await attention(true);assert.match(await indicator.innerText(),/connection needed/);await indicator.click();await red(page.locator('[data-intake-message]'));offline=false;queue={jobs:[],requests:[],service:{}};await page.locator('[data-refresh-incoming]').click();await page.waitForFunction(()=>!document.querySelector('[data-intake-message]').classList.contains('error'));await attention(false);assert.equal(await indicator.getAttribute('title'),'');await page.locator('[data-intake-close]').click();
+  offline=true;await tick();
+  if(mode==='web'){
+   await attention(false);assert.equal(await indicator.getAttribute('aria-label'),'Open TRIM Notes to process documents');
+   offline=false;queue={jobs:[],requests:[],service:{}};await tick();
+   assert.equal(await indicator.getAttribute('aria-label'),null);assert.equal(await indicator.innerText(),'Document intake');
+  }else{
+   await attention(true);assert.match(await indicator.innerText(),/connection needed/);await indicator.click();await red(page.locator('[data-intake-message]'));offline=false;queue={jobs:[],requests:[],service:{}};await page.locator('[data-refresh-incoming]').click();await page.waitForFunction(()=>!document.querySelector('[data-intake-message]').classList.contains('error'));await attention(false);assert.equal(await indicator.getAttribute('title'),'');await page.locator('[data-intake-close]').click();
+  }
   await page.evaluate(()=>intake.open({name:'Synthetic, Visual',phn:'0000000001'}));
   await page.locator('[data-intake-input]').setInputFiles({name:'synthetic.exe',mimeType:'application/octet-stream',buffer:Buffer.from('synthetic')});await red(page.locator('[data-intake-message]'));assert.match(await page.locator('[data-intake-message]').innerText(),/Choose PDF/);
   await page.locator('[data-intake-input]').setInputFiles({name:'synthetic.pdf',mimeType:'application/pdf',buffer:Buffer.from('%PDF synthetic visual only')});assert.equal(await page.locator('[data-intake-message]').getAttribute('class'),'');

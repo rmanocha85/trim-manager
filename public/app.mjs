@@ -1,5 +1,5 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261115-roster1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261113-combined1';
+import {documentIntakeUI} from './intake-ui.mjs?v=20261115-intake-icon1';
 import {billingUI} from './billing-ui.mjs?v=20261115-manual1';
 import {patientsUI} from './patients-ui.mjs?v=20261115-roster1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
