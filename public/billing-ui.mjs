@@ -7,10 +7,10 @@ import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=
 import {hostedBilling,HostedBillingAccess} from './hosted-billing-access.mjs';
 import {avaChartUrl} from './patient-links.mjs';
 import {planNewPatients} from './core.mjs?v=20261107-workflow1';
-import {saveRecovery,loadRecovery} from './recovery.mjs?v=20261012-backup1';
+import {deleteRecovery,loadRecovery} from './recovery.mjs?v=20261115-manual1';
 import {backupUI} from './backup-ui.mjs?v=20261114-renew1';
 import {renderReport} from './reports.mjs?v=20261019-fixes1';
-import {sessionChanges,changedBillCount,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261031-history-date1';
+import {sessionChanges,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261031-history-date1';
 import {mergeSession} from './merge.mjs?v=20261015-immediate1';
 import {laptopRuntime} from './runtime.mjs';
 import {sameRosterContent} from './patients-core.mjs?v=20261107-workflow1';
@@ -34,11 +34,11 @@ const historyFilters=document.createElement('section');historyFilters.className=
 const historySearch=document.createElement('section');historySearch.id='history-patient-picker';historySearch.hidden=true;historySearch.innerHTML='<label>Find a patient<input id="history-search" type="search" placeholder="Search name or PHN" autocomplete="off"></label><div id="history-patient-results"></div><div id="history-patient-summary"></div>';$('history-content').before(historySearch);
 const startingDates=document.createElement('details');startingDates.id='starting-dates';const baselineHeading=$('baseline-patient').closest('.card').querySelector('h2');startingDates.innerHTML='<summary>Historical starting dates / corrections <span id="baseline-needed-count"></span></summary><p id="baseline-needed-status"></p><label class="check-line"><input id="baseline-show-all" type="checkbox"> Show all patients / correct a starting date</label>';baselineHeading.before(startingDates);let baselineNode=baselineHeading.nextSibling;baselineHeading.remove();while(baselineNode){const next=baselineNode.nextSibling;startingDates.append(baselineNode);if(baselineNode.id==='baseline-list')break;baselineNode=next;}startingDates.querySelector('p:not([id])').textContent='Only needed when there is no known qualifying billing date. Saved billings update routine due dates automatically.';const savedStartingDates=document.createElement('details');savedStartingDates.innerHTML='<summary>Saved starting dates</summary>';$('baseline-list').before(savedStartingDates);savedStartingDates.append($('baseline-list'));
 let routineView='individual',routineUnits=new Set(),routineExcluded=new Set(),routineReceipt=null,historyView='date',historyPatient=null,historyDate='',historyMonth=today().slice(0,7);
-let savedBase=null,billingMode='concern',lastChecked=null,driveReachable=false,localRecoveryFailed=false,ocrBusy=false,ocrRun=0,ocrAbort=null,imageURL=null;
+let savedBase=null,billingMode='concern',lastChecked=null,driveReachable=false,ocrBusy=false,ocrRun=0,ocrAbort=null,imageURL=null;
 const localChanges=()=>dirty&&ledger&&savedBase?sessionChanges(savedBase,ledger):[];
 function checkedDrive(){driveReachable=true;lastChecked=new Date();}
 function connectionError(e){driveReachable=e?.status===409;if(driveReachable)lastChecked=new Date();}
-let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,timer,releaseLock,printedSignature=null,recoveryQueue=Promise.resolve(),recoveryPending=0;
+let adapter,ledger,roster,etag,selected=null,editingId=null,tab='billing',dirty=false,blocked=false,seq=0,saving=false,releaseLock,printedSignature=null,legacyDraft=false;
 let setupCandidate,connecting=false,loadingLatest=false;
 let mergeChoices={},mergeConflicts=[],remoteBilling=null;
 let stagedImport=null,importing=false,importRead=0;
@@ -100,11 +100,13 @@ function renderCalendar(){
 function selectDate(value){if(value===date())return;if(saving||checking||notes.hasChanges())return notice('Save this day’s notes and wait for the current operation before changing dates.');if(!validDate(value)||value>today())return notice('Choose today or an earlier service date.');$('service-date').value=value;calendarMonth=value.slice(0,7);editingId=null;routineExcluded.clear();renderCalendar();renderStats();renderRoster();renderEditor();renderRoutineBatch();void notes.selectDate(value);}
 function download(name,value){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 async function takeTabLock(id){if(!navigator.locks)throw new Error('This browser cannot protect against competing tabs. Use an up-to-date Chrome browser.');return new Promise((resolve,reject)=>navigator.locks.request(`trim-billing:${id}`,{ifAvailable:true},async lock=>{if(!lock)return reject(new Error('This billing file is already open for editing in another tab. Close or lock that tab first.'));resolve();await new Promise(r=>releaseLock=r);}));}
-async function recover(){
+async function recoverLegacyDraft(){
   const saved=await loadRecovery(ledger.datasetId);
+  legacyDraft=Boolean(saved);
+  if(saved && !saved.dirty)await clearLegacyDraft();
   if(saved?.dirty){
     validateLedger(saved.ledger);
-    if(sameBillingContent(saved.ledger,ledger)){dirty=false;blocked=false;await persistRecovery();notice('Your previous changes are already saved to Google Drive. Recovery status repaired.');return;}
+    if(sameBillingContent(saved.ledger,ledger)){dirty=false;blocked=false;await clearLegacyDraft();notice('Your previous changes are already saved to Google Drive. Recovery status repaired.');return;}
     const loadedBase=clone(ledger);remoteBilling=clone(ledger);ledger=saved.ledger;dirty=true;
     if(saved.baseLedger?.datasetId===ledger.datasetId){validateLedger(saved.baseLedger);savedBase=saved.baseLedger;}else savedBase=saved.etag===etag?loadedBase:null;
     if(saved.etag!==etag){blocked=true;notice('Drive has newer billing. Click Save my changes to Drive to add your local work, or discard local changes.');}
@@ -112,8 +114,8 @@ async function recover(){
     etag=saved.etag; // Keep the revision belonging to this draft's starting copy.
   }
 }
-function persistRecovery(){const snapshot={ledger:clone(ledger),baseLedger:clone(savedBase),etag,dirty,savedAt:new Date().toISOString()};recoveryPending++;
-  recoveryQueue=recoveryQueue.catch(()=>{}).then(()=>saveRecovery(snapshot.ledger.datasetId,snapshot)).then(()=>{recoveryPending--;localRecoveryFailed=false;}).catch(e=>{recoveryPending--;localRecoveryFailed=true;blocked=true;status('Recovery save failed — keep this tab open',true);notice(`Device recovery failed: ${e.message}. Download a private backup before closing.`);throw e;});return recoveryQueue;
+async function clearLegacyDraft(){
+  if(legacyDraft){await deleteRecovery(ledger.datasetId);legacyDraft=false;}
 }
 function applyNewPatientPlans(){
   if(!ledger||!roster||writeUnavailable()||saving)return;
@@ -147,11 +149,11 @@ async function connect(mode,create=false,selectAccount=false,resumeFile=''){
     if(releaseLock){releaseLock();releaseLock=null;}
     await takeTabLock(s.ledger.datasetId);
     adapter=candidate;roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;
-    await recover();await resetBillingDate();
+    await recoverLegacyDraft();await resetBillingDate();
     if(!blocked)applyNewPatientPlans();
     document.title=laptopRuntime()?'TRIM Notes':'TRIM';
     $('storage-note').textContent=mode==='local'?'Laptop connection · saves to this laptop’s Drive folder. Cloud sync is not verified. Roster edits use Save to Drive.':'Google Drive connected · Roster edits use Save to Drive.';
-    renderAll();setBillingMode(billingMode);status(blocked?'Draft conflict — action needed':dirty?'Saved on this device — not yet in Drive':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
+    renderAll();setBillingMode(billingMode);status(blocked?'Draft conflict — action needed':dirty?'Changes pending in this tab':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
     void backups.connected(adapter,s.ledger);
     await patients.connect(adapter,ledger.datasetId);
     await patients.refresh();
@@ -164,18 +166,22 @@ async function connect(mode,create=false,selectAccount=false,resumeFile=''){
   }catch(e){if(replacedConnection&&releaseLock){releaseLock();releaseLock=null;}$('connection-error').textContent=e.message;$('connection-error').dataset.state='error';}
   finally{connecting=false;for(const id of ['cloud-connect','cloud-switch-account','local-connect','create-cloud'])$(id).disabled=false;$('connection-dialog').removeAttribute('aria-busy');}
 }
-function commit(next){guardWrite();ledger=next;ledger.units=clone(roster.units);seq++;dirty=true;printedSignature=null;status('Saving on this device…',true);persistRecovery().then(()=>{if(!blocked&&!saving&&!writeUnavailable())status('Saved on this device — not yet in Drive',true);}).catch(()=>{});renderStats();renderRoster();updateWriteLock();}
+function commit(next,detailsOnly=false){
+  guardWrite();const wasDirty=dirty;ledger=next;seq++;dirty=true;printedSignature=null;
+  if(detailsOnly){if(!wasDirty)updateWriteLock();return;}
+  ledger.units=clone(roster.units);renderStats();renderRoster();
+}
 async function flush(){
-  clearTimeout(timer);if(!dirty||saving||blocked||!adapter)return;
-  if(!navigator.onLine){syncFailed=true;connectionVerified=false;status('Offline — changes retained on device',true);return;}
+  if(!dirty||saving||blocked||!adapter)return;
+  if(!navigator.onLine){syncFailed=true;connectionVerified=false;status('Offline — keep this tab open',true);return;}
   saveFocus=document.activeElement?.matches('#editor input,#editor textarea')?{el:document.activeElement,start:document.activeElement.selectionStart,end:document.activeElement.selectionEnd}:null;
   saving=true;updateWriteLock();const currentSeq=seq;const snapshot=clone(ledger);
   try{
-    await recoveryQueue;status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;savedBase=clone(saved.ledger);remoteBilling=clone(saved.ledger);checkedDrive();
+    status('Saving…',true);const saved=await adapter.save(snapshot,etag);etag=saved.etag;savedBase=clone(saved.ledger);remoteBilling=clone(saved.ledger);checkedDrive();
     if(seq===currentSeq){ledger=saved.ledger;dirty=false;}else{ledger.revision=saved.ledger.revision;ledger.updatedAt=saved.ledger.updatedAt;ledger.localWriter=saved.ledger.localWriter;}
-    syncFailed=false;connectionVerified=true;await persistRecovery();status(dirty?'More changes waiting to save':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);
+    syncFailed=false;connectionVerified=true;await clearLegacyDraft();status(dirty?'More changes waiting to save':adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive',dirty);
     await backups.capture(saved.ledger);
-  }catch(e){connectionError(e);syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice('Drive changed during saving. Your work is retained. Click Save my changes to Drive to try again.');}else{notice(e.message+' Your draft remains on this device. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Saved on device · not synced',true);}
+  }catch(e){connectionError(e);syncFailed=true;connectionVerified=false;if(e.status===409){blocked=true;notice('Drive changed during saving. Your work is retained. Click Save my changes to Drive to try again.');}else{notice(e.message+' Keep this tab open to retain your draft. Use Save to Drive / retry after reconnecting.');}status(e.status===409?'Conflict — save stopped':'Unsaved in this tab',true);}
   finally{saving=false;updateWriteLock();if(!dirty&&!writeUnavailable()){renderCalendar();if(tab==='history')renderHistory();if(saveFocus?.el.isConnected&&!saveFocus.el.disabled&&document.activeElement===document.body){saveFocus.el.focus();if(saveFocus.start!==null)saveFocus.el.setSelectionRange(saveFocus.start,saveFocus.end);}}saveFocus=null;}
 }
 function renderAll(){
@@ -207,12 +213,12 @@ function chartLink(p,className=''){
   return url?`<a class="ava-chart-link ${className}" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="Open Ava chart for ${esc(p.name)}">Ava ↗</a>`:'';
 }
 function currentEntry(){return editingId?ledger.entries.find(e=>e.id===editingId):ledger.entries.find(e=>e.patientKey===selected&&e.date===date());}
-function applyItems(items,comment=currentEntry()?.comment||''){
+function applyItems(items,comment=currentEntry()?.comment||'',detailsOnly=false){
   guardWrite();
   const p=person(selected),e=currentEntry();if(!p)throw new Error('Select a patient.');
   if(!items.length){if(e){if(!confirm('Remove all codes for this billing date?'))return;commit(cancelBillingCodes(ledger,e.id));editingId=null;}renderEditor();return;}
   items=inheritConferenceDiagnoses(items,p.codes||'');
-  const next=upsertInteractiveEntry(ledger,p,date(),items,comment,e?.id);editingId=next.entries.find(x=>x.patientKey===p.key&&x.date===date())?.id||null;commit(next);
+  const next=upsertInteractiveEntry(ledger,p,date(),items,comment,e?.id);editingId=next.entries.find(x=>x.patientKey===p.key&&x.date===date())?.id||null;commit(next,detailsOnly);
 }
 function renderEditor(){
   if(!selected){$('editor').innerHTML='<div class="empty-editor"><h2>Choose a patient</h2><p>Select a patient from the results to enter billing.</p><small>No charge is added until you select a code.</small></div>';return;}const p=person(selected);if(!p)return;const e=currentEntry(),items=e?.items||[],locked=Boolean(e?.batchId);
@@ -233,10 +239,10 @@ function renderEditor(){
   const addCode=code=>{if(!/^\d{5}$/.test(code))throw new Error('Enter the full five-digit fee code.');if(currentEntry()?.items.some(i=>i.code===code))throw new Error('That code is already selected.');applyItems([...(currentEntry()?.items||[]),newItem(code)]);renderEditor();};
   $('add-code').onclick=safe(()=>addCode($('custom-code').value.trim()));$('other-code').onchange=safe(()=>{if($('other-code').value)addCode($('other-code').value);});
   $('editor').querySelectorAll('[data-remove-code]').forEach(b=>b.onclick=safe(()=>{cancelCode(currentEntry().id,b.dataset.removeCode);}));
-  $('editor').querySelectorAll('[data-field]:not([data-time-text])').forEach(input=>input.addEventListener('input',safe(()=>{const list=clone(currentEntry().items),item=list[Number(input.dataset.index)];item[input.dataset.field]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;if(input.dataset.field==='diagnosis'&&CONFERENCE_CODES.includes(item.code))item.diagnosisSource='manual';if(input.dataset.field==='customTimed'&&item.customTimed&&!item.start){item.start=roundedPacificTime();item.end=tenMinutesLater(item.start);item.endAuto=true;}if(item.code==='00114'&&['reason','diagnosis'].includes(input.dataset.field))item.diagnosisMode='per-charge';applyItems(list);for(const el of $('editor').querySelectorAll('[data-field="diagnosis"]')){if(el!==input)el.value=currentEntry()?.items[Number(el.dataset.index)]?.diagnosis||'';}if(input.dataset.field==='customTimed')renderEditor();else renderEditorIssues();})));
+  $('editor').querySelectorAll('[data-field]:not([data-time-text])').forEach(input=>input.addEventListener('input',safe(()=>{const list=clone(currentEntry().items),item=list[Number(input.dataset.index)];item[input.dataset.field]=input.type==='checkbox'?input.checked:input.type==='number'?Number(input.value):input.value;if(input.dataset.field==='diagnosis'&&CONFERENCE_CODES.includes(item.code))item.diagnosisSource='manual';if(input.dataset.field==='customTimed'&&item.customTimed&&!item.start){item.start=roundedPacificTime();item.end=tenMinutesLater(item.start);item.endAuto=true;}if(item.code==='00114'&&['reason','diagnosis'].includes(input.dataset.field))item.diagnosisMode='per-charge';applyItems(list,undefined,true);for(const el of $('editor').querySelectorAll('[data-field="diagnosis"]')){if(el!==input)el.value=currentEntry()?.items[Number(el.dataset.index)]?.diagnosis||'';}if(input.dataset.field==='customTimed')renderEditor();else renderEditorIssues();})));
   bindTimeFields($('editor'),{guard:()=>{try{guardWrite();return !currentEntry()?.batchId;}catch(e){notice(e.message);return false;}},change:safe((index,field,value)=>{guardWrite();const list=clone(currentEntry().items);if(currentEntry().batchId)return;list[index]=editBillingTime(list[index],field,value);applyItems(list);if(field==='start'){const end=$('editor').querySelector(`[data-index="${index}"][data-field="end"]`);if(end){end.value=list[index].end||'';end.dispatchEvent(new Event('time-refresh'));}}renderEditorIssues();})});
   $('editor').querySelectorAll('[data-reason-preset]').forEach(button=>button.onclick=safe(()=>{guardWrite();const list=clone(currentEntry().items),item=list[Number(button.dataset.index)],preset=REASON_PRESETS[Number(button.dataset.reasonPreset)];if(!preset||item?.code!=='00114')return;if((item.reason?.trim()||item.diagnosis?.trim())&&!REASON_PRESETS.some(p=>p.reason===item.reason&&p.diagnosis===item.diagnosis)&&!confirm('Replace the current billing reason and diagnosis with this preset?'))return;Object.assign(item,preset,{diagnosisMode:'per-charge'});applyItems(list);renderEditor();}));
-  if($('entry-comment'))$('entry-comment').oninput=safe(()=>{if(!currentEntry())return;applyItems(clone(currentEntry().items),$('entry-comment').value);renderEditorIssues();});
+  if($('entry-comment'))$('entry-comment').oninput=safe(()=>{if(!currentEntry())return;applyItems(clone(currentEntry().items),$('entry-comment').value,true);renderEditorIssues();});
   enhanceDateInputs($('editor'));
   if($('remove-entry'))$('remove-entry').onclick=safe(()=>cancelCode(currentEntry().id));
   $('editor').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEntry(b.dataset.edit));renderEditorIssues();updateWriteLock();
@@ -250,7 +256,8 @@ function itemHTML(i,index,locked){
 function reasonPresetHTML(item,index,locked,field){
   return `<div class="reason-workspace"><div class="reason-presets" aria-label="Common billing reasons">${REASON_PRESETS.map((p,n)=>`<button type="button" data-reason-preset="${n}" data-index="${index}" aria-pressed="${item.reason===p.reason&&item.diagnosis===p.diagnosis}" ${locked?'disabled':''}><span>${esc(p.reason)}</span><small>${esc(p.diagnosis)}</small></button>`).join('')}</div><div class="reason-diagnosis"><label>Billing reason / comment<textarea data-index="${index}" data-field="reason" maxlength="2000" ${locked?'disabled':''} placeholder="Type a reason, or choose one above…">${esc(item.reason||'')}</textarea></label>${field('diagnosis','ICD-9 for this billing','text','maxlength="32" placeholder="Up to 3 codes; spaces or commas" title="Enter up to 3 ICD-9 codes, separated by spaces, commas or semicolons. Usual diagnosis if blank."')}</div></div>`;
 }
-function renderEditorIssues(){const e=currentEntry();$('editor').querySelectorAll('[data-reason-preset]').forEach(b=>{const i=e?.items[Number(b.dataset.index)],p=REASON_PRESETS[Number(b.dataset.reasonPreset)];b.setAttribute('aria-pressed',String(i?.reason===p.reason&&i?.diagnosis===p.diagnosis));});if(!$('editor-issues'))return;const issues=e?entryIssues(e,ledger,person(selected)):[];$('editor-issues').innerHTML=issues.length?`<div class="issue-box"><strong>Saved as a draft · needs information</strong><ul>${issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:e?'<p class="hint">Required fields complete. Physician eligibility review still required.</p>':'';}
+$('editor').addEventListener('change',event=>{if(event.target.matches('[data-field],#entry-comment')){renderStats();renderSaveControls();}});
+function renderEditorIssues(){const e=currentEntry();$('editor').querySelectorAll('[data-reason-preset]').forEach(b=>{const i=e?.items[Number(b.dataset.index)],p=REASON_PRESETS[Number(b.dataset.reasonPreset)];b.setAttribute('aria-pressed',String(i?.reason===p.reason&&i?.diagnosis===p.diagnosis));});if(!$('editor-issues'))return;const issues=e?entryIssues(e,ledger,person(selected)):[];const card=$('roster').querySelector('.patient.selected .patient-right .patient-detail');if(card&&e&&!e.batchId)card.textContent=issues.length?'Needs information':'Selected';$('editor-issues').innerHTML=issues.length?`<div class="issue-box"><strong>Saved as a draft · needs information</strong><ul>${issues.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`:e?'<p class="hint">Required fields complete. Physician eligibility review still required.</p>':'';}
 function openEntry(id){if(saving||checking)return notice('Wait for the current save before opening another entry.');const e=ledger.entries.find(e=>e.id===id);if(!e)return;if(e.date!==date()&&notes.hasChanges())return notice('Save your current notes before opening another date.');if(e.date!==date())void notes.selectDate(e.date);selected=e.patientKey;editingId=e.id;$('service-date').value=e.date;calendarMonth=e.date.slice(0,7);switchTab('billing');renderCalendar();renderStats();renderRoster();renderEditor();}
 function chosen(){return batchEntries(ledger,$('batch-from').value,$('batch-to').value);}
 function issuesFor(entries){return entries.flatMap(e=>entryIssues(e,ledger,person(e.patientKey)).map(issue=>({id:e.id,text:`${person(e.patientKey)?.name||'Patient'} · ${formatDate(e.date)} · ${issue}`})));}
@@ -345,7 +352,7 @@ function renderHistory(){
       (historyDate?'':ledger.batches.map(b=>'<div class="card"><h3>'+esc(formatDate(b.from))+' → '+esc(formatDate(b.to))+'</h3><p>'+b.entryIds.length+' entries · handed over '+esc(formatTimestamp(b.handedOverAt))+'</p></div>').join(''));
   }
   const recent=(ledger.cancellations||[]).filter(c=>!c.undoneAt&&!savedBase?.cancellations?.some(b=>b.id===c.id)&&matches(c.before));
-  if(recent.length)$('history-content').insertAdjacentHTML('afterbegin','<section class="card history-removals"><h3>Removals waiting to save</h3><p>These changes are on this device until you save the session to Drive.</p>'+recent.map(c=>'<div class="history-row"><span>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+' · '+esc(formatDate(c.before.date))+'<small>Removed: '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</small></span><button data-history-undo="'+esc(c.id)+'">Undo removal</button></div>').join('')+'</section>');
+  if(recent.length)$('history-content').insertAdjacentHTML('afterbegin','<section class="card history-removals"><h3>Removals waiting to save</h3><p>These changes are in this tab until you save the session to Drive.</p>'+recent.map(c=>'<div class="history-row"><span>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+' · '+esc(formatDate(c.before.date))+'<small>Removed: '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</small></span><button data-history-undo="'+esc(c.id)+'">Undo removal</button></div>').join('')+'</section>');
   $('history').querySelectorAll('[data-history-patient]').forEach(b=>b.onclick=()=>showPatientHistory(b.dataset.historyPatient));
   $('history-content').querySelectorAll('[data-history-remove]').forEach(b=>b.onclick=safe(()=>cancelCode(b.dataset.historyRemove,b.dataset.historyCode||null)));
   $('history-content').querySelectorAll('[data-history-undo]').forEach(b=>b.onclick=safe(()=>undoCancellation(b.dataset.historyUndo)));
@@ -388,10 +395,10 @@ $('import-apply').onclick=async()=>{
     // First setup creates an empty private file, then uses the same revision-
     // checked save as an existing workspace. A failed import never replaces data.
     if(!adapter&&!await connect('cloud',true))throw new Error($('connection-error').textContent);
-    if(dirty||saving||blocked)throw new Error('Choose Save to Drive or resolve local recovery before importing.');
+    if(dirty||saving||blocked)throw new Error('Choose Save to Drive or resolve pending changes before importing.');
     const fresh=await adapter.load();if(fresh.etag!==etag)throw new Error('Billing changed elsewhere. Reload saved data, then choose the import again. Nothing was imported.');
     const result=mergeImport(ledger,stagedImport.p,stagedImport.sha256);
-    if(!result.duplicate){if(ledger.entries.length||ledger.historicalBillings?.length||Object.keys(ledger.baselines).length)download(`PRIVATE_TRIM_Before_Import_${today()}.json`,ledger);commit(result.ledger);await recoveryQueue;notice('Reviewed billing imported locally. Choose Save to Drive when ready.');}
+    if(!result.duplicate){if(ledger.entries.length||ledger.historicalBillings?.length||Object.keys(ledger.baselines).length)download(`PRIVATE_TRIM_Before_Import_${today()}.json`,ledger);commit(result.ledger);notice('Reviewed billing imported locally. Choose Save to Drive when ready.');}
     stagedImport=null;$('import-file').value='';$('import-dialog').close();renderAll();switchTab('history');notice(`Import prepared locally: ${result.summary.billed} already billed, ${result.summary.pending} in the current batch, ${result.summary.held} held for clarification.${result.summary.resolved?` ${result.summary.resolved} prior held items resolved.`:''} Choose Save to Drive to finish. No billing was submitted.`);
   }catch(e){$('import-error').textContent=e.message;}
   finally{importing=false;$('workspace').inert=false;$('import-file').disabled=false;$('import-close').disabled=false;$('import-apply').disabled=!stagedImport;}
@@ -419,7 +426,7 @@ function renderRoutineBatch(){
   $('routine-units').querySelectorAll('[data-routine-unit]').forEach(el=>el.onchange=()=>{if(el.checked)routineUnits.add(el.dataset.routineUnit);else routineUnits.delete(el.dataset.routineUnit);renderRoutineBatch();});
   $('routine-review').querySelectorAll('[data-routine-patient]').forEach(el=>el.onchange=()=>{if(el.checked)routineExcluded.delete(el.dataset.routinePatient);else routineExcluded.add(el.dataset.routinePatient);updateRoutineAction();});
   const canUndo=routineReceipt&&routineReceipt.entries.some(e=>ledger.entries.some(x=>x.id===e.id))&&!routineReceipt.entries.some(e=>savedBase?.entries.some(x=>x.id===e.id));
-  $('routine-result').innerHTML=canUndo?'<p>Routine batch added for '+esc(formatDate(routineReceipt.date))+'. Saved locally, not yet in Drive.</p><button id="undo-routine-batch">Undo this routine batch</button>':'';
+  $('routine-result').innerHTML=canUndo?'<p>Routine batch added for '+esc(formatDate(routineReceipt.date))+'. Choose Save to Drive to keep this batch.</p><button id="undo-routine-batch">Undo this routine batch</button>':'';
   if($('undo-routine-batch'))$('undo-routine-batch').onclick=safe(()=>{guardWrite();commit(undoRoutineBatch(ledger,routineReceipt));routineReceipt=null;renderRoutineBatch();renderCalendar();renderHistory();notice('Routine batch undone locally. Other billing is unchanged.');});
   updateRoutineAction();
 }
@@ -449,7 +456,7 @@ $('service-date').onchange=()=>{const next=$('service-date').value;$('service-da
 $('month-prev').onclick=()=>{const d=new Date(calendarMonth+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()-1);calendarMonth=d.toISOString().slice(0,7);renderCalendar();};
 $('month-next').onclick=()=>{const d=new Date(calendarMonth+'-01T12:00:00Z');d.setUTCMonth(d.getUTCMonth()+1);calendarMonth=d.toISOString().slice(0,7);renderCalendar();};
 $('calendar-today').onclick=()=>selectDate(today());
-// Searching changes selection only; committed local billing and recovery stay intact.
+// Searching changes selection only; pending billing stays in memory.
 $('search').addEventListener('input',()=>{selected=null;editingId=null;renderRoster();renderEditor();});
 for(const id of ['unit-filter','panel-filter','due-filter'])$(id).addEventListener('input',()=>renderRoster());
 for(const id of ['batch-from','batch-to','report-layout'])$(id).onchange=()=>{printedSignature=null;renderReports();};
@@ -458,7 +465,7 @@ async function syncSession(save=true){
   try{
     if(!navigator.onLine)throw new Error('Reconnect to the internet. Your local work is retained.');
     await adapter.ensureConnected();
-    await recoveryQueue;
+
     const current=await adapter.load();remoteBilling=clone(current.ledger);checkedDrive();roster=patients.state().ready?normalizeRoster(patients.roster()):await adapter.roster();
     if(!dirty||sameBillingContent(ledger,current.ledger)){await adoptSaved(current);checking=false;applyNewPatientPlans();if(save&&dirty)await flush();renderAll();return;}
     const merged=mergeSession(savedBase,ledger,current.ledger,mergeChoices);
@@ -466,11 +473,11 @@ async function syncSession(save=true){
       blocked=true;mergeConflicts=merged.conflicts;renderEditor();renderMergeChoices();status('Review overlapping billing changes',true);
       notice('Choose which version to keep for the billing changed on both computers.');return;
     }
-    // Rebase the local recovery before the one conditional upload. If the upload
+    // Rebase the in-memory edits before the one conditional upload. If the upload
     // fails, retry uses the same changes against the newly loaded Drive version.
     ledger=planNewPatients(merged.ledger,roster);savedBase=clone(current.ledger);etag=current.etag;seq++;
     dirty=!sameBillingContent(ledger,current.ledger);blocked=false;syncFailed=false;connectionVerified=true;
-    printedSignature=null;mergeChoices={};mergeConflicts=[];await persistRecovery();
+    printedSignature=null;mergeChoices={};mergeConflicts=[];
     if($('merge-dialog').open)$('merge-dialog').close();
     checking=false;
     if(dirty&&save)await flush();else if(!dirty)await adoptSaved(current);
@@ -482,7 +489,7 @@ async function syncSession(save=true){
 async function adoptSaved(s){
   validateLedger(s.ledger);
   ledger=s.ledger;savedBase=clone(s.ledger);remoteBilling=clone(s.ledger);etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;printedSignature=null;mergeChoices={};mergeConflicts=[];seq++;
-  checkedDrive();await persistRecovery();notice('');renderAll();
+  checkedDrive();await clearLegacyDraft();notice('');renderAll();
   if($('merge-dialog').open)$('merge-dialog').close();
   status(adapter.mode==='local'?'Saved to Drive folder · sync unverified':'Saved to Google Drive');
   await backups.capture(s.ledger);
@@ -494,11 +501,9 @@ async function discardLocal(){
   try{
     if(!navigator.onLine)throw new Error('Reconnect first. Your local changes have not been discarded.');
     await adapter.ensureConnected();
-    await recoveryQueue;
+
     const current=await adapter.load();validateLedger(current.ledger);
     if(current.ledger.datasetId!==ledger.datasetId)throw new Error('Wrong billing file. Your draft has not been discarded.');
-    // Keep a private encrypted safety copy on this device, without downloads.
-    if(dirty)await saveRecovery(`${ledger.datasetId}:discarded`,{ledger:clone(ledger),baseLedger:clone(savedBase),etag,dirty:true,savedAt:new Date().toISOString()});
     selected=null;editingId=null;await adoptSaved(current);
     notice('Local changes discarded. Latest Drive billing loaded.');
   }finally{checking=false;updateWriteLock();}
@@ -538,7 +543,7 @@ $('conflict-discard').onclick=safe(discardLocal);
 $('changes-discard').onclick=safe(discardLocal);
 $('sync').onclick=safe(saveSession);
 $('drive-connection').onclick=()=>{document.getElementById('load-latest').click();};
-$('lock').onclick=safe(async()=>{document.getElementById('workspace-menu').hidePopover();await notes.beforeLock();await patients.beforeLock();await persistRecovery();if((dirty||notes.hasChanges()||patients.hasChanges())&&!confirm('Changes remain on this device. Lock anyway? Reconnect on this browser to recover them.'))return;await adapter?.hostedAccess?.lock();if(laptopStartup)sessionStorage.setItem(laptopLockKey,'yes');releaseLock?.();releaseLock=null;location.reload();});
+$('lock').onclick=safe(async()=>{document.getElementById('workspace-menu').hidePopover();await notes.beforeLock();await patients.beforeLock();if((dirty||notes.hasChanges()||patients.hasChanges())&&!confirm(dirty?'Lock and discard unsaved billing in this tab?':'Lock with pending roster or Notes changes?'))return;await adapter?.hostedAccess?.lock();if(laptopStartup)sessionStorage.setItem(laptopLockKey,'yes');releaseLock?.();releaseLock=null;location.reload();});
 $('other-form').onsubmit=async ev=>{ev.preventDefault();try{guardWrite();if(ocrBusy)throw new Error('Wait for screenshot reading to finish.');const p=coveragePatient(Object.fromEntries(new FormData(ev.target)),people(),crypto.randomUUID());const next=clone(ledger);next.nonPanel.push(p);next.patients[p.key]=p;commit(next);resetPatientForm();$('search').value='';$('unit-filter').value='';$('panel-filter').value='all';$('due-filter').checked=false;selected=p.key;editingId=null;renderRoster();renderEditor();}catch(e){$('other-error').textContent=e.message;}};
 $('parallel').onchange=safe(()=>{const off=!$('parallel').checked;if(off&&!confirm('End paper-comparison mode? Only do this when you are ready to use digital reports as the single MOA billing source.')){$('parallel').checked=true;return;}const n=clone(ledger);n.settings.parallel=!off;commit(n);});
 $('totals-year').onchange=renderSettings;
@@ -562,7 +567,7 @@ window.addEventListener('online',async()=>{
   catch(e){if(adapter!==existing)return;connectionError(e);notice(e.status===409?'Back online. Drive changed; refresh to reconcile.':e.message);}
   finally{updateWriteLock();}
 });
-window.addEventListener('beforeunload',e=>{if(dirty||recoveryPending||backups.busy()){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if(dirty||backups.busy()){e.preventDefault();e.returnValue='';}});
 // Drive revisions are checked on opening, explicit refresh, and conditional saves.
 
 function renderSaveControls(){
@@ -573,10 +578,9 @@ function renderSaveControls(){
   $('drive-connection').textContent=connected?(adapter?.mode==='local'?'● Local folder connected':'● Drive connected'):offline?'● Offline':adapter?.needsRenewal?.()?'● Renew Google access':'● Retry Drive';
   $('drive-connection').title=lastChecked?'Last checked '+formatTimestamp(lastChecked):'Check your connection without saving billing';
   $('drive-connection').disabled=saving||checking||loadingLatest||!adapter;
-  const changes=localChanges(),count=changedBillCount(changes);
-  $('local-changes').dataset.state=blocked||localRecoveryFailed?'error':dirty?'pending':'ok';
-  $('local-changes').textContent=localRecoveryFailed?'! Local save needs attention':recoveryPending?'◌ Saving locally…':dirty?(count?'● '+count+' bill'+(count===1?'':'s')+' pending':'● Other local changes'):'✓ No local changes';
-  $('local-changes').title=dirty?'Saved on this device, not in Drive. Click to review changes.':'Everything matches your last Drive save.';
+  $('local-changes').dataset.state=blocked?'error':dirty?'pending':'ok';
+  $('local-changes').textContent=dirty?'● Changes pending':'✓ No local changes';
+  $('local-changes').title=dirty?'Unsaved billing in this tab. Choose Save to Drive before closing.':'Matches your last Drive save.';
   $('local-changes').disabled=!ledger;
   $('sync').textContent=saving?'◌ Saving session…':blocked?'Save my changes to Drive':'Save session to Drive';
   $('sync').dataset.state=saving?'busy':dirty?'pending':'quiet';
@@ -601,7 +605,7 @@ function billingRows(entry,editable=false){
 }
 function renderChanges(){
   const changes=localChanges();
-  $('changes-summary').textContent=localRecoveryFailed?'Local recovery failed. Keep this tab open and download a private backup in Settings.':recoveryPending?'Saving the latest changes on this device…':dirty?'Review the changes below, then save.':'No local changes waiting for Drive.';
+  $('changes-summary').textContent=dirty?'Billing changes are in this tab until you choose Save to Drive.':'No billing changes waiting for Drive.';
   const removals=(ledger?.cancellations||[]).filter(c=>!c.undoneAt&&!savedBase?.cancellations?.some(b=>b.id===c.id));
 $('changes-list').innerHTML=changes.map(r=>'<article class="change-row"><div><strong>'+esc(r.name)+nameCopy(r.name)+'</strong><span>'+esc(formatDate(r.date))+'</span></div><b>'+esc(!r.after&&r.before?'Will be removed from Drive':r.kind)+'</b>'+(r.before?'<h4>Before</h4>'+billingRows(r.before):'')+(r.after?'<h4>After</h4>'+billingRows(r.after):'')+(r.detail?'<p>'+esc(r.detail)+'</p>':'')+'</article>').join('')+removals.map(c=>'<article class="change-row removal-record"><strong>'+esc(ledger.patients[c.before.patientKey]?.name||'Patient')+nameCopy(ledger.patients[c.before.patientKey]?.name||'Patient')+'</strong><p>'+esc(formatDate(c.before.date))+' · Removed '+c.before.items.filter(i=>!c.after?.items.some(a=>a.code===i.code)).map(i=>esc(i.code.replace(/^0+/,''))).join(', ')+'</p><button data-undo-cancel="'+esc(c.id)+'" '+(writeUnavailable()||saving?'disabled':'')+'>Undo removal</button></article>').join('')||(dirty?'<p>A recovered session is waiting to save. No patient changes compared with the saved snapshot.</p>':'');
   $('changes-list').querySelectorAll('[data-undo-cancel]').forEach(b=>b.onclick=safe(()=>undoCancellation(b.dataset.undoCancel)));
@@ -682,7 +686,7 @@ async function openLaptopWorkspace(){
     render:renderAll,
     state:()=>({adapter,ledger,roster,date:date(),people:ledger?people():[]}),
     save:async()=>{await syncSession(true);if(dirty||blocked)throw new Error('Resolve the TRIM Billing conflict before finishing this save.');},
-    status:()=>({dirty,busy:saving||checking||loadingLatest||recoveryPending>0,error:localRecoveryFailed||mergeConflicts.length>0,ready:!!ledger,mode:adapter?.mode}),
+    status:()=>({dirty,busy:saving||checking||loadingLatest,error:mergeConflicts.length>0,ready:!!ledger,mode:adapter?.mode}),
     openPatientBilling,showPatientHistory:key=>showPatientHistory(key,true),switchTab,recordRoutine,notify:notice,chooseConnection:openConnectionDialog,loadLatest,
     setRoster:raw=>{roster=normalizeRoster(raw);if(ledger){renderAll();notes.render();applyNewPatientPlans();}},
     connectionStatus:()=>({mode:adapter?.mode,connected:driveReachable&&navigator.onLine&&!adapter?.authExpired,reason:!navigator.onLine?'offline':adapter?.authExpired?'expired':!driveReachable?'network':null,ready:!!ledger,lastChecked:lastChecked?.toISOString()}),

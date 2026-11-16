@@ -29,16 +29,18 @@ try{
  await page.locator('[data-section="notes"]').click();await page.locator('[data-tab="rounds"]').click();await page.locator('#notes-input').fill('Synthetic local note retained after reopening.');
  await page.locator('#rounds .notes-save-state').filter({hasText:'Saved on this device'}).waitFor();
  await page.reload();await opened(page);assert.match(await page.locator('#local-changes').innerText(),/pending/);
- await page.locator('.patient').click();assert.equal(await page.locator('[data-field="reason"]').inputValue(),'Fall and trauma');
+ await page.locator('.patient').click();assert.equal(await page.locator('[data-code="00114"]').evaluate(b=>b.classList.contains('on')),false);
  await page.locator('[data-section="notes"]').click();await page.locator('[data-tab="rounds"]').click();assert.equal(await page.locator('#notes-input').inputValue(),'Synthetic local note retained after reopening.');
  assert.equal(await readFile(billingPath,'utf8'),original);await assert.rejects(access(path.join(notesPath,'patient-context.json')));assert.equal(writes,0);
- await page.locator('#lock').click();await page.locator('#connect').filter({hasText:'Open local workspace'}).waitFor();assert.equal(await page.locator('#workspace').isVisible(),false);
+ await page.locator('#workspace-more').click();await page.locator('#lock').click();await page.locator('#connect').filter({hasText:'Open local workspace'}).waitFor();assert.equal(await page.locator('#workspace').isVisible(),false);
  const lockedReads=rosterReads;await page.reload();await page.locator('#connect').filter({hasText:'Open local workspace'}).waitFor();assert.equal(rosterReads,lockedReads);
  await page.locator('#connect').click();await opened(page);await page.locator('[data-section="notes"]').click();await page.locator('[data-tab="rounds"]').click();await page.locator('#notes-input').waitFor();
  const second=await newPage();await second.goto(url);await second.locator('#local-startup-status').filter({hasText:'already open for editing'}).waitFor();assert.equal(await second.locator('#workspace').isVisible(),false);assert.equal(writes,0);
- await page.locator('#lock').click();await page.locator('#connect').filter({hasText:'Open local workspace'}).waitFor();await second.locator('#connect').click();await opened(second);
- // Existing recovery must still stop at a changed file revision, without uploads.
- const changed={...structuredClone(ledger),revision:ledger.revision+1,settings:{...ledger.settings,parallel:false}};
+ await page.locator('#workspace-more').click();await page.locator('#lock').click();await page.locator('#connect').filter({hasText:'Open local workspace'}).waitFor();await second.locator('#connect').click();await opened(second);
+ // Older versions may have left a pending encrypted draft for this dataset.
+ const legacy=structuredClone(ledger);legacy.settings.parallel=!ledger.settings.parallel;
+ await second.evaluate(async payload=>(await import('/recovery.mjs')).saveRecovery('local-startup-test',payload),{ledger:legacy,baseLedger:ledger,dirty:true,etag:'older-revision'});
+ const changed={...structuredClone(ledger),revision:ledger.revision+1,settings:{...ledger.settings,fixtureMarker:true}};
  await writeFile(billingPath,JSON.stringify(changed));await second.reload();await second.locator('#billing-lock').filter({hasText:'Changes saved on another computer'}).waitFor();
  assert.equal(await second.locator('#workspace').isVisible(),true);assert.equal(writes,0);assert.deepEqual(JSON.parse(await readFile(billingPath,'utf8')),changed);
  await page.close();await second.close();
@@ -49,7 +51,7 @@ try{
  await rename(path.join(dir,'saved-billing.json'),billingPath);await missing.locator('#connect').click();await missing.locator('.patient').waitFor();assert.equal(await missing.locator('#gate').isVisible(),false);
  await missing.screenshot({path:'work/local-startup-synthetic.png',fullPage:true});
  assert.equal(externalRequests,0);assert.equal(writes,0);assert.deepEqual(errors,[]);
- console.log('PASS automatic local startup without Google, billing/notes recovery, explicit lock, competing-tab protection, missing-file retry and stale-revision protection; zero record uploads.');
+ console.log('PASS automatic local startup without Google, in-memory billing and Notes recovery, explicit lock, competing-tab protection, missing-file retry and stale-revision protection; zero record uploads.');
 }finally{
  await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));
  assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));assert.ok(path.basename(dir).startsWith('trim-local-startup-'));await rm(dir,{recursive:true,force:true});

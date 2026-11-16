@@ -19,7 +19,7 @@ export class Session {
       this.message = completed.length ? `${completed.join(', ')} saved. ${this.parts.some(p=>p.state().mode==='local')?'Saved to the laptop’s Drive folder; cloud sync is unverified.':'Save verified in Drive.'}` : 'No changes to save.';
     } catch (error) {
       this.lastError = error.message;
-      this.message = `${completed.length ? completed.join(', ') + ' saved. ' : ''}${error.message} Remaining changes stay on this device.`;
+      this.message = `${completed.length ? completed.join(', ') + ' saved. ' : ''}${error.message} Remaining changes are pending. Keep this tab open and retry Save to Drive.`;
       throw error;
     } finally { this.saving = false; this.notify(); }
   }
@@ -35,8 +35,8 @@ export function saveIndicator({states,session,unfinished=false,connection={}}){
  if(session.lastError)return result('⚠ Save failed · Retry','error',session.message||session.lastError);
  if(errors.length)return result('⚠ Needs attention','error',errors.map(s=>s.name).join(', ')+' needs attention. Click to review.');
  if(!connection.ready)return result('Connect to Drive','quiet','Open your workspace to load saved records.');
- if(pending.length)return result('● Changes pending','pending',pending.map(s=>s.name).join(', ')+' changes are on this device and still need Save to Drive.');
+ if(pending.length)return result('● Changes pending','pending',pending.map(s=>s.name).join(', ')+' changes are pending. Choose Save to Drive before closing this tab.');
  if(unfinished)return result('● Form in progress','pending','Finish the patient form before saving to Drive.');
- if(!connection.connected){if(connection.reason==='expired')return result('Renew Google access','error','Use Refresh from Drive or Save to renew access.');if(connection.reason==='offline'||connection.reason==='network')return result(connection.reason==='offline'?'Offline':'Drive unreachable','error','Your work stays on this device. Retry when the connection returns.');return result('⚠ Connection lost','error','Reconnect to verify the latest saved records.');}
+ if(!connection.connected){if(connection.reason==='expired')return result('Renew Google access','error','Use Refresh from Drive or Save to renew access.');if(connection.reason==='offline'||connection.reason==='network')return result(connection.reason==='offline'?'Offline':'Drive unreachable','error','Keep this tab open. Retry when the connection returns.');return result('⚠ Connection lost','error','Reconnect to verify the latest saved records.');}
  return result(local?'✓ Saved to folder':'✓ Saved to Drive','ok',local?'Saved in the laptop Drive folder; cloud sync is unverified.':'No local changes. Matches the verified Drive copy. Click for details.');
 }

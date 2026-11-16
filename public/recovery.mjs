@@ -10,4 +10,5 @@ export const setBackupDirectory=handle=>set('backup-directory',handle);
 let keyPromise;
 async function key(){return keyPromise??= (async()=>{let k=await get('key');if(!k){k=await crypto.subtle.generateKey({name:'AES-GCM',length:256},false,['encrypt','decrypt']);await set('key',k);}return k;})();}
 export async function saveRecovery(id,value){const iv=crypto.getRandomValues(new Uint8Array(12));const bytes=new TextEncoder().encode(JSON.stringify(value));const data=await crypto.subtle.encrypt({name:'AES-GCM',iv},await key(),bytes);await set(`draft:${id}`,{iv,data});}
+export async function deleteRecovery(id){const d=await db();return new Promise((resolve,reject)=>{const tx=d.transaction('vault','readwrite');tx.objectStore('vault').delete('draft:'+id);tx.oncomplete=resolve;tx.onabort=tx.onerror=()=>reject(tx.error||new Error('Could not clear the old draft.'));});}
 export async function loadRecovery(id){const v=await get(`draft:${id}`);if(!v)return null;return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:v.iv},await key(),v.data)));}

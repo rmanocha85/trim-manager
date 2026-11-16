@@ -42,9 +42,10 @@ try{
   await save();assert.doesNotMatch(await page.locator('#editor-issues').innerText(),/reason required/i);
   const text='Synthetic first line\nSecond line <check>';
   await note.fill(text);await ready();
-  // Device recovery preserves an unsynced note across reload.
-  await page.reload();await page.locator('.patient').first().waitFor();await ready();
-  await page.locator('#search').fill(patients[0].phn);await page.locator('.patient').click();assert.equal(await note.inputValue(),text);await save();
+  // Explicit save preserves a note across reload.
+  await save();
+  await page.reload();await page.locator('.patient').first().waitFor();await saved();
+  await page.locator('#search').fill(patients[0].phn);await page.locator('.patient').click();assert.equal(await note.inputValue(),text);
   assert.equal((await readBilling()).entries[0].items[0].reason,text);
   await page.locator('[data-tab=history]').click();await page.locator('.history-reason').filter({hasText:'Synthetic first line'}).waitFor();
   await page.locator('[data-tab=billing]').click();
@@ -70,6 +71,6 @@ try{
     await page.emulateMedia({media:'screen'});await page.screenshot({path:`work/app-fixes-${action}.png`});await page.locator('#patients-print-close').click();
   }
   assert.deepEqual(errors,[]);assert.deepEqual(dialogs,[]);
-  console.log('PASS six-fix UI checks: exact navigation, Sunday-first headers, independent Ava links in both billing modes, optional 14077 note and recovery/save/history, responsive layout, 151 patients saved/reloaded/searched/printed without omissions.');
+  console.log('PASS six-fix UI checks: exact navigation, Sunday-first headers, independent Ava links in both billing modes, optional 14077 note and manual save/history, responsive layout, 151 patients saved/reloaded/searched/printed without omissions.');
 }catch(e){console.error(errors,dialogs);await page.screenshot({path:'work/app-fixes-failure.png',fullPage:true});throw e;}
 finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));assert.equal(path.dirname(dir),path.resolve(os.tmpdir()));await rm(dir,{recursive:true,force:true});}

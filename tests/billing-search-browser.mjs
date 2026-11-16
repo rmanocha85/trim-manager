@@ -21,7 +21,8 @@ try{
  await select(0);await page.locator('[data-code="14077"]').click();await page.getByLabel('Note (optional)',{exact:true}).fill('Keep this unfinished billing note.');
  await page.locator('#search').fill(patients[1].phn);await empty();assert.equal(await page.locator('.patient').count(),1);
  await page.waitForFunction(()=>!document.querySelector('#sync').disabled);assert.equal(JSON.parse(await readFile(billingPath,'utf8')).entries.length,0);
- await page.reload();await page.locator('.patient').first().waitFor();await select(0);assert.equal(await page.getByLabel('Note (optional)',{exact:true}).inputValue(),'Keep this unfinished billing note.');
+ await select(0);assert.equal(await page.getByLabel('Note (optional)',{exact:true}).inputValue(),'Keep this unfinished billing note.');
+ const pending=await page.evaluate(async()=>await (await import('/recovery.mjs')).loadRecovery('search-synthetic'));assert.equal(pending,null);
  await page.locator('#search').fill('Example');await empty();await page.locator('#search').fill('no such patient');await empty();await page.locator('#search').fill('');await empty();
  await page.waitForFunction(()=>!document.querySelector('#sync').disabled);await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
  const saved=JSON.parse(await readFile(billingPath,'utf8'));assert.equal(saved.entries.length,1);assert.equal(saved.entries[0].patientKey,'phn:'+patients[0].phn);assert.equal(saved.entries[0].items[0].reason,'Keep this unfinished billing note.');
@@ -31,5 +32,13 @@ try{
  await page.locator('[data-tab=billing]').click();await select(0);await page.locator('#search').fill(patients[1].phn);await empty();
  await mkdir('work',{recursive:true});await page.screenshot({path:'work/billing-search-cleared.png'});
  assert.deepEqual(JSON.parse(await readFile(billingPath,'utf8')),saved);assert.deepEqual(errors,[]);
- console.log('PASS search clears selection and historical editing ID in Concern/Routine; single, multiple, zero and cleared results require selection; pending billing survives reload and save unchanged.');
+ await select(0);await page.getByLabel('Note (optional)',{exact:true}).fill('Unsaved replacement');await page.reload();await page.locator('.patient').first().waitFor();await select(0);assert.equal(await page.getByLabel('Note (optional)',{exact:true}).inputValue(),'Keep this unfinished billing note.');
+ // An outstanding draft from an older version is retired only after its explicit save.
+ const legacy=structuredClone(saved);legacy.entries[0].items[0].reason='Previous version draft';
+ await page.evaluate(async payload=>{const {saveRecovery}=await import('/recovery.mjs');await saveRecovery('search-synthetic',payload);},{dirty:true,baseLedger:saved,ledger:legacy,etag:'older-revision'});
+ await page.reload();await page.locator('.patient').first().waitFor();await select(0);assert.equal(await page.getByLabel('Note (optional)',{exact:true}).inputValue(),'Previous version draft');
+ await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
+ assert.equal(JSON.parse(await readFile(billingPath,'utf8')).entries[0].items[0].reason,'Previous version draft');
+ assert.equal(await page.evaluate(async()=>await(await import('/recovery.mjs')).loadRecovery('search-synthetic')),null);
+ console.log('PASS search clears selection and historical editing ID in Concern/Routine; single, multiple, zero and cleared results require selection; billing stays in memory between patients, saves explicitly, and reload discards unsaved edits.');
 }finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}
