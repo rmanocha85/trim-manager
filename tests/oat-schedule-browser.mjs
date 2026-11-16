@@ -42,7 +42,12 @@ try{
  pending.patients[0].ava='1234567';await writeFile(oatPath,JSON.stringify(pending));await host.locator('[data-oat-patients]').getByRole('button',{name:'Reload OAT FH',exact:true}).click();await host.locator('[data-oat-patients] tbody a').filter({hasText:'Jordan Lee'}).waitFor();await host.getByRole('button',{name:'Schedule',exact:true}).click();assert.equal(await host.locator('.oat-schedule-table tbody a').count(),3);
  await host.getByRole('button',{name:'All patients',exact:true}).click();
  const panel=host.locator('[data-oat-patients]'),first=panel.locator('tbody tr').first();
- await first.getByRole('button',{name:/Phone actions/}).click();await panel.getByRole('button',{name:'Add phone…'}).click();
+ await page.setViewportSize({width:1920,height:1000});
+ const nameBox=await first.locator('td').nth(1).boundingBox(),phnBox=await first.locator('td').nth(2).boundingBox();
+ assert.ok(phnBox.x-nameBox.x<=250,'PHN stays beside the name on wide screens');
+ const addPhone=first.getByRole('button',{name:/Add phone number/});
+ assert.equal(await addPhone.locator('svg').count(),1);
+ await addPhone.click();
  const phoneForm=panel.getByRole('dialog');
  await phoneForm.getByRole('textbox').fill('604-555-0142');await phoneForm.getByRole('button',{name:'Save phone'}).click();
  await first.getByRole('link',{name:/Call Jordan/}).waitFor();

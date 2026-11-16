@@ -8,6 +8,13 @@
 .clinic-toolbar input{width:min(440px,100%);min-height:42px;background:white}
 .clinic-filters{display:flex;gap:6px}.clinic-filters button{min-height:40px}.clinic-filters [aria-pressed=true]{background:#e4eee3;border-color:#9ab89f;color:#183c27}
 .clinic-table-wrap{overflow-x:auto;border:1px solid #dce3da;border-radius:10px;background:white}
+/* Keep OAT identifiers together even on a wide desktop. The last column takes the spare space. */
+[data-oat-patients] .clinic-table{table-layout:fixed;min-width:26rem}
+[data-oat-patients] th:nth-child(1){width:3rem}
+[data-oat-patients] th:nth-child(2){width:clamp(9rem,19vw,15rem)}
+[data-oat-patients] th:nth-child(3){width:10rem}
+[data-oat-patients] td:nth-child(2){overflow-wrap:anywhere}
+[data-oat-patients] td:last-child>div{display:inline-block}
 .clinic-table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}
 .clinic-table th{background:#edf2eb;color:#465e49;font-size:12px;padding:12px;white-space:nowrap}
 .clinic-table td{padding:14px 12px;border-top:1px solid #e5eae2;vertical-align:top}

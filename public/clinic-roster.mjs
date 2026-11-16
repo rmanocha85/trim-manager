@@ -1,4 +1,4 @@
-import {phoneControls,bindRosterTips} from './roster-phone.mjs';
+import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs';
 import {bindIdentity} from './patient-identity.mjs?v=20261116-phone1';
 import {assessmentPlanningText} from './maid-assessment.mjs?v=20261112-provision1';
 import {dateCalendar} from './maid-date-calendar.mjs';
@@ -199,8 +199,17 @@ export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onLink,onCha
       else {
         const phone=cell(row,'');
         if(p.phone)phone.append(compactContact({phone:p.phone,role:'Patient'},p.name));
-        else phone.textContent='—';
-        if(onPhone){
+        else {
+          const controls=document.createElement('span'),add=document.createElement('button');
+          controls.className='roster-phone';
+          add.type='button';add.className='roster-icon';add.innerHTML=handset;
+          add.title=onPhone?'Add phone number':'Phone number not recorded';
+          add.setAttribute('aria-label',add.title+' for '+p.name);
+          add.disabled=!onPhone||!ready||busy;
+          add.onclick=()=>openPhone(p);
+          controls.append(add);phone.append(controls);
+        }
+        if(onPhone&&p.phone){
           const more=document.createElement('button');
           more.type='button';more.className='clinic-phone-edit';more.textContent='⋯';
           more.setAttribute('aria-label','Phone actions for '+p.name);
