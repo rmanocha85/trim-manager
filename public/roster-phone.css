@@ -1,0 +1,12 @@
+.roster-phone{display:inline-flex;align-items:center;gap:2px;vertical-align:middle}
+.roster-phone .roster-icon,.roster-name .active-issue-badge{display:inline-flex;align-items:center;justify-content:center;width:29px;height:29px;min-height:29px;padding:4px;flex:none;border:1px solid transparent;border-radius:5px;text-decoration:none;color:#345d43;background:transparent}
+.roster-phone .roster-icon:hover,.roster-phone .roster-icon:focus-visible{background:#e9f0e7;border-color:#b8cbb8}
+.roster-phone .roster-icon svg{width:17px;height:17px;pointer-events:none}
+.roster-name .active-issue-badge:hover,.roster-name .active-issue-badge:focus-visible{background:#fff1ef;border-color:#e8c5bd}
+.roster-tip{position:fixed;inset:auto;margin:0;border:0;border-radius:6px;padding:9px 12px;background:#243c30;color:#fff;box-shadow:0 4px 12px #17342628;font:13px/1.45 system-ui,sans-serif;max-width:min(340px,90vw);white-space:pre-line;overflow-wrap:anywhere;pointer-events:none}
+.clinic-table .clinic-phone-edit{background:transparent;color:#345d43;border:0;border-radius:4px;padding:5px;cursor:pointer}
+.clinic-table .clinic-phone-edit:hover{background:#e9f0e7}
+.clinic-remove-dialog input[type=tel]{display:block;width:100%;padding:8px;margin:5px 0 14px;font:inherit}
+.clinic-phone-menu{position:fixed;inset:auto;margin:0;padding:4px;border:1px solid #d4d8ce;border-radius:6px;box-shadow:0 4px 12px #17342622}
+.clinic-phone-menu button{color:#345d43;background:white;border:0;padding:7px 12px;cursor:pointer}
+.clinic-table .clinic-phone-edit{margin-left:6px;min-width:28px}

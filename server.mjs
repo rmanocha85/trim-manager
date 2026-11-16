@@ -17,7 +17,7 @@ import {LocalBackupStore} from './backup-storage.mjs';
 import {snapshot,hash} from './public/backups.mjs';
 import {MaidStore} from './maid-storage.mjs';
 import {OatStore} from './oat-storage.mjs';
-import {finishAppointment} from './public/oat-schedule.mjs';
+import {applyOatAction} from './public/oat-roster-repository.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 const home=os.homedir();
 const testRoot=process.env.TRIM_TEST_MODE==='1'?path.join(os.tmpdir(),'trim-isolated-no-live-data'):null;
@@ -50,6 +50,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('maid-date-calendar.mjs');
   allowed.add('clinic-contacts.mjs');
   allowed.add('roster-contacts.mjs');
+  allowed.add('roster-phone.mjs');allowed.add('roster-phone.css');
   allowed.add('clinic-roster.css');
   allowed.add('clinic-roster-repository.mjs');
   allowed.add('oat-roster-repository.mjs');
@@ -96,7 +97,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         }
         if(url.pathname==='/api/oat-fh/roster'){
           if(req.method==='GET')return json(200,await oatStore.load());
-          if(req.method==='POST'){const action=await readJSON();return json(200,await oatStore.update(req.headers['if-match'],roster=>finishAppointment(roster,action)));}
+          if(req.method==='POST'){const action=await readJSON();return json(200,await oatStore.update(req.headers['if-match'],roster=>applyOatAction(roster,action)));}
           return json(405,{error:'Unsupported OAT FH action.'});
         }
         if(url.pathname==='/api/maid/roster'){

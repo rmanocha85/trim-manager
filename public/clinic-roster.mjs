@@ -1,3 +1,5 @@
+import {phoneControls,bindRosterTips} from './roster-phone.mjs';
+import {bindIdentity} from './patient-identity.mjs?v=20261116-phone1';
 import {assessmentPlanningText} from './maid-assessment.mjs?v=20261112-provision1';
 import {dateCalendar} from './maid-date-calendar.mjs';
 import {provisionDefaults,provisionPlanningText,provisionMapUrl} from './maid-provision.mjs';
@@ -6,15 +8,17 @@ import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.
-export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
+export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onChange=()=>{}}) {
   const maid=kind==='maid', title=maid?'MAID':'OAT Fraser Health';
   let patients=[],view='active',query='',busy=false,ready=false,loaded=false,loadState='idle',loadMessage='';
   host.classList.add('clinic-workspace');
   host.innerHTML=`<div class="clinic-heading"><div><h1>${title}</h1><p>${maid?'Current patients and assessment history.':'Your clinic list, in the order you provide.'}</p></div><span class="clinic-count" role="status" aria-live="polite"></span></div>
     <div class="clinic-toolbar">${maid?'<nav class="clinic-filters" aria-label="MAID patient status"><button data-view="active" aria-pressed="true">Active</button><button data-view="history" aria-pressed="false">History</button><button data-view="all" aria-pressed="false">All</button></nav>':''}<input type="search" aria-label="Search ${title}" placeholder="${maid?'Search name, PHN or location':'Search name, PHN or Ava number'}" autocomplete="off"></div>
     <p class="clinic-load-status" role="status" aria-live="polite" hidden></p>
-    <div class="clinic-table-wrap" role="region" aria-label="${title} patient list" tabindex="0"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient</th><th scope="col">PHN</th>${maid?'<th scope="col">Patient phone</th><th scope="col">Primary / family contact</th>':''}${maid?'<th scope="col">Location</th>':''}${maid?'<th scope="col" class="clinic-planning-heading">Assessment</th><th scope="col">Provision</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
+    <div class="clinic-table-wrap" role="region" aria-label="${title} patient list" tabindex="0"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient</th><th scope="col">PHN</th><th scope="col">Patient phone</th>${maid?'<th scope="col">Primary / family contact</th>':''}${maid?'<th scope="col">Location</th>':''}${maid?'<th scope="col" class="clinic-planning-heading">Assessment</th><th scope="col">Provision</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
     <div class="clinic-empty"><h2>Waiting for your patient list</h2><p>${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.</p></div><p class="clinic-feedback" role="status" aria-live="polite"></p>`;
+  bindIdentity(host);
+  const hideTip = bindRosterTips(host);
   if(onReload){const reload=document.createElement('button');reload.textContent=maid?'Reload MAID':'Reload OAT FH';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
   const dialog=document.createElement('dialog');dialog.className='clinic-remove-dialog';dialog.innerHTML='<form method="dialog"><h2>Remove patient from MAID?</h2><p class="remove-name"></p><p>This deletes all of their tracking information from Active and History. Their original documents and folders stay in place.</p><div class="actions"><button value="cancel">Cancel</button><button value="remove" class="danger">Remove patient</button></div></form>';if(maid)host.append(dialog);
   const planningDialog=document.createElement('dialog');planningDialog.className='clinic-planning-dialog';
@@ -85,35 +89,72 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   }
   const count=host.querySelector('.clinic-count'),body=host.querySelector('tbody'),empty=host.querySelector('.clinic-empty'),feedback=host.querySelector('.clinic-feedback');
   const cell=(row,value)=>{const td=document.createElement('td');td.textContent=value??'Not recorded';row.append(td);return td;};
-  function contactCard(contact,{patient=false,source=false,phoneOnly=false}={}){
+  function contactSource(contact){
     const card=document.createElement('div');card.className='clinic-contact';
     const role=contactRole(contact).replace(/\s+on\s+1632\b/gi,'').trim();
     const phone=phoneLink(contact.phone,contact.extension),number=document.createElement(phone?'a':'span');number.className='clinic-phone';number.textContent=contact.phone||'Phone not recorded';
     if(phone){number.href=phone.href;number.title=`Call in your phone app (ZAC on this PC)${phone.extension?`; enter extension ${phone.extension} after connection`:''}`;number.setAttribute('aria-label',`Call ${contact.name||role||'contact'} at ${contact.phone}${phone.extension?`, extension ${phone.extension}`:''}`);}
     card.append(number);
     if(contact.extension){const ext=document.createElement('small');ext.textContent=`Extension ${contact.extension}`;card.append(ext);}
-    if(!phoneOnly){
-    if(!patient){const name=document.createElement('strong');name.textContent=contact.name||'Name not recorded';card.append(name);}
+    {const name=document.createElement('strong');name.textContent=contact.name||'Name not recorded';card.append(name);}
     if(role){const label=document.createElement('small');label.textContent=role;card.append(label);}
     if(contact.primary===true){const primary=document.createElement('small');primary.textContent='Primary contact';card.append(primary);}
     const location=[contact.facility,contact.unit].filter(Boolean).join(' · ');if(location){const label=document.createElement('small');label.textContent=location;card.append(label);}
-    }
     const provenance=[contact.source,contact.sourceDate&&`Source date: ${contact.sourceDate}`,contact.verifiedDate&&`Verified: ${contact.verifiedDate}`].filter(Boolean).join(' · ');
     if(provenance)card.title=provenance;
-    if(source){for(const text of [contact.email,provenance,contact.note])if(text){const line=document.createElement('small');line.textContent=text;card.append(line);}}
+    for(const text of [contact.email,provenance,contact.note])if(text){const line=document.createElement('small');line.textContent=text;card.append(line);}
     return card;
+  }
+  const phoneDialog=document.createElement('dialog'),phoneMenu=document.createElement('div');
+  if(onPhone){
+    phoneMenu.popover='auto';phoneMenu.className='clinic-phone-menu';
+    phoneMenu.innerHTML='<button type="button">Add phone…</button>';host.append(phoneMenu);
+    phoneDialog.className='clinic-remove-dialog';
+    phoneDialog.innerHTML='<form><h2>Patient phone</h2><p></p><label>Phone number<input type="tel" name="phone" required maxlength="80"></label><p role="alert"></p><div class="actions"><button type="button">Cancel</button><button type="submit">Save phone</button></div></form>';
+    host.append(phoneDialog);
+    phoneDialog.querySelector('[type=button]').onclick=()=>phoneDialog.close();
+    phoneDialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
+    phoneDialog.addEventListener('close',onChange);
+  }
+  function openPhone(patient){
+    if(!ready||busy||phoneDialog.open)return;
+    const form=phoneDialog.querySelector('form'),input=form.elements.phone,error=form.querySelector('[role=alert]');
+    form.querySelector('p').textContent=patient.name;
+    input.value=patient.phone||'';error.textContent='';
+    form.onsubmit=async e=>{
+      e.preventDefault();
+      if(busy||!ready)return;
+      if(!phoneLink(input.value)){error.textContent='Enter one valid phone number.';return;}
+      busy=true;onChange();
+      const controls=form.querySelectorAll('input,button');controls.forEach(el=>el.disabled=true);
+      try{
+        const saved=await onPhone({type:'patient-phone',patientId:patient.id,expectedPhone:patient.phone||'',phone:input.value.trim()});
+        patients=structuredClone(saved.roster.patients);
+        phoneDialog.close();
+      }catch(errorSaving){error.textContent=errorSaving.message;}
+      finally{busy=false;controls.forEach(el=>el.disabled=false);if(!phoneDialog.open){render();feedback.textContent='Phone saved.';}onChange();}
+    };
+    phoneDialog.showModal();input.focus();onChange();
+  }
+  function compactContact(contact,fallback) {
+    const wrapper=document.createElement('div');
+    const role=contactRole(contact).replace(/\s+on\s+1632\b/gi,'').trim();
+    const label=[contact.name || fallback,role,contact.primary && 'Primary contact',contact.facility,contact.unit].filter(Boolean).join(' · ');
+    wrapper.innerHTML=phoneControls(contact,label);
+    return wrapper;
   }
   function renderContacts(row,p){
     const groups=contactGroups(p.contacts),own=cell(row,'');own.className='clinic-patient-phone';
-    if(groups.patient.length)for(const c of groups.patient)own.append(contactCard(c,{patient:true}));else own.textContent='Not recorded';
+    if(groups.patient.length)for(const c of groups.patient)own.append(compactContact(c,p.name));else own.textContent='Not recorded';
     const others=cell(row,'');others.className='clinic-contacts';
-    const hospice=/\b(hospice|CMH)\b/i.test(patientLocation(p));
-    for(const c of groups.family)others.append(contactCard(c));
-    for(const c of groups.care)others.append(contactCard(c,{phoneOnly:hospice}));
+    for(const c of groups.family)others.append(compactContact(c));
+    for(const c of groups.care)others.append(compactContact(c));
     if(!groups.family.length&&!groups.care.length){const missing=document.createElement('span');missing.textContent='Not recorded';others.append(missing);}
-    if(groups.other.length){const heading=document.createElement('small');heading.className='clinic-contact-heading';heading.textContent='Other contacts';others.append(heading);for(const c of groups.other)others.append(contactCard(c));}
+    if(groups.other.length){const heading=document.createElement('small');heading.className='clinic-contact-heading';heading.textContent='Other contacts';others.append(heading);for(const c of groups.other)others.append(compactContact(c));}
   }
   function render(){
+    hideTip();
+    if(phoneMenu.matches(':popover-open'))phoneMenu.hidePopover();
     body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open||provisionDialog.open);
     const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!['loading','error'].includes(loadState);
     loadStatus.textContent=loadState==='error'?loadMessage+(loaded?(maid?' Showing the last loaded list; changes are disabled until reload succeeds.':' Showing the last loaded list.'): ''):loaded?`Refreshing ${title} patients…`:`Loading ${title} patients…`;
@@ -143,6 +184,28 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
         copy.onclick=async()=>{try{await navigator.clipboard.writeText(digits);feedback.textContent='PHN copied.';}catch{feedback.textContent='Could not copy. Select the displayed PHN to copy it.';}};phn.append(copy);
       }else phn.textContent='Not recorded';
       if(maid)renderContacts(row,p);
+      else {
+        const phone=cell(row,'');
+        if(p.phone)phone.append(compactContact({phone:p.phone,role:'Patient'},p.name));
+        else phone.textContent='—';
+        if(onPhone){
+          const more=document.createElement('button');
+          more.type='button';more.className='clinic-phone-edit';more.textContent='⋯';
+          more.setAttribute('aria-label','Phone actions for '+p.name);
+          more.disabled=!ready||busy;
+          more.onclick=()=>{
+            phoneMenu.showPopover();
+            const box=more.getBoundingClientRect();
+            phoneMenu.style.left=Math.max(4,Math.min(box.left,innerWidth-phoneMenu.offsetWidth-4))+'px';
+            phoneMenu.style.top=(box.bottom+phoneMenu.offsetHeight+4<innerHeight?box.bottom+3:box.top-phoneMenu.offsetHeight-3)+'px';
+            const edit=phoneMenu.querySelector('button');
+            edit.textContent=p.phone?'Edit phone…':'Add phone…';
+            edit.onclick=()=>{phoneMenu.hidePopover();openPhone(p);};
+            edit.focus();
+          };
+          phone.append(more);
+        }
+      }
       if(maid)cell(row,patientLocation(p));
       if(maid){
         if(showPlanning){
@@ -167,7 +230,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
         }
         disclosure.append(list);
         const contacts=document.createElement('div');contacts.className='clinic-contact-sources';
-        if(appContacts(p.contacts).length)for(const c of appContacts(p.contacts))contacts.append(contactCard(c,{source:true}));else contacts.textContent='No contacts recorded';
+        if(appContacts(p.contacts).length)for(const c of appContacts(p.contacts))contacts.append(contactSource(c));else contacts.textContent='No contacts recorded';
         if(p.contactSourceNotes){const note=document.createElement('p');note.textContent=p.contactSourceNotes;contacts.append(note);}
         disclosure.append(contacts);detail.append(disclosure);smoothDisclosure(disclosure,summary);
         const status=document.createElement('small');status.textContent=isProvisionPending(p)?`Provision ${p.provisionDate} — closeout pending`:p.status==='active'?'Active':'History';
@@ -184,7 +247,7 @@ export function clinicRosterUI({host,kind,onAction,onReload,onChange=()=>{}}) {
   host.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{view=button.dataset.view;host.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render();});
   render();
   return {
-    state(){return {busy:busy||planningDialog.open||provisionDialog.open,ready,loading:loadState==='loading',dirty:false};},
+    state(){return {busy:busy||phoneDialog.open||planningDialog.open||provisionDialog.open,ready,loading:loadState==='loading',dirty:false};},
     setPatients(records){if(busy)return;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
     loading({preserve=true}={}){ready=false;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
     error(message){ready=false;loadState='error';loadMessage=message;render();}

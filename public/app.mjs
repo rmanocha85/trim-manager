@@ -1,12 +1,12 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261115-roster1';
 import {documentIntakeUI} from './intake-ui.mjs?v=20261116-oatlink1';
 import {billingUI} from './billing-ui.mjs?v=20261116-oatlink1';
-import {patientsUI} from './patients-ui.mjs?v=20261115-roster1';
+import {patientsUI} from './patients-ui.mjs?v=20261116-phone1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261112-provision1';
-import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261116-oatlink1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261116-phone1';
+import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261116-phone1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
-import {OatRepository,OAT_FILE_ID} from './oat-roster-repository.mjs?v=20261116-oatlink1';
+import {OatRepository,OAT_FILE_ID} from './oat-roster-repository.mjs?v=20261116-phone1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
 
 if(laptopRuntime()){document.title='TRIM Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261111-n1';}
@@ -129,10 +129,10 @@ async function start(){
     if(access.email.toLowerCase()!==adapter.accountEmail.toLowerCase())throw new Error('Choose the same Google account you used for TRIM.');
     await adapter.connect({interactive:false});
     await refreshOat();
-  },onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onFinish:async action=>{
+  },onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onSave:async action=>{
     if(!oatRepository)throw new Error('Reload OAT FH before editing.');
     const repository=oatRepository;++oatLoad;
-    const saved=await repository.finish(action);return {...saved,local:repository.adapter.mode==='local'};
+    const saved=await repository.save(action);return {...saved,local:repository.adapter.mode==='local'};
   }});
   patients=await patientsUI({host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onBilling:key=>billing.openPatientBilling(key),onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();

@@ -1,23 +1,21 @@
 import {escapeHTML as esc} from './core.mjs';
 import {phoneLink} from './clinic-contacts.mjs?v=20261108-closeout1';
 
-export function familyContactsCell(patient, historical) {
-  const edit = (index, label) => historical ? '' : `<button type="button" class="btn btn-ghost btn-sm contact-edit" data-roster-edit-action data-contact-index="${index}" data-click="editFamilyContact(this)">${label}</button>`;
-  const rows = (patient.familyContacts || []).map((contact, index) => {
-    const phone = phoneLink(contact.phone, contact.extension);
-    const call = phone ? `<a class="btn btn-ghost btn-sm" href="${esc(phone.href)}" aria-label="Call ${esc(contact.name)}" title="Call through your phone app${phone.extension ? '; enter extension ' + esc(phone.extension) + ' after connection' : ''}">Call</a>` : '';
-    return `<div class="family-contact"><div><strong>${esc(contact.name)}</strong>${contact.relationship ? ' (' + esc(contact.relationship) + ')' : ''} ${edit(index,'Edit')}</div>
-      <div class="contact-number"><span>${esc(contact.phone)}${contact.extension ? ' ext. ' + esc(contact.extension) : ''}</span>
-      ${contact.phone ? `<button type="button" class="btn btn-ghost btn-sm" data-copy-value="${esc(contact.phone)}" data-copy-feedback="Number copied">Copy number</button>` : ''} ${call}</div></div>`;
-  }).join('');
-  return `<td class="family-contacts">${rows}${edit(-1,'+ Add contact')}</td>`;
+import {phoneControls} from './roster-phone.mjs';
+
+export function familyContactsCell(patient) {
+  const rows = (patient.familyContacts || []).map(contact => {
+    const label = [contact.name, contact.relationship].filter(Boolean).join(' · ');
+    return '<div class="family-contact">'+phoneControls(contact,label)+'</div>';
+  });
+  return '<td class="family-contacts">'+(rows.join('') || '—')+'</td>';
 }
 
 export function familyContactDialog(root, save) {
   const dialog = document.createElement('dialog');
   dialog.className = 'family-contact-dialog';
   dialog.setAttribute('aria-labelledby','contact-dialog-title');
-  dialog.innerHTML = `<form><h2 id="contact-dialog-title"></h2><p class="contact-patient"></p>
+  dialog.innerHTML = `<h2 id="contact-dialog-title"></h2><p class="contact-patient"></p><div class="contact-choices"></div><form>
     <label>Contact name<input name="name" required></label><label>Relationship<input name="relationship"></label>
     <label>Phone number<input name="phone" type="tel" required></label><p role="alert"></p>
     <div class="actions"><button type="button" class="btn btn-ghost">Cancel</button><button type="submit" class="btn btn-green">Save contact</button></div></form>`;
@@ -38,14 +36,31 @@ export function familyContactDialog(root, save) {
       dialog.close();
     } catch (e) { error.textContent = e.message; }
   };
-  return {get open(){return dialog.open;}, show(patient,index){
+  function selectContact(patient,index){
     const contacts = patient.familyContacts || [];
     target = {id:patient.id, index, contact:contacts[index], expected:JSON.stringify(contacts)};
-    form.querySelector('h2').textContent = index < 0 ? 'Add family contact' : 'Edit family contact';
-    form.querySelector('.contact-patient').textContent = [patient.name,patient.room && 'Room '+patient.room].filter(Boolean).join(' · ');
+    dialog.querySelector('h2').textContent = index < 0 ? 'Add family contact' : 'Edit family contact';
+    dialog.querySelector('.contact-patient').textContent = [patient.name,patient.room && 'Room '+patient.room].filter(Boolean).join(' · ');
     for (const key of ['name','relationship','phone']) form.elements[key].value = target.contact?.[key] || '';
     error.textContent = '';
-    dialog.showModal();
+    choices.hidden = true;
+    form.hidden = false;
     form.elements.name.focus();
+  }
+  const choices = dialog.querySelector('.contact-choices');
+  return {get open(){return dialog.open;}, show(patient){
+    form.hidden = true;
+    choices.hidden = false;
+    dialog.querySelector('h2').textContent = 'Family contacts';
+    dialog.querySelector('.contact-patient').textContent = [patient.name,patient.room && 'Room '+patient.room].filter(Boolean).join(' · ');
+    choices.innerHTML = (patient.familyContacts || []).map((c,i) =>
+      '<div class="contact-choice"><span><strong>'+esc(c.name)+'</strong> '+esc(c.relationship || '')+'<br>'+esc(c.phone || '')+(c.extension?' ext. '+esc(c.extension):'')+'</span><button class="btn btn-ghost" data-index="'+i+'">Edit</button></div>'
+    ).join('')+'<div class="actions"><button class="btn btn-green" data-index="-1">Add contact</button><button class="btn btn-ghost" data-done>Done</button></div>';
+    choices.onclick = e=>{
+      const button = e.target.closest('button');
+      if (button?.hasAttribute('data-index')) selectContact(patient,Number(button.dataset.index));
+      else if (button?.hasAttribute('data-done')) dialog.close();
+    };
+    dialog.showModal();
   }};
 }

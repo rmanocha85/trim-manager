@@ -14,7 +14,7 @@ try{
  assert.equal(await host.locator('.oat-schedule-table tbody tr').count(),5);assert.equal(await host.locator('.oat-schedule-table tbody a').count(),3);assert.equal(await host.locator('.oat-schedule-table tbody a').first().getAttribute('href'),'https://www.avaemr.ca/patients/1234567');assert.match(await host.locator('.oat-schedule-table').innerText(),/Patient match needed/);
  await page.screenshot({path:'work/oat-schedule-preview.png',fullPage:true});
  await setDate('2026-11-20');await host.getByRole('heading',{name:'No schedule saved',exact:true}).waitFor();assert.equal(await host.locator('.oat-schedule-table').isVisible(),false);
- await host.getByRole('button',{name:'All patients',exact:true}).click();assert.deepEqual(await host.locator('[data-oat-patients] thead th').allTextContents(),['#','Patient','PHN']);assert.equal(await host.locator('[data-oat-patients] tbody tr').count(),3);assert.doesNotMatch(await host.locator('[data-oat-patients]').getByRole('searchbox').getAttribute('placeholder'),/location/i);
+ await host.getByRole('button',{name:'All patients',exact:true}).click();assert.deepEqual(await host.locator('[data-oat-patients] thead th').allTextContents(),['#','Patient','PHN','Patient phone']);assert.equal(await host.locator('[data-oat-patients] tbody tr').count(),3);assert.doesNotMatch(await host.locator('[data-oat-patients]').getByRole('searchbox').getAttribute('placeholder'),/location/i);
  await host.getByRole('button',{name:'Schedule',exact:true}).click();await setDate('2026-11-13');await page.setViewportSize({width:390,height:844});assert.equal(await host.locator('.oat-schedule-table tbody a').count(),3);assert.ok(await host.getByRole('button',{name:'Choose clinic date',exact:true}).isVisible());
  assert.equal(await readFile(oatPath,'utf8'),original);
  await host.getByRole('searchbox',{name:'Search clinic day'}).fill('Patel');assert.equal(await host.locator('.oat-schedule-table tbody tr').count(),1);
@@ -40,5 +40,18 @@ try{
 
  const pending=structuredClone(records);pending.patients[0].ava=null;await writeFile(oatPath,JSON.stringify(pending));await host.locator('[data-reload]').click();await host.locator('.oat-schedule-table').getByText('Ava number pending',{exact:true}).waitFor();assert.equal(await host.locator('.oat-schedule-table tbody a').count(),2);await host.getByRole('button',{name:'All patients',exact:true}).click();await host.locator('[data-oat-patients]').getByText('Ava number pending',{exact:true}).waitFor();
  pending.patients[0].ava='1234567';await writeFile(oatPath,JSON.stringify(pending));await host.locator('[data-oat-patients]').getByRole('button',{name:'Reload OAT FH',exact:true}).click();await host.locator('[data-oat-patients] tbody a').filter({hasText:'Jordan Lee'}).waitFor();await host.getByRole('button',{name:'Schedule',exact:true}).click();assert.equal(await host.locator('.oat-schedule-table tbody a').count(),3);
+ await host.getByRole('button',{name:'All patients',exact:true}).click();
+ const panel=host.locator('[data-oat-patients]'),first=panel.locator('tbody tr').first();
+ await first.getByRole('button',{name:/Phone actions/}).click();await panel.getByRole('button',{name:'Add phone…'}).click();
+ const phoneForm=panel.getByRole('dialog');
+ await phoneForm.getByRole('textbox').fill('604-555-0142');await phoneForm.getByRole('button',{name:'Save phone'}).click();
+ await first.getByRole('link',{name:/Call Jordan/}).waitFor();
+ assert.equal(await first.getByRole('link',{name:/Call Jordan/}).getAttribute('href'),'tel:6045550142');
+ await first.getByRole('button',{name:/Copy number/}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'604-555-0142');
+ await panel.getByRole('button',{name:'Reload OAT FH'}).click();await first.getByRole('button',{name:/Phone actions/}).click();await panel.getByRole('button',{name:'Edit phone…'}).click();
+ await phoneForm.getByRole('textbox').fill('604-555-0121');
+ const concurrent=JSON.parse(await readFile(oatPath,'utf8'));concurrent.patients[0].phone='604-555-0170';await writeFile(oatPath,JSON.stringify(concurrent));
+ await phoneForm.getByRole('button',{name:'Save phone'}).click();await phoneForm.getByRole('alert').filter({hasText:'changed'}).waitFor();
+ assert.deepEqual(JSON.parse(await readFile(oatPath,'utf8')),concurrent);
  assert.deepEqual(errors,[]);console.log('PASS RAAC dated schedule, pending Ava patients, later chart links, unmatched names, breaks, empty dates, no OAT Location column, patient roster and mobile.');
 }catch(error){console.log(await page.locator('body').innerText(),errors);throw error;}finally{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));assert.equal(path.dirname(path.resolve(dir)),path.resolve(os.tmpdir()));await rm(dir,{recursive:true,force:true});}

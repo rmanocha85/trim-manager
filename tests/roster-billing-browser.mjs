@@ -33,7 +33,14 @@ try {
   const row=id=>root.locator('[data-roster-patient="'+id+'"]');
   await tab.click();
   const record=row('sample'), number=record.locator('.family-contact');
-  assert.match(await number.innerText(),/Sam Example \(Son\)/);
+  await number.getByRole('link').hover();
+  assert.match(await root.locator('.roster-tip:popover-open').innerText(),/Sam Example · Son/);
+  const search=root.locator('#roster-search');
+  await page.setViewportSize({width:1440,height:600});
+  await page.evaluate(()=>scrollTo(0,500));
+  const header=await page.locator('#workspace>header').boundingBox(),box=await search.boundingBox();
+  assert.ok(await page.evaluate(()=>scrollY)>200 && box.y>=header.y+header.height-1 && box.y<header.y+header.height+35,'Search pinned below header');
+  await page.evaluate(()=>scrollTo(0,0));await page.setViewportSize({width:1440,height:1000});
   await number.getByRole('button',{name:'Copy number'}).click();
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),contacts[0].phone);
   assert.equal(await number.getByRole('link').getAttribute('href'),'tel:6045550142');
@@ -44,21 +51,23 @@ try {
   assert.ok(fits,'DEWDNEY must fit on one line inside its own column');
   const form=root.locator('.family-contact-dialog');
   async function enter(row,action,name,relationship,phone){
-    await row.getByRole('button',{name:action,exact:true}).click();
+    await row.locator('.patient-actions-toggle').click();
+    await row.getByRole('button',{name:'Family contacts…'}).click();
+    await form.getByRole('button',{name:action,exact:true}).click();
     await form.getByLabel('Contact name').fill(name);await form.getByLabel('Relationship').fill(relationship);
     await form.getByLabel('Phone number').fill(phone);await form.getByRole('button',{name:'Save contact'}).click();
     await form.waitFor({state:'hidden'});
   }
-  await enter(record,'+ Add contact','Casey Example','Daughter','604-555-0103');
+  await enter(record,'Add contact','Casey Example','Daughter','604-555-0103');
   assert.equal(await record.locator('.family-contact').count(),2);
-  await enter(row('second'),'+ Add contact','Robin Example','Spouse','604-555-0168');
+  await enter(row('second'),'Add contact','Robin Example','Spouse','604-555-0168');
   await enter(row('second'),'Edit','Robin Example','Partner','604-555-0188');
   assert.deepEqual(JSON.parse(await readFile(rosterPath,'utf8')),roster);
   await page.locator('#sync:not([disabled])').click();
   await page.waitForFunction(()=>!document.querySelector('#sync').textContent.includes('Saving') && document.querySelector('#local-changes').dataset.state!=='busy');
   assert.match(await page.locator('#local-changes').innerText(),/Saved to folder/,await page.locator('#session-status').textContent());
   await page.reload();await page.locator('.patient').first().waitFor();await tab.click();
-  assert.match(await row('second').innerText(),/Partner/);
+  assert.match(await row('second').locator('[data-roster-tip]').getAttribute('data-roster-tip'),/Partner/);
   assert.equal(await row('second').locator('.family-contact a').getAttribute('href'),'tel:6045550188');
   assert.equal(await record.locator('.family-contact').count(),2);
   for(const [id,key] of [['second','roster:second'],['sample','phn:0000000001']]){

@@ -9,15 +9,12 @@
 body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
 #removed-list{overflow-x:auto;margin-top:16px}
 /* The quick return stays beside the admission date in both live rosters. */
-.roster-table.roster-table{min-width:1480px}
-.roster-table .col-contacts{width:210px}
-@media(min-width:1600px){.roster-table .col-contacts{width:270px}}
-.family-contacts .btn{font-size:11px;min-height:24px;padding:2px 5px}
-.family-contacts .contact-edit{border:0;color:var(--accent)}
-.family-contact{overflow-wrap:anywhere;margin-bottom:2px}
-.family-contact + .family-contact{border-top:1px solid var(--border-light);padding-top:4px}
-.contact-number{display:flex;flex-wrap:wrap;align-items:center;gap:3px 5px}
-.contact-number a{text-decoration:none}
+.roster-table.roster-table{min-width:1370px}
+.roster-table .col-contacts{width:104px}
+.contact-choice{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-light)}
+.contact-choices .actions{margin-top:14px}
+#tab-patients .roster-search{position:sticky;top:var(--billing-header-height,80px);z-index:4;background:#f6f7f4;padding:8px 0;margin-bottom:6px}
+@media(max-width:760px){#tab-patients .roster-search{top:0}}
 .family-contact-dialog{width:min(360px,90vw);border:1px solid var(--border);border-radius:9px;padding:20px;color:var(--text)}
 .family-contact-dialog::backdrop{background:#0005}
 .family-contact-dialog label{display:grid;gap:4px;margin:10px 0}
@@ -379,13 +376,10 @@ body #btn-connect:disabled{opacity:.7;cursor:wait}
 .active-issue-priority .uhdr{background:#fff1cf}
 .active-issue-priority .unm,.active-issue-priority .uchev{color:#684100}
 .active-issue-priority .ucnt{background:#f0dcad;color:#684100}
-.active-issue-summary{margin:5px 0;max-width:340px;min-width:180px;white-space:normal}
-.active-issue-summary .active-issue-badge{display:inline-flex;align-items:center;gap:5px;background:#fff5f5;border-color:#e3baba;color:#a12626;font-size:11px}
 .active-issue-icon{width:22px;height:22px;flex:none;color:#b42323}
 .patient-actions-menu .flag-toggle .active-issue-icon{color:#b42323}
 .patient-actions-menu .flag-toggle{min-height:42px}
 .active-issue-badge .active-issue-icon{width:16px;height:16px}
-.active-issue-summary p{margin:4px 0 0;line-height:1.4;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}
 #active-issue-dialog{margin:auto;width:500px;max-width:calc(100vw - 32px);max-height:85dvh;overflow:auto;padding:24px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text)}
 #active-issue-dialog::backdrop{background:#0006}
 #active-issue-dialog h2{font-size:22px;margin-bottom:6px}

@@ -39,20 +39,20 @@ try{
  assert.equal(await m.locator('tbody a[target="_blank"]').first().getAttribute('href'),'https://www.avaemr.ca/patients/123457');
  assert.deepEqual(await m.locator('thead th').allTextContents(),['#','Patient','PHN','Patient phone','Primary / family contact','Location','Assessment','Provision','1645','Details / actions']);
  const first=m.locator('tbody tr').first(),own=first.locator('.clinic-patient-phone'),family=first.locator('.clinic-contacts');
- assert.match(await own.innerText(),/^604-555-0101\nPatient - preferred contact/);assert.doesNotMatch(await own.innerText(),/on 1632/);assert.doesNotMatch(await own.innerText(),/Family Synthetic/);
+ await own.getByRole('link').hover();assert.match(await m.locator('.roster-tip:popover-open').innerText(),/Zulu Synthetic · Patient - preferred contact/);assert.doesNotMatch(await m.locator('.roster-tip:popover-open').innerText(),/on 1632|Family Synthetic/);
  assert.equal(await own.locator('a').getAttribute('href'),'tel:6045550101');
- assert.match(await family.innerText(),/Family Synthetic/);assert.match(await family.innerText(),/Son - MAID referral contact/);assert.match(await family.innerText(),/Synthetic hospital · Unit A/);assert.match(await family.innerText(),/Other contacts\s+Phone not recorded\s+Witness Synthetic/);
+ assert.equal(await family.getByRole('link',{name:/Call Family Synthetic · Son/}).count(),1);assert.match(await family.getByRole('link',{name:/Call Team Synthetic/}).getAttribute('aria-label'),/Synthetic hospital · Unit A/);assert.match(await family.innerText(),/Other contacts/);
  assert.equal(await family.getByRole('link',{name:/Call Team Synthetic/}).getAttribute('href'),'tel:6045550103');
- assert.match(await family.getByRole('link',{name:/Call Team Synthetic/}).getAttribute('title'),/enter extension 42 after connection/);
+ await family.getByRole('link',{name:/Call Team Synthetic/}).hover();assert.match(await m.locator('.roster-tip:popover-open').innerText(),/Extension 42/);
  assert.equal(await first.locator('.clinic-phn-copy').innerText(),'');assert.equal(await first.locator('.clinic-phn-copy svg').count(),1);
  await first.locator('summary').click();await first.locator('details').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished));});assert.match(await first.locator('.clinic-contact-sources').innerText(),/Synthetic 1632 patient\/contact sections · Source date: 2026-10-01 · Verified: 2026-11-08/);await first.locator('summary').click();await first.locator('details').evaluate(async el=>{await Promise.all(el.getAnimations().map(a=>a.finished));});assert.equal(await first.locator('details').getAttribute('open'),null);
  await page.emulateMedia({reducedMotion:'reduce'});await first.locator('summary').press('Enter');assert.equal(await first.locator('details').getAttribute('open'),'');assert.equal(await first.locator('details').evaluate(el=>el.getAnimations().length),0);await first.locator('summary').press('Enter');assert.equal(await first.locator('details').getAttribute('open'),null);await page.emulateMedia({reducedMotion:'no-preference'});
 
  assert.equal(await m.locator('tbody tr').nth(1).locator('.clinic-patient-phone').innerText(),'Not recorded');
  assert.doesNotMatch(await first.textContent(),/Hidden Doctor Synthetic|Hidden Social Synthetic/);
- assert.match(await family.innerText(),/^604-555-0102\nFamily Synthetic/);
- const ownTop=await own.locator('.clinic-phone').first().boundingBox(),familyTop=await family.locator('.clinic-phone').first().boundingBox();assert.ok(Math.abs(ownTop.y-familyTop.y)<1);
- const hospiceContact=m.locator('tbody tr').nth(1).locator('.clinic-contacts');assert.equal(await hospiceContact.innerText(),'604-555-0108');
+ await family.getByRole('button',{name:/Copy number for Family Synthetic/}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'604-555-0102');
+ const ownTop=await own.locator('.roster-icon').first().boundingBox(),familyTop=await family.locator('.roster-icon').first().boundingBox();assert.ok(Math.abs(ownTop.y-familyTop.y)<1);
+ const hospiceContact=m.locator('tbody tr').nth(1).locator('.clinic-contacts');assert.equal(await hospiceContact.getByRole('link').getAttribute('href'),'tel:6045550108');
 
  // Inspect links only: no protocol navigation and no external call is permitted in this test.
  await m.getByRole('button',{name:'Copy PHN for Zulu Synthetic',exact:true}).click();
@@ -60,7 +60,7 @@ try{
  assert.equal(await m.locator('.clinic-feedback').innerText(),'PHN copied.');
  await m.getByRole('searchbox').fill('hospice');assert.equal(await m.locator('tbody tr').count(),1);assert.equal(await m.locator('tbody td').first().innerText(),'2');
  await m.getByRole('searchbox').fill('');await m.getByRole('button',{name:'History',exact:true}).click();assert.equal(await m.locator('tbody a[target="_blank"]').count(),0);assert.match(await m.innerText(),/Ava number needed/);
- assert.equal(await m.locator('.clinic-patient-phone a').getAttribute('href'),'tel:6045550104');assert.match(await m.locator('.clinic-contacts').innerText(),/Preferred contact · Daughter/);assert.equal(await m.locator('.clinic-contacts a').getAttribute('href'),'tel:6045550105');
+ assert.equal(await m.locator('.clinic-patient-phone a').getAttribute('href'),'tel:6045550104');assert.match(await m.locator('.clinic-contacts a').getAttribute('aria-label'),/Preferred contact · Daughter/);assert.equal(await m.locator('.clinic-contacts a').getAttribute('href'),'tel:6045550105');
  await m.getByRole('button',{name:'All',exact:true}).click();assert.equal(await m.locator('tbody tr').count(),3);
  await page.locator('[data-section="oat-fh"]').click();const oat=page.locator('#oat-fh-workspace');await oat.getByRole('button',{name:'All patients',exact:true}).click();await oat.getByRole('heading',{name:'OAT Fraser Health roster could not load'}).waitFor();
  // Exercise the same ordered renderer with synthetic OAT data; it never saves.

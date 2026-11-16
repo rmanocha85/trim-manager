@@ -1,3 +1,4 @@
+import {phoneLink} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {validateClinicRoster} from './clinic-roster-repository.mjs';
 import {validateClinicDays,finishAppointment} from './oat-schedule.mjs?v=20261113-combined1';
 const V2='https://www.googleapis.com/drive/v2/files';
@@ -10,18 +11,27 @@ export function validateOatRoster(data){
   validateClinicDays(data.clinicDays??[],data.patients);
   return data;
 }
-// The only UI write is a conditional, appointment-scoped completion change.
+export function applyOatAction(roster,action) {
+  if(action?.type!=='patient-phone')return finishAppointment(roster,action);
+  if(typeof action.phone!=='string'||action.phone.length>80||!phoneLink(action.phone))throw new Error('Enter one valid phone number.');
+  const next=structuredClone(roster);
+  const patient=next.patients.find(p=>p.id===action.patientId);
+  if(!patient||(patient.phone||'')!==action.expectedPhone)throw Object.assign(new Error('This patient’s phone changed. Reload OAT FH before editing it.'),{status:409});
+  patient.phone=action.phone.trim();
+  return next;
+}
 export class OatRepository {
   constructor(adapter){this.adapter=adapter;}
-  async finish(action){
+  finish(action){return this.save(action);}
+  async save(action){
     await this.adapter.ensureConnected?.();
     const current=await this.load();
-    const next=validateOatRoster(finishAppointment(current.roster,action));
+    const next=validateOatRoster(applyOatAction(current.roster,action));
     if(this.adapter.mode==='local')return this.adapter.request('/api/oat-fh/roster',{method:'POST',headers:{'Content-Type':'application/json','If-Match':current.etag},body:JSON.stringify(action)});
     const id=await this.locate();
     await this.adapter.request(`https://www.googleapis.com/upload/drive/v2/files/${id}?uploadType=media`,{method:'PUT',headers:{'Content-Type':'application/json','If-Match':current.etag},body:JSON.stringify(next,null,2)+'\n'});
     const saved=await this.load();
-    if(JSON.stringify(saved.roster)!==JSON.stringify(next))throw new Error('Completion save could not be verified. Reload OAT FH.');
+    if(JSON.stringify(saved.roster)!==JSON.stringify(next))throw new Error('OAT save could not be verified. Reload OAT FH.');
     return saved;
   }
   async locate(){
