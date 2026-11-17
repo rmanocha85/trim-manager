@@ -1,3 +1,4 @@
+import {editProfileBirthDate} from './clinical-profile.mjs?v=20261117-profile1';
 import {saveRecovery,loadRecovery} from './recovery.mjs';
 export const CONTENT_PATH='patient-context.json';
 export const dayPath=date=>`visits/${date}.json`;
@@ -54,3 +55,36 @@ export class DriveNotesRepository{
   }
 }
 export function checkPath(name){if(!/^(patient-context\.json|patient-display\.json|index\.json|patients\/\d{10}\.json|visits\/\d{4}-\d{2}-\d{2}\.json|handoffs\/\d{4}-\d{2}-\d{2}\.json|sources\/[a-zA-Z0-9-]{1,80}\.json)$/.test(name||''))throw new Error('Invalid clinical document path.');return name;}
+
+// Profiled patients have one clinical DOB. The roster form also serves patients
+// who have never had a clinical file; looking up an absent file never creates it.
+export async function savePatientBirthDate(repository,datasetId,phn,expected,next) {
+  if(!datasetId||!/^\d{10}$/.test(phn))throw new Error('Invalid patient workspace or identity.');
+  const local=repository.mode==='local',key='phn:'+phn,name=local?CONTENT_PATH:'patients/'+phn+'.json';
+  if(!local){
+    const index=(await repository.load('index.json')).data;
+    if(index?.app!=='trim-notes'||index.kind!=='patient-index'||index.context?.datasetId!==datasetId||!index.patients)throw new Error('Connect patient records to verify the clinical DOB before editing.');
+    const ref=index.patients[key];if(!ref)return false;
+    if(ref.path!==name||ref.phn!==phn)throw new Error('Patient index identity mismatch.');
+  }
+  const loaded=await repository.load(name),data=loaded.data;
+  if(!data){if(local)return false;throw new Error('Connect patient records to update this patient’s clinical file.');}
+  if(data.app!=='trim-notes'||data.schema!==1||data.kind!==(local?'context':'patient-context')||data.datasetId!==datasetId)throw new Error('Wrong patient workspace.');
+  const current=local?data.patients[key]:data.context;
+  if(!current)return false;
+  const profile=editProfileBirthDate(current,phn,expected,next);
+  if(!equal(current,profile)){
+    const updated=local?{...data,patients:{...data.patients,[key]:profile}}:{...data,context:profile};
+    await repository.save(name,updated,loaded.etag);
+  }
+  if(!local) {
+    // A retry after a lost response can finish publishing just the DOB.
+    const display=await repository.load('patient-display.json');
+    if(display.data?.app!=='trim-patient-display'||display.data.datasetId!==datasetId||!display.data.patients?.[phn])throw new Error('Saved DOB; patient display needs a refresh.');
+    const latest=(await repository.load(name)).data;
+    if(latest?.context?.patient?.dateOfBirth!==profile.patient.dateOfBirth)throw new Error('Patient DOB changed during editing. Reload before continuing.');
+    const patients={...display.data.patients,[phn]:{...display.data.patients[phn],structuredDob:true,dateOfBirth:profile.patient.dateOfBirth||''}};
+    await repository.save('patient-display.json',{...display.data,patients},display.etag);
+  }
+  return true;
+}

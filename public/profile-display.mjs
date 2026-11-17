@@ -21,9 +21,9 @@ export function legacyMost(context){
 }
 export function profileDisplay(context,historyImport=null){
  const summary=String(context?.summaryMarkdown||'');
- const dob=context?.patient?.dateOfBirth||context?.dateOfBirth||summary.match(/\b(?:DOB|Date of birth)\s*:\s*(\d{4}-\d{2}-\d{2})\b/i)?.[1]||'';
- return {dateOfBirth:dob,structuredMost:Object.hasOwn(context||{},'mostStatus'),mostStatus:normalizeMost(context?.mostStatus),mostEvidence:context?.mostSource?.evidence||'',mostReview:context?.mostReview?.reason||'',sourceUpdatedAt:context?.updatedAt||'',historyImport};
+ const dob=Object.hasOwn(context?.patient||{},'dateOfBirth')?(context.patient.dateOfBirth||''):context?.dateOfBirth||summary.match(/\b(?:DOB|Date of birth)\s*:\s*(\d{4}-\d{2}-\d{2})\b/i)?.[1]||'';
+ return {dateOfBirth:dob,structuredDob:Object.hasOwn(context?.patient||{},'dateOfBirth'),structuredMost:Object.hasOwn(context||{},'mostStatus'),mostStatus:normalizeMost(context?.mostStatus),mostEvidence:context?.mostSource?.evidence||'',mostReview:context?.mostReview?.reason||'',sourceUpdatedAt:context?.updatedAt||'',historyImport};
 }
 let profiles={};
 export function setProfileDisplay(value){profiles=value?.patients||{};}
-export function withProfile(p){const c=profiles[String(p.phn||'').replace(/\D/g,'')]||{};const roster=normalizeMost(p.mostStatus);return {...p,historyImport:c.historyImport||null,dateOfBirth:p.dateOfBirth||p.dob||c.dateOfBirth||'',structuredMost:c.structuredMost===true,mostStatus:c.structuredMost?normalizeMost(c.mostStatus):roster||normalizeMost(c.mostStatus),mostReview:c.mostReview||'',mostEvidence:[p.mostStatus?'Roster entry: '+p.mostStatus:'',p.mostStatus&&!roster?'Pending review: roster designation is incomplete.':'',c.mostEvidence].filter(Boolean).join('\n')};}
+export function withProfile(p){const c=profiles[String(p.phn||'').replace(/\D/g,'')]||{};const roster=normalizeMost(p.mostStatus);return {...p,historyImport:c.historyImport||null,structuredDob:c.structuredDob===true,dateOfBirth:c.structuredDob?(c.dateOfBirth||''):(c.dateOfBirth||p.dateOfBirth||p.dob||''),structuredMost:c.structuredMost===true,mostStatus:c.structuredMost?normalizeMost(c.mostStatus):roster||normalizeMost(c.mostStatus),mostReview:c.mostReview||'',mostEvidence:[p.mostStatus?'Roster entry: '+p.mostStatus:'',p.mostStatus&&!roster?'Pending review: roster designation is incomplete.':'',c.mostEvidence].filter(Boolean).join('\n')};}

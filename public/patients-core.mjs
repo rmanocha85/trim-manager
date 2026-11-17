@@ -67,6 +67,8 @@ export function add(raw,fields,asOf=today(),newId=()=>globalThis.crypto.randomUU
     if(retained.length>1||retained.some(p=>digits(p.phn)!==phn||digits(p.ava)!==ava))throw new Error('Returning patient identifiers conflict. Verify both PHN and Ava before reactivation.');
     const old=retained[0];
     const patient={...old,...fields,id:old?.id||newId(),phn,ava,...(!old?{panelAddedDate:asOf,newPanelPatient:true}:{newPanelPatient:false})};
+    if(fields.dateOfBirth||old?.dateOfBirth||old?.dob)patient.dateOfBirth=fields.dateOfBirth||old.dateOfBirth||old.dob;
+    delete patient.dob;
     delete patient.removedDate;
     return validate({...roster,patients:[...roster.patients,patient],removedPatients:roster.removedPatients.filter(p=>p!==old)});
   }
@@ -74,6 +76,7 @@ export function edit(raw,id,fields,asOf=today()){
     const roster=expire(raw,asOf),old=roster.patients.find(p=>String(p.id)===String(id));
     if(!old)throw new Error('Patient not found.');
     const updated={...old,...fields,id:old.id};
+    if(Object.hasOwn(fields,'dateOfBirth'))delete updated.dob;
     if(Object.hasOwn(fields,'phn'))updated.phn=digits(fields.phn);
     if(Object.hasOwn(fields,'ava'))updated.ava=digits(fields.ava);
     return validate({...roster,patients:roster.patients.map(p=>p===old?updated:p)});

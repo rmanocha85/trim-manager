@@ -1,7 +1,7 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261115-roster1';
-import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261116-most2';
+import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261117-profile1';
 import {billingUI} from './billing-ui.mjs?v=20261116-oatlink1';
-import {patientsUI} from './patients-ui.mjs?v=20261116-billingicons1';
+import {patientsUI} from './patients-ui.mjs?v=20261117-profile1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261116-oatlayout1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261116-oatlayout1';
@@ -145,9 +145,9 @@ async function start(){
     const repository=oatRepository;++oatLoad;
     const saved=await repository.save(action);return {...saved,local:repository.adapter.mode==='local'};
   }});
-  patients=await patientsUI({host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onBilling:key=>billing.openPatientBilling(key),onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
+  patients=await patientsUI({onBirthDate:(...args)=>intake.updateBirthDate(...args),host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onBilling:key=>billing.openPatientBilling(key),onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs?v=20261113-history1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  notes=laptop?(await import('./notes-ui.mjs?v=20261117-profile1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
   const rosterRoot=$('patients-workspace').shadowRoot;
   const profileBanner=document.createElement('div'),profileMessage=document.createElement('span'),profileAction=document.createElement('button');

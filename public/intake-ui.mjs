@@ -2,9 +2,9 @@ import {incomingLabel,incomingMessage} from './incoming-request.mjs?v=20261111-i
 import {typedHistorySource,clipboardImages} from './intake-sources.mjs?v=20261111-roster1';
 import {identityHTML} from './patient-identity.mjs?v=20261113-history1';
 import {DriveIntake} from './intake-drive.mjs?v=20261111-best-effort1';
-import {DriveNotesRepository} from './notes-storage.mjs?v=20261031-compact1';
+import {DriveNotesRepository,LocalNotesRepository,savePatientBirthDate} from './notes-storage.mjs?v=20261117-profile1';
 import {setProfileDisplay} from './profile-display.mjs?v=20261113-history1';
-import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261111-best-effort1';
+import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261117-profile1';
 import {escapeHTML as esc} from './core.mjs?v=20261105-flags1';
 import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261116-oatlink1';
 import {laptopRuntime} from './runtime.mjs';
@@ -133,5 +133,13 @@ export function documentIntakeUI({state,notes,onProfiles=()=>{},onProfileStatus=
  setInterval(async()=>{if(!laptopRuntime()||queuePolling||!state().adapter||document.hidden)return;queuePolling=true;try{repo();updateQueue(await readQueue());await notes.refreshImported?.();}catch(e){queueUnavailable(e);}finally{queuePolling=false;}},15000);
  async function updateFooterQueue(){try{repo();updateQueue(await readQueue());}catch(e){queueUnavailable(e);}}
  async function refreshQueue(){if(!state().adapter)return;if(dialog.open){try{await refresh();}catch(e){queueUnavailable(e);}}else await updateFooterQueue();}
- return {open,profiles,refreshQueue,recordsConnection(){return adapter===state().adapter?recordsAdapter:null;},offerConnection(){recordsNeeded=true;connectButton.hidden=false;}};
+ async function updateBirthDate(phn,expected,next){
+  const adapter=repo(),dataset=state().ledger?.datasetId;
+  const connection=laptopRuntime()?await local():null;
+  const target=connection?new LocalNotesRepository((...args)=>connection.request(...args)):new DriveNotesRepository(recordsAdapter||adapter);
+  try{await savePatientBirthDate(target,dataset,phn,expected,next);}
+  catch(error){if(!connection&&!recordsAdapter&&adapter.hostedAccess){recordsNeeded=true;connectButton.hidden=false;}throw error;}
+  await profiles();
+ }
+ return {updateBirthDate,open,profiles,refreshQueue,recordsConnection(){return adapter===state().adapter?recordsAdapter:null;},offerConnection(){recordsNeeded=true;connectButton.hidden=false;}};
 }

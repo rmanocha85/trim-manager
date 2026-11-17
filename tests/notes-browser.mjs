@@ -13,7 +13,7 @@ const dir=await mkdtemp(path.join(os.tmpdir(),'trim-notes-browser-')),date=today
 const roster={units:[{id:'test',name:'SYNTHETIC CEDAR',floor:1},{id:'second',name:'SYNTHETIC CHERRY',floor:2}],patients:[1,2,3].map(n=>({id:'synthetic-'+n,phn:String(n).padStart(10,'0'),name:'SYNTHETIC, Patient '+n,room:String(n),unit:n===3?'second':'test',codes:'401'}))};
 const ledger=blankLedger('notes-browser-synthetic');for(let n=1;n<=3;n++)ledger.baselines['phn:'+String(n).padStart(10,'0')]={date:'2025-01-01'};
 const imported=contextRecord(ledger.datasetId);
-imported.patients['phn:0000000001']={patient:{key:'phn:0000000001',phn:'0000000001',name:'SYNTHETIC, Patient 1'},summaryMarkdown:'',importStatus:{importedAt:new Date().toISOString(),sourceDates:['2025-01-01']},medicationSnapshot:{sourceDate:'2025-01-01',scheduled:['Synthetic medicine held'],prn:[],documentedChanges:['Recheck before restarting'],clinicalReviewStatus:'pending'},reviewIssues:['Synthetic source discrepancy']};
+imported.patients['phn:0000000001']={patient:{key:'phn:0000000001',phn:'0000000001',name:'SYNTHETIC, Patient 1'},summaryMarkdown:'DOB: 1940-01-01\nDOB source: synthetic intake\n## PMHx\nPrior synthetic procedure.\n## Allergies\n- Synthetic A: rash.',labs:[{test:'Legacy X',value:'<0.5',unit:'mg/L',date:null},{date:'2025-01',results:['Grouped Y: 2 U/L']}],importStatus:{importedAt:new Date().toISOString(),sourceDates:['2025-01-01']},medicationSnapshot:{sourceDate:'2025-01-01',scheduled:['Synthetic medicine held'],prn:[],documentedChanges:['Recheck before restarting'],clinicalReviewStatus:'pending'},reviewIssues:['Synthetic source discrepancy']};
 await new LocalNotesStore(notesPath,path.join(dir,'notes-locks')).save('patient-context.json',imported,'new');
 await writeFile(rosterPath,JSON.stringify(roster));await writeFile(billingPath,JSON.stringify(ledger));let generations=0;
 const generatedInputs=[];
@@ -23,10 +23,21 @@ const browser=await chromium.launch({channel:'chrome',headless:true});const cont
 try{
   await page.route('https://accounts.google.com/**',r=>r.fulfill({contentType:'text/javascript',body:''}));
   const connect=async()=>{await page.locator('.patient').first().waitFor();await page.locator('[data-section="notes"]').click();await page.locator('[data-tab="rounds"]').click();await page.locator('#notes-input').waitFor();};
+  if(process.env.TRIM_ASSET_BASE)await page.route('**/*',async route=>{
+    const asset=new URL(route.request().url());
+    if(asset.origin!==url||asset.pathname.startsWith('/api/')||asset.pathname==='/health')return route.fallback();
+    const target=new URL(asset.pathname==='/'?'index.html':asset.pathname.slice(1),process.env.TRIM_ASSET_BASE);target.search=asset.search;
+    const remote=await fetch(target);return route.fulfill({status:remote.status,contentType:remote.headers.get('content-type')||'application/octet-stream',body:Buffer.from(await remote.arrayBuffer())});
+  });
   await page.goto(url);await connect();await page.locator('#rounds [data-notes-unit]').selectOption('test');assert.equal(await page.locator('[data-notes-patient]').count(),2);assert.equal(await page.locator('[name="notes-report"][value="combined"]').isChecked(),true);
   assert.equal(await page.locator('#notes-no-concerns').isChecked(),true);assert.equal(await page.locator('[data-notes-statement]:checked').count(),0);
   assert.match(await page.locator('.notes-imported-context').textContent(),/Synthetic source discrepancy/);
-  assert.match(await page.locator('[data-notes-patient]').first().textContent(),/History imported/);
+  assert.match(await page.locator('.notes-imported-context').textContent(),/Date not documented.*Legacy X: <0.5 mg\/L/s);
+  assert.match(await page.locator('.notes-imported-context').textContent(),/2025-01.*Grouped Y: 2 U\/L/s);
+  assert.match(await page.locator('#notes-pmhx').inputValue(),/Prior synthetic procedure/);
+  assert.match(await page.locator('#notes-allergies').inputValue(),/Synthetic A: rash/);
+  await page.locator('.notes-context summary').click();
+  assert.match(await page.locator('[data-notes-patient]').first().textContent(),/PMHx imported/);
   await page.locator('[data-notes-statement="bpsdStable"]').check();await page.locator('[data-notes-statement="vitalsStable"]').check();await page.locator('[data-notes-statement="glucometersStable"]').check();await page.locator('[data-notes-statement="vitalsStable"]').uncheck();
   await page.locator('#notes-no-concerns').uncheck();assert.equal(await page.locator('[name="notes-report"][value="custom"]').isChecked(),true);
   await page.locator('#notes-no-concerns').check();assert.equal(await page.locator('[name="notes-report"][value="combined"]').isChecked(),true);
@@ -42,6 +53,7 @@ try{
   await page.locator('#notes-record-billing').click();await page.locator('#notes-billing-result').filter({hasText:'2 routine billings added'}).waitFor();await page.locator('#notes-record-billing').click();await page.locator('#notes-billing-result').filter({hasText:'0 routine billings added; 2 already recorded'}).waitFor();assert.equal(JSON.parse(await readFile(billingPath,'utf8')).entries.length,0);
   await page.locator('#notes-handoff').click();await page.locator('#notes-handoff-result').filter({hasText:'prepared locally'}).waitFor();await assert.rejects(access(path.join(notesPath,'handoffs',date+'.json')));await page.locator('#sync').click();await page.locator('#notes .notes-message').filter({hasText:'Handoff ready: 2'}).waitFor();assert.equal(await page.locator('[data-assessment]').first().isEnabled(),true);
   const handoff=JSON.parse(await readFile(path.join(notesPath,'handoffs',date+'.json'),'utf8')),savedDay=JSON.parse(await readFile(path.join(notesPath,'visits',date+'.json'),'utf8')),summary={patients:{'phn:0000000001':JSON.parse(await readFile(path.join(notesPath,'patients','0000000001.json'),'utf8')).context}};
+  const savedProfile=summary.patients['phn:0000000001'];assert.equal(savedProfile.patient.dateOfBirth,'1940-01-01');assert.match(savedProfile.medicalHistory.text,/Prior synthetic procedure/);assert.equal(savedProfile.allergies.entries[0].text,'Synthetic A: rash.');
   assert.equal(handoff.patients.length,2);assert.match(handoff.patients[0].assessment,/physician edited target/);assert.ok(!/billing|dueState/.test(JSON.stringify(handoff)));assert.match(summary.patients['phn:0000000001'].lastReviewed.text,/physician edited target/);assert.equal(savedDay.entries['phn:0000000001'].reviews.length,1);assert.deepEqual(savedDay.entries['phn:0000000001'].quickStatements,['bpsdStable','glucometersStable']);assert.deepEqual(savedDay.entries['phn:0000000002'].quickStatements,['labsCurrent']);assert.ok(!JSON.stringify(savedDay).includes('base64'));
   await page.locator('#save-status').filter({hasText:'Saved'}).waitFor();await page.locator('[data-section="notes"]').click();await page.locator('[data-tab="rounds"]').click();assert.equal(await page.locator('[data-notes-patient]').count(),2);await page.screenshot({path:'work/notes-rounds-synthetic.png',fullPage:true});
   await page.locator('[data-section="notes"]').click();await page.locator('[data-tab="notes"]').click();await page.locator('[data-assessment]').first().fill('Edited after review');assert.equal(await page.locator('.note-review-badge.reviewed').count(),1);await page.locator('#notes-handoff').click();await page.locator('#notes-handoff-result').filter({hasText:'prepared locally'}).waitFor();await page.locator('#sync').click();await page.locator('#notes .notes-message').filter({hasText:'Handoff ready: 1'}).waitFor();assert.equal(JSON.parse(await readFile(path.join(notesPath,'handoffs',date+'.json'),'utf8')).patients.length,1);

@@ -1,3 +1,4 @@
+import {organizePatient,profileUpdate} from '../public/clinical-profile.mjs';
 // Apply a physician-authorized, verified extraction batch. Extraction is a separate step.
 // The prepared file is temporary clinical data, never committed to this repository.
 import {readFile,writeFile,mkdir,unlink} from 'node:fs/promises';
@@ -19,12 +20,12 @@ export async function importPatientContext({root,rosterPath,preparedPath,dataset
     if(!/^\d{10}$/.test(id))throw new Error('Invalid PHN.');
     const matches=all.filter(p=>phn(p)===id);
     if(matches.length!==1)throw new Error('PHN must match exactly one roster patient.');
-    return snapshotPatient({...matches[0],phn:id,key:'phn:'+id},roster.units);
+    return snapshotPatient({...matches[0],phn:id,key:'phn:'+id},roster.units,true);
   };
   // Create empty records for the current physician panel; preserve former/other contexts.
   for(const p of roster.patients){
     const patient=identify(phn(p));
-    context.patients[patient.key]||={patient,summaryMarkdown:''};
+    context.patients[patient.key]||=organizePatient({patient,summaryMarkdown:''});
   }
   const sourceFiles=[],keys=new Set(),changedKeys=new Set(),now=new Date().toISOString();
   for(const update of prepared){
@@ -33,7 +34,7 @@ export async function importPatientContext({root,rosterPath,preparedPath,dataset
     const current=context.patients[key],known=new Set((current.sourceDocuments||[]).map(s=>s.sha256));
     if(update.sources.every(s=>known.has(s.sha256)))continue;
     changedKeys.add(key);
-    if(current.summaryMarkdown?.trim())throw new Error('Existing summary needs explicit reconciliation before replacement.');
+    if(current.summaryMarkdown?.trim()||current.medicalHistory?.text||current.allergies?.entries?.length)throw new Error('Existing summary needs explicit reconciliation before replacement.');
     const sourceNames=[];
     for(const source of update.sources){
       if(!/^[a-f0-9]{64}$/.test(source.sha256)||source.path!==`sources/${source.sha256}${path.extname(source.originalName).toLowerCase()}`)throw new Error('Invalid source hash/path.');
@@ -44,7 +45,7 @@ export async function importPatientContext({root,rosterPath,preparedPath,dataset
       sourceFiles.push({filename,destination:path.join(root,source.path),raw,sha256:source.sha256,key});
       sourceNames.push(source);
     }
-    const next={...current,patient,summaryMarkdown:update.summaryMarkdown,followUp:update.followUp||[],reviewIssues:update.reviewIssues||[],sourceDocuments:[...(current.sourceDocuments||[]),...sourceNames],importStatus:{importedAt:now,clinicalReviewStatus:'pending',sourceDates:[update.medicationSnapshot.sourceDate,...(update.labs||[]).map(l=>l.date)]},updatedAt:now};
+    const next={...current,...profileUpdate({...current,patient:{...patient,...current.patient}},update.summaryMarkdown,update),followUp:update.followUp||[],reviewIssues:update.reviewIssues||[],sourceDocuments:[...(current.sourceDocuments||[]),...sourceNames],importStatus:{importedAt:now,clinicalReviewStatus:'pending',sourceDates:[update.medicationSnapshot.sourceDate,...(update.labs||[]).map(l=>l.date)]},updatedAt:now};
     if(current.medicationSnapshot)next.medicationHistory=[...(current.medicationHistory||[]),current.medicationSnapshot];
     next.medicationSnapshot=update.medicationSnapshot;
     if(update.labs)next.labs=[...(current.labs||[]),...update.labs];

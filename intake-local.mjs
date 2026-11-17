@@ -22,7 +22,7 @@ export class DocumentIntake{
  relative(file){return path.relative(this.root,file).split(path.sep).join('/');}
  async read(id){return checkManifest(JSON.parse(await readFile(this.file(id),'utf8')));}
  async write(job){checkManifest(job);await mkdir(this.jobs,{recursive:true});const file=this.file(job.id),temp=file+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(job,null,2)+'\n',{mode:0o600});await rename(temp,file);return this.read(job.id);}
- async patient(job){const roster=await this.roster(),ledger=await this.ledger();if(ledger.datasetId!==job.datasetId)throw stop('The document belongs to a different workspace.');const matches=[...(roster.patients||[]),...(roster.otherPatients||[])].filter(p=>String(p.phn||'').replace(/\D/g,'')===job.phn);if(matches.length!==1)throw stop('The source PHN must match exactly one saved roster patient.');return {...snapshotPatient({...matches[0],phn:job.phn,key:'phn:'+job.phn},roster.units),mostStatus:matches[0].mostStatus||null};}
+ async patient(job){const roster=await this.roster(),ledger=await this.ledger();if(ledger.datasetId!==job.datasetId)throw stop('The document belongs to a different workspace.');const matches=[...(roster.patients||[]),...(roster.otherPatients||[])].filter(p=>String(p.phn||'').replace(/\D/g,'')===job.phn);if(matches.length!==1)throw stop('The source PHN must match exactly one saved roster patient.');return {...snapshotPatient({...matches[0],phn:job.phn,key:'phn:'+job.phn},roster.units,true),mostStatus:matches[0].mostStatus||null};}
  async submit({job,documents}){
   checkManifest(job);await this.patient(job);if(!Array.isArray(documents)||documents.length!==job.files.length)throw new Error('Missing upload content.');
   const buffers=documents.map((data,i)=>{if(typeof data!=='string'||!/^data:[\w/+.-]+;base64,[A-Za-z0-9+/=]+$/.test(data))throw new Error('Invalid upload encoding.');const b=Buffer.from(data.split(',')[1],'base64'),f=job.files[i];if(b.length!==f.size||hash(b)!==f.sha256||!signatureMatches(b,f.mime))throw new Error('File contents did not match the upload.');return b;});
@@ -153,13 +153,13 @@ export class DocumentIntake{
    const proposal=validateReconciliation(await this.ai.analyzeDocuments({model,patient,context:current,documents:indices.map(i=>documents[i])}));
    if(!identityMatches(proposal,job.phn,indices.length))throw stop('Every source must contain the selected patient’s exact PHN.');
    job={...job,proposal};await this.write(job);
-   const now=new Date().toISOString(),fields={...reconciledFields(current||{},proposal,now),...reconcileMost(current||{mostStatus:patient.mostStatus},proposal.mostFindings,indices.map(i=>job.files[i]),now)};
+   const now=new Date().toISOString(),fields={...reconciledFields({...current,patient:{...patient,...current?.patient}},proposal,now),...reconcileMost(current||{mostStatus:patient.mostStatus},proposal.mostFindings,indices.map(i=>job.files[i]),now)};
    // Interpretation is best effort. Identity, source integrity and conditional-save
    // checks remain mandatory; an AI content-quality opinion cannot veto an import.
    for(let attempt=0;attempt<4;attempt++){
     const latest=await this.loadContext(job),data=latest.data||contextRecord(job.datasetId),record=data.patients[patient.key]||null;
     if(fingerprint(record)!==job.baseFingerprint)throw Object.assign(new Error('The patient profile changed; reconciling against the newer profile.'),{reconcileAgain:true});
-    data.patients[patient.key]={...record,...fields,patient:record?.patient||patient,sourceDocuments:[...(record?.sourceDocuments||[]),...indices.map(i=>({intakeId:id,path:this.relative(this.source(job,job.files[i])),originalName:job.files[i].name,retained:true,sha256:job.files[i].sha256,importedAt:now}))],importStatus:{...(typeof record?.importStatus==='object'?record.importStatus:{}),importedAt:now,clinicalReviewStatus:'pending',sourceDates:[...new Set([...(record?.importStatus?.sourceDates||[]),...proposal.sourceDates])],intakeId:id},updatedAt:now};
+    data.patients[patient.key]={...record,...fields,sourceDocuments:[...(record?.sourceDocuments||[]),...indices.map(i=>({intakeId:id,path:this.relative(this.source(job,job.files[i])),originalName:job.files[i].name,retained:true,sha256:job.files[i].sha256,importedAt:now}))],importStatus:{...(typeof record?.importStatus==='object'?record.importStatus:{}),importedAt:now,clinicalReviewStatus:'pending',sourceDates:[...new Set([...(record?.importStatus?.sourceDates||[]),...proposal.sourceDates])],intakeId:id},updatedAt:now};
     try{await this.notes.save('patient-context.json',data,latest.etag);}catch(e){if(e.status===409&&attempt<3)continue;throw e;}
     const verified=await this.loadContext(job);if(fingerprint(verified.data?.patients?.[patient.key])!==fingerprint(data.patients[patient.key]))throw stop('Patient profile read-back differed. Source retained for recovery.');break;
    }

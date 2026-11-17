@@ -8,7 +8,7 @@ import {returnFromHospitalToday,canUndoHospitalReturn,undoHospitalReturn} from '
 import {hospitalEditor} from './hospital-entry.mjs?v=20261105-return1';
 import {formatDate,formatTimestamp} from './dates.mjs';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
-import * as TrimRoster from './patients-core.mjs?v=20261111-active-issue1';
+import * as TrimRoster from './patients-core.mjs?v=20261117-profile1';
 import {rosterPrintPages} from './roster-print.mjs';
 import {visitList} from './visit-list.mjs?v=20261113-combined1';
 import {RosterRepository} from './roster-repository.mjs';
@@ -22,7 +22,7 @@ function formatRosterName(value) {
   }).replace(/\s*,\s*/gu, ', ');
 }
 
-export async function patientsUI({host,onChange=()=>{},onRoster=()=>{},onSaved=async()=>{},onUpload=()=>{},onHistory=()=>{},onBilling=()=>{}}){
+export async function patientsUI({host,onBirthDate=async()=>{},onChange=()=>{},onRoster=()=>{},onSaved=async()=>{},onUpload=()=>{},onHistory=()=>{},onBilling=()=>{}}){
 
 const MAX_D=17;
 const LIST_PAGES=[['cedar','cherry','hatzic','fern'],['dewdney','deroche','silver','stave']];
@@ -405,7 +405,7 @@ function addPatient(){
 let editSecondary=false;
 function startEdit(id,secondary=0){if(!canEdit()||hasForm())return;editSecondary=Boolean(secondary);editId=id;render();void persist().catch(()=>{});}
 function cancelEdit(){editId=null;render();void persist().catch(()=>{});}
-function saveEdit(id){
+async function saveEdit(id){
   if(!canEdit())return;
   const other=otherPatients().find(x=>x.id===id);
   if(other){
@@ -414,10 +414,21 @@ function saveEdit(id){
   }
   const p=state.patients.find(x=>x.id===id);if(!p)return;
   const enteredName=g(`en-${id}`).value.trim();
-  try{applyRoster(TrimRoster.edit(currentRoster(),id,validateDemographics({
+  try{const fields=validateDemographics({
     name:enteredName && enteredName!==p.name ? formatRosterName(enteredName).trim() : p.name,phn:g(`ep-${id}`).value.trim(),unit:g(`eu-${id}`).value,
     room:g(`er-${id}`).value.trim(),codes:g(`ec-${id}`).value.trim(),ava:g(`ea-${id}`).value.trim(),pFlag:g(`epf-${id}`).checked,palliativeFlag:g(`epal-${id}`).checked,dateOfBirth:g(`edob-${id}`).value,mostStatus:g(`emost-${id}`).disabled?p.mostStatus||'':g(`emost-${id}`).value
-  })));}catch(e){alert(e.message);return;}
+  });
+  const initial=g(`edob-${id}`).defaultValue;
+  if(fields.dateOfBirth===initial)delete fields.dateOfBirth;
+  const updated=TrimRoster.edit(currentRoster(),id,fields);
+  if(Object.hasOwn(fields,'dateOfBirth')){
+    const before=JSON.stringify(currentRoster()),phn=String(p.phn).replace(/\D/g,'');
+    if(String(fields.phn).replace(/\D/g,'')!==phn)throw new Error('Save the identity correction before editing the DOB.');
+    await onBirthDate(phn,initial,fields.dateOfBirth);
+    if(before!==JSON.stringify(currentRoster()))throw new Error('Roster changed during the DOB edit. Reopen this patient to finish the roster edit.');
+  }
+  applyRoster(updated);
+  }catch(e){alert(e.message);return;}
   editId=null;stageRoster();render();
 }
 function promptDel(id){
@@ -580,7 +591,7 @@ function rosterEditRow(p,other=false){
  return `<tr><td colspan="8"><div class="roster-edit">
 <label>Name<input class="einp" id="en-${esc(p.id)}" value="${esc(p.name)}"></label><label>PHN<input class="einp" id="ep-${esc(p.id)}" value="${esc(p.phn||'')}"></label>
 <label>Unit<select class="sel" id="eu-${esc(p.id)}">${state.units.map(u=>`<option value="${esc(u.id)}"${p.unit===u.id?' selected':''}>${esc(u.name)}</option>`).join('')}</select></label><label>Room<input class="einp" id="er-${esc(p.id)}" value="${esc(p.room)}"></label>
-<label>Ava chart ID<input class="einp" id="ea-${esc(p.id)}" value="${esc(p.ava||'')}"></label><label>ICD codes<input class="einp" id="ec-${esc(p.id)}" value="${esc(p.codes||'')}"></label><label>Date of birth<input class="einp" type="date" id="edob-${esc(p.id)}" value="${esc(p.dateOfBirth||p.dob||'')}"></label>
+<label>Ava chart ID<input class="einp" id="ea-${esc(p.id)}" value="${esc(p.ava||'')}"></label><label>ICD codes<input class="einp" id="ec-${esc(p.id)}" value="${esc(p.codes||'')}"></label><label>Date of birth<input class="einp" type="date" id="edob-${esc(p.id)}" value="${esc(withProfile(p).dateOfBirth||'')}"></label>
 <label>MOST<select class="sel" id="emost-${esc(p.id)}" ${withProfile(p).structuredMost?'disabled title="From patient history. Update through Documents."':''}>${MOST_OPTIONS.map(v=>`<option value="${esc(v)}"${(withProfile(p).mostStatus||'')===v?' selected':''}>${esc(v||'Not recorded')}</option>`).join('')}</select></label><label class="p-toggle"><input id="epf-${esc(p.id)}" type="checkbox"${p.pFlag?' checked':''}>Ψ Psychiatric consult</label><label class="p-toggle"><input id="epal-${esc(p.id)}" type="checkbox"${p.palliativeFlag?' checked':''}>${flagIcon('palliativeFlag')} Palliative protocol</label>
 <div class="pact"><button class="btn btn-green btn-sm" data-click="saveEdit('${esc(p.id)}')">Save</button><button class="btn btn-ghost btn-sm" data-click="cancelEdit()">Cancel</button></div></div></td></tr>`;}
 
