@@ -24,8 +24,8 @@ export function finishAppointment(roster,action){
   const {date,appointmentId,finished,expected}=action||{};
   if(!validClinicDate(date)||typeof finished!=='boolean'||!expected)throw new Error('Invalid appointment completion.');
   const next=structuredClone(roster),slot=next.clinicDays?.find(d=>d.date===date)?.appointments.find(s=>s.id===appointmentId);
-  if(!slot||!slot.patientId&&!slot.sourceName)throw new Error('Appointment no longer exists. Reload OAT FH.');
-  if(['patientId','sourceName','time'].some(k=>(slot[k]??null)!==(expected[k]??null))||Boolean(slot.finished)!==Boolean(expected.finished))throw Object.assign(new Error('This appointment changed elsewhere. Reload OAT FH before changing Finished.'),{status:409});
+  if(!slot||!slot.patientId&&!slot.sourceName)throw new Error('Appointment no longer exists. Reload the clinic schedule.');
+  if(['patientId','sourceName','time'].some(k=>(slot[k]??null)!==(expected[k]??null))||Boolean(slot.finished)!==Boolean(expected.finished))throw Object.assign(new Error('This appointment changed elsewhere. Reload the clinic schedule before changing Finished.'),{status:409});
   slot.finished=finished;
   slot.finishedAt=finished?new Date().toISOString():null;
   return next;

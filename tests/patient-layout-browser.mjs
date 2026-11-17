@@ -32,7 +32,7 @@ const diagnosis=()=>page.locator('.code-details').filter({has:page.locator('[dat
 const row=p('#ulist tbody tr').first();
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.locator('.patient').first().waitFor();await saved();
- assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes','MAID','OAT Fraser Health']);
+ assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes','MAID','OAT FH','OAT Purple']);
  for(const name of ['patients','billing','notes']){
    await section(name);const footer=await page.locator('.app-utility').boundingBox();assert.equal(footer.y+footer.height,1000);
    await section('settings');assert.equal(await page.locator('#settings').isVisible(),true);assert.equal(await page.locator('#calendar').isVisible(),false);assert.equal(await page.locator('.app-sections [aria-pressed=true]').count(),0);

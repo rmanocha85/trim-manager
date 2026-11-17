@@ -25,12 +25,14 @@ export const defaults={
   roster:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Roster','trim-patients-data.json'),
   billing:path.join(home,'My Drive','02. TRIM','TRIM AI','Data','Billing','trim-billing-data-v1.json')
 };
-export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,oatPath,snapshotPaths,chatgpt,onDemand=false,lifecycleOptions={}}={}) {
+export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot?path.join(testRoot,'roster.json'):defaults.roster),billingPath=process.env.TRIM_BILLING_PATH||(testRoot?path.join(testRoot,'billing.json'):defaults.billing),lockPath=path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMBilling',`${digest(billingPath)}.lock`),notesPath=process.env.TRIM_NOTES_PATH,maidPath,oatPath,purplePath,snapshotPaths,chatgpt,onDemand=false,lifecycleOptions={}}={}) {
   const live=path.resolve(rosterPath)===path.resolve(defaults.roster)&&path.resolve(billingPath)===path.resolve(defaults.billing);
   maidPath ||= live?path.join(home,'My Drive','00. MAID','00. MAID info','MAID AI','maid-roster.json'):path.join(path.dirname(rosterPath),'maid-roster.json');
   const maidStore=new MaidStore(maidPath);
   oatPath ||= live?path.join(home,'My Drive','01. Active List','05. OAT','OAT AI','oat-fh-roster.json'):path.join(path.dirname(rosterPath),'oat-fh-roster.json');
-  const oatStore=new OatStore(oatPath);
+  purplePath ||= live?path.join(home,'My Drive','01. Active List','07. Purple Medical OAT','oat-purple-roster.json'):path.join(path.dirname(rosterPath),'oat-purple-roster.json');
+  const oatStores=new Map([['/api/oat-fh/roster',new OatStore(oatPath)],['/api/oat-purple/roster',new OatStore(purplePath,'oat-purple')]]);
+
   notesPath ||= live?path.join(home,'My Drive','02. TRIM','TRIM AI','Working records','Routine notes'):path.join(path.dirname(billingPath),'notes');
   chatgpt ||= live?new ChatGPTConnection():{status:async()=>({connected:false,planEnabled:false}),models:async()=>[],generate:async()=>{throw new Error('AI is disabled for isolated data. Inject a test connection.');}};
   if(path.resolve(rosterPath)===path.resolve(billingPath))throw new Error('Roster and billing paths must be different.');
@@ -95,10 +97,11 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
           if(activeRequests>1||intake.running||chatgpt.aborters?.size)return json(409,{error:'TRIM is still processing or saving. Let it finish, then stop it.'});
           lifecycle.stopRequested=true;res.once('finish',()=>setImmediate(idleCheck));return json(200,{stopping:true});
         }
-        if(url.pathname==='/api/oat-fh/roster'){
+        if(oatStores.has(url.pathname)){
+          const oatStore=oatStores.get(url.pathname);
           if(req.method==='GET')return json(200,await oatStore.load());
           if(req.method==='POST'){const action=await readJSON();return json(200,await oatStore.update(req.headers['if-match'],roster=>applyOatAction(roster,action)));}
-          return json(405,{error:'Unsupported OAT FH action.'});
+          return json(405,{error:'Unsupported OAT action.'});
         }
         if(url.pathname==='/api/maid/roster'){
           if(req.method==='GET')return json(200,await maidStore.load());

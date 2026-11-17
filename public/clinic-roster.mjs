@@ -8,8 +8,8 @@ import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.
-export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onLink,onChange=()=>{}}) {
-  const maid=kind==='maid', title=maid?'MAID':'OAT Fraser Health';
+export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',onAction,onPhone,onReload,onLink,onChange=()=>{}}) {
+  const maid=kind==='maid';
   let patients=[],view='active',query='',busy=false,ready=false,loaded=false,loadState='idle',loadMessage='';
   host.classList.add('clinic-workspace');
   host.innerHTML=`<div class="clinic-heading"><div><h1>${title}</h1><p>${maid?'Current patients and assessment history.':'Your clinic list, in the order you provide.'}</p></div><span class="clinic-count" role="status" aria-live="polite"></span></div>
@@ -19,7 +19,7 @@ export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onLink,onCha
     <div class="clinic-empty"><h2>Waiting for your patient list</h2><p>${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.</p></div><p class="clinic-feedback" role="status" aria-live="polite"></p>`;
   bindIdentity(host);
   const hideTip = bindRosterTips(host);
-  if(onReload){const reload=document.createElement('button');reload.textContent=maid?'Reload MAID':'Reload OAT FH';reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
+  if(onReload){const reload=document.createElement('button');reload.textContent='Reload '+title;reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
   const linkButton=document.createElement('button');
   if(onLink){
     linkButton.hidden=true;
@@ -171,18 +171,20 @@ export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onLink,onCha
     const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!['loading','error'].includes(loadState);
     loadStatus.textContent=loadState==='error'?loadMessage+(loaded?(maid?' Showing the last loaded list; changes are disabled until reload succeeds.':' Showing the last loaded list.'): ''):loaded?`Refreshing ${title} patients…`:`Loading ${title} patients…`;
     const showPlanning=maid;
-    const appPatients=maid?maidAppPatients(patients):patients;
+    const appPatients=maid?maidAppPatients(patients):patients.filter(p=>p.status===view);
     const inView=appPatients.map((patient,index)=>({patient,index})).filter(({patient})=>!maid||view==='all'||(isProvisionPending(patient)?'active':patient.status)===view);
     const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,patientLocation(p),p.plannedProvision?.location,p.plannedProvision?.address,...appContacts(p.contacts).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
     count.textContent=!loaded?(loadState==='loading'?'Loading patients…':loadState==='error'?'Patient list unavailable':'Patient list not loaded'):`${visible.length} of ${inView.length} patients`;
     empty.hidden=visible.length>0;
+    if(!maid)host.querySelector('.clinic-heading p').textContent=view==='history'?'Patients no longer on the active clinic list.':'Patients on the current clinic list.';
     if(!visible.length){
       empty.querySelector('h2').textContent=appPatients.length?'No patients match this view':'Waiting for your patient list';
       empty.querySelector('p').textContent=appPatients.length?'Try another search or patient view.':`${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.`;
       if(loadState==='loading'){empty.querySelector('h2').textContent=`Loading ${title} patients…`;empty.querySelector('p').textContent='Reading the existing patient list.';}
       else if(loadState==='error'){empty.querySelector('h2').textContent=`${title} roster could not load`;empty.querySelector('p').textContent=loadMessage;}
-      else if(!loaded){empty.querySelector('h2').textContent=`${title} patient list not loaded`;empty.querySelector('p').textContent=maid?'Connect your workspace, then reload MAID.':'Connect your workspace, then reload OAT FH.';}
-      else if(!appPatients.length){empty.querySelector('h2').textContent=`No ${title} patients`;empty.querySelector('p').textContent=maid?'There are no patients to show. Completed provisions are removed automatically after closeout.':'The saved OAT FH roster is empty.';}
+      else if(!loaded){empty.querySelector('h2').textContent=`${title} patient list not loaded`;empty.querySelector('p').textContent='Connect your workspace, then reload '+title+'.';}
+      else if(!maid&&view==='history'&&!appPatients.length){empty.querySelector('h2').textContent='No patients in history';empty.querySelector('p').textContent='Patients who leave the active list will appear here.';}
+      else if(!appPatients.length){empty.querySelector('h2').textContent=`No ${title} patients`;empty.querySelector('p').textContent=maid?'There are no patients to show. Completed provisions are removed automatically after closeout.':'The saved '+title+' roster is empty.';}
     }
     for(const {patient:p,index} of visible){
       const row=document.createElement('tr');cell(row,String(index+1));
@@ -269,6 +271,7 @@ export function clinicRosterUI({host,kind,onAction,onPhone,onReload,onLink,onCha
   render();
   return {
     state(){return {busy:busy||phoneDialog.open||planningDialog.open||provisionDialog.open,ready,loading:loadState==='loading',dirty:false};},
+    selectPatientView(value){if(!maid&&['active','history'].includes(value)){if(value!==view){query='';host.querySelector('input[type=search]').value='';}view=value;render();}},
     setPatients(records){if(busy)return;linkButton.hidden=true;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
     loading({preserve=true}={}){ready=false;linkButton.hidden=true;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
     error(message,{link=false}={}){ready=false;linkButton.hidden=!link;loadState='error';loadMessage=message;render();}

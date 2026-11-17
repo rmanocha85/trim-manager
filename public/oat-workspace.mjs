@@ -1,24 +1,32 @@
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261116-oatlayout1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
 import {avaChartUrl} from './patient-links.mjs';
-import {appointmentsForDate,upcomingFriday} from './oat-schedule.mjs?v=20261113-combined1';
+import {appointmentsForDate,upcomingFriday,pacificDate} from './oat-schedule.mjs?v=20261117-purple1';
 import {dateCalendar} from './maid-date-calendar.mjs?v=20261113-combined1';
 import {formatDate} from './dates.mjs';
-export function oatWorkspaceUI({host,onReload,onLink,onFinish,onSave=onFinish,onChange=()=>{}}){
+export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onLink,onFinish,onSave=onFinish,onChange=()=>{}}){
+  const calendarId=clinic==='oat-fh'?'oat-calendar':'oat-purple-calendar';
   host.classList.add('clinic-workspace','oat-workspace');
+  const tabs=[
+    ['schedule','Schedule','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h3m3 0h3"/>'],
+    ['patients','Active patients','<circle cx="10" cy="8" r="3.5"/><path d="M3 21v-2a7 7 0 0 1 12-5m1 3 2 2 4-5"/>'],
+    ['history','Patient history','<path d="M3 11a9 9 0 1 1 2 7M3 5v6h6m3-5v6l4 2"/>']
+  ].map(([key,label,icon])=>'<button type="button" data-oat-view="'+key+'" title="'+label+'" aria-label="'+label+'" aria-pressed="'+(key==='schedule')+'"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></button>').join('');
   const tableMarkup=caption=>'<table class="clinic-table"><caption class="sr-only">'+caption+'</caption><thead><tr><th scope="col">Time</th><th scope="col">Finished</th><th scope="col">Patient</th><th scope="col">PHN</th><th scope="col">Notes</th></tr></thead><tbody></tbody></table>';
-  host.innerHTML='<nav class="clinic-filters oat-views" aria-label="OAT FH views"><button data-oat-view="schedule" aria-pressed="true">Schedule</button><button data-oat-view="patients" aria-pressed="false">All patients</button></nav><section data-oat-schedule><div class="clinic-heading"><div><h1>OAT Fraser Health</h1><p>RAAC clinic</p></div></div><div class="oat-day-controls"><input type="hidden" data-clinic-date><button data-calendar popovertarget="oat-calendar" aria-label="Choose clinic date"></button><button data-upcoming>Upcoming Friday</button><button data-reload>Reload OAT FH</button></div><div id="oat-calendar" popover><section class="planning-calendar" aria-label="Clinic date calendar"><div class="planning-calendar-nav"><button type="button" data-month="-1" aria-label="Previous month">‹</button><h3 aria-live="polite"></h3><button type="button" data-month="1" aria-label="Next month">›</button></div><div class="planning-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="planning-days"></div><button type="button" data-today>Current month</button><p class="planning-selected" aria-live="polite"></p></section></div><div class="oat-day-heading"><h2></h2><span class="oat-appointment-count"></span></div><div class="oat-search"><label>Find a patient<input type="search" placeholder="Search this day · name, PHN or notes" aria-label="Search clinic day"></label></div><p class="oat-schedule-status" role="status" aria-live="polite"></p><p class="oat-save-status" role="status" aria-live="polite"></p><div class="clinic-table-wrap oat-schedule-table">'+tableMarkup('Remaining appointments')+'</div><div class="clinic-empty oat-schedule-empty"><h2></h2><p></p></div><details class="oat-completed"><summary>Show Completed</summary><div class="clinic-table-wrap">'+tableMarkup('Completed appointments')+'</div><p data-completed-empty>No completed appointments.</p></details></section><section data-oat-patients hidden></section>';
+  host.innerHTML='<nav class="clinic-filters oat-views" aria-label="'+title+' views">'+tabs+'</nav><section data-oat-schedule><div class="clinic-heading"><div><h1>'+title+'</h1>'+(clinic==='oat-fh'?'<p>RAAC clinic</p>':'')+'</div></div><div class="oat-day-controls"><input type="hidden" data-clinic-date><button data-calendar popovertarget="'+calendarId+'" aria-label="Choose clinic date"></button><button data-upcoming>Upcoming Friday</button><button data-reload>Reload '+title+'</button></div><div id="'+calendarId+'" class="oat-calendar" popover><section class="planning-calendar" aria-label="Clinic date calendar"><div class="planning-calendar-nav"><button type="button" data-month="-1" aria-label="Previous month">‹</button><h3 aria-live="polite"></h3><button type="button" data-month="1" aria-label="Next month">›</button></div><div class="planning-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="planning-days"></div><button type="button" data-today>Current month</button><p class="planning-selected" aria-live="polite"></p></section></div><div class="oat-day-heading"><h2></h2><span class="oat-appointment-count"></span></div><div class="oat-search"><label>Find a patient<input type="search" placeholder="Search this day · name, PHN or notes" aria-label="Search clinic day"></label></div><p class="oat-schedule-status" role="status" aria-live="polite"></p><p class="oat-save-status" role="status" aria-live="polite"></p><div class="clinic-table-wrap oat-schedule-table">'+tableMarkup('Remaining appointments')+'</div><div class="clinic-empty oat-schedule-empty"><h2></h2><p></p></div><details class="oat-completed"><summary>Show Completed</summary><div class="clinic-table-wrap">'+tableMarkup('Completed appointments')+'</div><p data-completed-empty>No completed appointments.</p></details></section><section data-oat-patients hidden></section>';
   const schedule=host.querySelector('[data-oat-schedule]'),panel=host.querySelector('[data-oat-patients]');
-  const rosterUI=clinicRosterUI({host:panel,kind:'oat-fh',onReload,onChange,onPhone:onSave && (async action=>{
+  const rosterUI=clinicRosterUI({host:panel,kind:clinic,title,onReload,onChange,onPhone:onSave && (async action=>{
     const saved=await onSave(action);
     roster=structuredClone(saved.roster);
     render();
     return saved;
   })});
   let roster=null,loadState='idle',message='',busy=false,query='';
-  const date=host.querySelector('[data-clinic-date]'),rows=host.querySelector('.oat-schedule-table tbody'),table=host.querySelector('.oat-schedule-table'),empty=host.querySelector('.oat-schedule-empty'),status=host.querySelector('.oat-schedule-status'),feedback=host.querySelector('.oat-save-status'),completed=host.querySelector('.oat-completed'),doneRows=completed.querySelector('tbody'),popover=host.querySelector('#oat-calendar');
-  date.value=upcomingFriday();
+  const date=host.querySelector('[data-clinic-date]'),rows=host.querySelector('.oat-schedule-table tbody'),table=host.querySelector('.oat-schedule-table'),empty=host.querySelector('.oat-schedule-empty'),status=host.querySelector('.oat-schedule-status'),feedback=host.querySelector('.oat-save-status'),completed=host.querySelector('.oat-completed'),doneRows=completed.querySelector('tbody'),popover=host.querySelector('.oat-calendar');
+  const defaultDate=clinic==='oat-fh'?upcomingFriday:pacificDate;
+  host.querySelector('[data-upcoming]').textContent=clinic==='oat-fh'?'Upcoming Friday':'Today';
+  date.value=defaultDate();
   const link=document.createElement('button');
-  link.type='button';link.textContent='Link OAT roster to TRIM';link.hidden=true;
+  link.type='button';link.textContent='Link '+title+' roster to TRIM';link.hidden=true;
   host.querySelector('.oat-views').after(link);
   link.onclick=async()=>{
     link.disabled=true;
@@ -52,7 +60,7 @@ export function oatWorkspaceUI({host,onReload,onLink,onFinish,onSave=onFinish,on
           // Begin within the checkbox gesture so expired Google access can renew.
           const saving=onSave(action);schedule.querySelectorAll('[data-reload],[data-upcoming],[data-calendar],input[type=checkbox]').forEach(el=>el.disabled=true);const saved=await saving;
           roster=structuredClone(saved.roster);rosterUI.setPatients(roster.patients);feedback.textContent=saved.local?'Saved to laptop folder · cloud sync unverified.':'Saved.';
-        }catch(error){loadState='error';message=error.message+' Reload OAT FH to check the saved status.';feedback.textContent='Finished status was not confirmed.';}
+        }catch(error){loadState='error';message=error.message+' Reload '+title+' to check the saved status.';feedback.textContent='Finished status was not confirmed.';}
         finally{busy=false;render();onChange();}
       };
     }
@@ -73,9 +81,9 @@ export function oatWorkspaceUI({host,onReload,onLink,onFinish,onSave=onFinish,on
     empty.querySelector('h2').textContent=loadState==='loading'&&!roster?'Loading clinic schedule…':loadState==='error'?'Schedule needs attention':!roster?'Connect your workspace':query?'No matches':slots?.length?'No appointments remaining':slots?'No appointments':'No schedule saved';
     empty.querySelector('p').textContent=loadState==='error'?message:!roster?'Connect TRIM to load your clinic schedule.':query?'Try another name, PHN or note.':slots?.length?'Open Show Completed to review finished appointments.':'Your appointments will appear here once this clinic schedule is added.';
   }
-  host.querySelectorAll('[data-oat-view]').forEach(button=>button.onclick=()=>{const showSchedule=button.dataset.oatView==='schedule';schedule.hidden=!showSchedule;panel.hidden=showSchedule;host.querySelectorAll('[data-oat-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));});
+  host.querySelectorAll('[data-oat-view]').forEach(button=>button.onclick=()=>{const showSchedule=button.dataset.oatView==='schedule';schedule.hidden=!showSchedule;panel.hidden=showSchedule;if(!showSchedule)rosterUI.selectPatientView(button.dataset.oatView==='history'?'history':'active');host.querySelectorAll('[data-oat-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));});
   host.querySelector('[type=search]').oninput=e=>{query=e.target.value.trim().toLocaleLowerCase();render();};
-  host.querySelector('[data-upcoming]').onclick=()=>{date.value=upcomingFriday();feedback.textContent='';render();};host.querySelector('[data-reload]').onclick=()=>void onReload();render();
+  host.querySelector('[data-upcoming]').onclick=()=>{date.value=defaultDate();feedback.textContent='';render();};host.querySelector('[data-reload]').onclick=()=>void onReload();render();
   return {
     state:()=>({...rosterUI.state(),busy:busy||rosterUI.state().busy}),
     setRoster(data){if(busy)return;link.hidden=true;feedback.textContent='';roster=structuredClone(data);loadState='ready';message='';rosterUI.setPatients(data.patients);render();},

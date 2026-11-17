@@ -1,46 +1,64 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261115-roster1';
-import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261117-profile1';
+import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261117-purple1';
 import {billingUI} from './billing-ui.mjs?v=20261116-oatlink1';
 import {patientsUI} from './patients-ui.mjs?v=20261117-profile1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261116-oatlayout1';
-import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261116-oatlayout1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
+import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261117-purple1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
-import {OatRepository,OAT_FILE_ID} from './oat-roster-repository.mjs?v=20261116-phone1';
+import {OatRepository,oatClinics} from './oat-roster-repository.mjs?v=20261117-purple1';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
 
 if(laptopRuntime()){document.title='TRIM Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261111-n1';}
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
-let oatRoster,oatRepository,oatPending,oatLoad=0;
-async function refreshOat(){
-  if(oatRoster?.state().busy)return;
-  const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
-  if(!adapter){oatRoster.error('Connect your workspace, then reload OAT FH.');return;}
-  if(oatPending?.adapter===adapter)return oatPending.promise;
-  const preserve=oatRepository?.adapter===adapter,version=++oatLoad,repository=new OatRepository(adapter);
-  oatRepository=repository;oatRoster.loading({preserve});
-  const pending={adapter};oatPending=pending;
-  pending.promise=(async()=>{
-    let timeout;
-    try{
-      const data=await Promise.race([repository.load(),new Promise((_,reject)=>{timeout=setTimeout(()=>reject(new Error('OAT FH took too long to load. Check your connection and reload OAT FH.')),30000);})]);
-      if(version===oatLoad)oatRoster.setRoster(data.roster);
-    }catch(error){
-      if(version===oatLoad){
+const oatViews=new Map();
+function createOatView(clinic){
+  const {title,fileId}=oatClinics[clinic];
+  let repository,pending,version=0;
+  const view=oatWorkspaceUI({host:$(clinic+'-workspace'),clinic,title,onChange:status,
+    onLink:()=>linkClinicFile(fileId,refresh),
+    onReload:async()=>{
+      try{await repository?.adapter.ensureConnected?.();await refresh();}
+      catch(error){view.error(error.message);}
+    },
+    onSave:async action=>{
+      if(!repository)throw new Error('Reload '+title+' before editing.');
+      const current=repository;
+      ++version;
+      const saved=await current.save(action);
+      return {...saved,local:current.adapter.mode==='local'};
+    }
+  });
+  async function refresh(){
+    if(view.state().busy)return;
+    const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
+    if(!adapter){view.error('Connect your workspace, then reload '+title+'.');return;}
+    if(pending?.adapter===adapter)return pending.promise;
+    const preserve=repository?.adapter===adapter,requestVersion=++version;
+    repository=new OatRepository(adapter,clinic);
+    view.loading({preserve});
+    const request={adapter};pending=request;
+    request.promise=(async()=>{
+      let timeout;
+      try{
+        const data=await Promise.race([repository.load(),new Promise((_,reject)=>{
+          timeout=setTimeout(()=>reject(new Error(title+' took too long to load. Please reload.')),30000);
+        })]);
+        if(version===requestVersion)view.setRoster(data.roster);
+      }catch(error){
+        if(version!==requestVersion)return;
+        if(error.code==='LINK_OAT'){view.error(error.message,{link:true});return;}
         const needsAccess=adapter.mode==='cloud'&&[401,403,404].includes(error.status);
-        if(error.code==='LINK_OAT'){
-          oatRoster.error(error.message,{link:true});
-          return;
-        }
         if(needsAccess)intake?.offerConnection?.();
-        oatRoster.error(needsAccess?'Connect patient records to load or renew access to the OAT FH roster, then reload OAT FH. You can also use the laptop app.':error.message);
-      }
-    }finally{clearTimeout(timeout);if(oatPending===pending)oatPending=null;}
-  })();
-  return pending.promise;
+        view.error(needsAccess?'Connect patient records and reload '+title+'.':error.message);
+      }finally{clearTimeout(timeout);if(pending===request)pending=null;}
+    })();
+    return request.promise;
+  }
+  return {refresh,state:view.state,needsLoad:()=>!repository};
 }
-function refreshClinics(){return Promise.all([refreshMaid(),refreshOat()]);}
+function refreshClinics(){return Promise.all([refreshMaid(),...Array.from(oatViews.values(),view=>view.refresh())]);}
 async function refreshMaid(){
   if(maidRoster?.state().busy)return;
   const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
@@ -71,12 +89,12 @@ const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
   if(section!==value)$('workspace').scrollTop=0;
   section=value;
-  const clinic=['maid','oat-fh'].includes(value);
+  const clinic=['maid',...oatViews.keys()].includes(value);
   const enteringPatients=value==='patients'&&$('patients-workspace').hidden;
   $('patients-workspace').hidden=value!=='patients';
   if(enteringPatients)patients?.activate();
   $('maid-workspace').hidden=value!=='maid';
-  $('oat-fh-workspace').hidden=value!=='oat-fh';
+  for(const id of oatViews.keys())$(id+'-workspace').hidden=value!==id;
   document.querySelector('.shell').hidden=value==='patients'||clinic;
   document.querySelectorAll('[data-section]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.section===value)));
   document.querySelectorAll('.sidebar .nav').forEach(b=>{
@@ -140,15 +158,11 @@ async function start(){
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
     return {patients:saved.roster.patients,local:maidRepository.adapter.mode==='local'};
   }});
-  oatRoster=oatWorkspaceUI({host:$('oat-fh-workspace'),onLink:()=>linkClinicFile(OAT_FILE_ID,refreshOat),onReload:async()=>{try{await oatRepository?.adapter.ensureConnected?.();await refreshOat();}catch(e){oatRoster.error(e.message);}},onChange:status,onSave:async action=>{
-    if(!oatRepository)throw new Error('Reload OAT FH before editing.');
-    const repository=oatRepository;++oatLoad;
-    const saved=await repository.save(action);return {...saved,local:repository.adapter.mode==='local'};
-  }});
+  for(const clinic of Object.keys(oatClinics))oatViews.set(clinic,createOatView(clinic));
   patients=await patientsUI({onBirthDate:(...args)=>intake.updateBirthDate(...args),host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onBilling:key=>billing.openPatientBilling(key),onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261117-profile1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid',...oatViews.keys()].includes(wanted)?wanted:section);status();},saveSession});
   const rosterRoot=$('patients-workspace').shadowRoot;
   const profileBanner=document.createElement('div'),profileMessage=document.createElement('span'),profileAction=document.createElement('button');
   profileBanner.className='profile-status';profileBanner.hidden=true;profileMessage.setAttribute('role','status');profileAction.type='button';profileAction.className='btn btn-ghost btn-sm';
@@ -167,7 +181,7 @@ async function start(){
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
     {name:'MAID',state:maidRoster.state,save:async()=>{}},
-    {name:'OAT FH',state:()=>({busy:oatRoster.state().busy}),save:async()=>{}},
+    ...Array.from(oatViews,([id,view])=>({name:oatClinics[id].title,state:()=>({busy:view.state().busy}),save:async()=>{}})),
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
@@ -189,9 +203,9 @@ async function start(){
       if(notesLaunchBlocked()){switcher.click();return;}
       billing.switchTab(lastTab.notes);$('open-laptop-notes').click();status();return;
     }
-    if(['patients','maid','oat-fh'].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
+    if(['patients','maid',...oatViews.keys()].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
     if(b.dataset.section==='maid'&&!maidSnapshot)void refreshMaid();
-    if(b.dataset.section==='oat-fh'&&!oatRepository)void refreshOat();
+    const oat=oatViews.get(b.dataset.section);if(oat?.needsLoad())void oat.refresh();
     status();
   });
   $('patients-print-close').onclick=()=>$('patients-print-dialog').close();

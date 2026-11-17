@@ -3,10 +3,10 @@ import {createHash,randomUUID} from 'node:crypto';
 import os from 'node:os';import path from 'node:path';
 import {validateOatRoster} from './public/oat-roster-repository.mjs';
 export class OatStore {
-  constructor(filename){this.filename=filename;}
+  constructor(filename,clinic='oat-fh'){this.filename=filename;this.clinic=clinic;}
   async load(){
     const text=await readFile(this.filename,'utf8');
-    return {roster:validateOatRoster(JSON.parse(text)),etag:createHash('sha256').update(text).digest('hex')};
+    return {roster:validateOatRoster(JSON.parse(text),this.clinic),etag:createHash('sha256').update(text).digest('hex')};
   }
   async update(expected,mutator){
     const hash=value=>createHash('sha256').update(value).digest('hex');
@@ -17,7 +17,7 @@ export class OatStore {
     const temporary=this.filename+'.'+randomUUID()+'.tmp';
     try{
       const current=await this.load();if(current.etag!==expected)throw new Error('OAT changed elsewhere. Reload before retrying.');
-      const next=validateOatRoster(await mutator(structuredClone(current.roster)));
+      const next=validateOatRoster(await mutator(structuredClone(current.roster)),this.clinic);
       // Imports rebuild the day's rows. Carry a finished visit forward only for
       // one unambiguous patient at the same time on the same clinic date.
       for(const day of next.clinicDays||[]){
