@@ -44,7 +44,7 @@ try{
   await page.locator('#search').focus();
   assert.equal(await card.locator('.flag-psych').count(),1);assert.equal(await card.locator('.pflag').count(),0);
   const box=await card.boundingBox(),empty=await page.locator('#editor').boundingBox(),list=await page.locator('.roster-area').boundingBox();
-  assert.ok(box.height<130,JSON.stringify(box));assert.ok(empty.height<180,JSON.stringify(empty));assert.ok(list.width>empty.width);
+  assert.ok(box.height<130,JSON.stringify(box));assert.ok(empty.height<180,JSON.stringify(empty));assert.ok(Math.abs(list.width/empty.width-.88/1.12)<.01,'Keep the original list/editor width balance');
   const searchTop=(await page.locator('#search').boundingBox()).y;
   await page.locator('#roster').evaluate(el=>el.scrollTop=500);assert.equal((await page.locator('#search').boundingBox()).y,searchTop);await page.locator('#roster').evaluate(el=>el.scrollTop=0);
   await card.getByRole('button',{name:'Copy PHN for '+patients[0].name,exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[0].phn);assert.equal(await page.locator('.patient.selected').count(),0);

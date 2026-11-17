@@ -1,5 +1,5 @@
 /* Shared identity fields, compact billing dates, and a direct history action. */
-#billing .patient-row{position:relative;border-bottom:1px solid var(--line)}
+#billing .patient-row{position:relative;border-bottom:1px solid var(--line);container-type:inline-size}
 #billing .patient-row:last-child{border-bottom:0}
 #billing .patient-row .patient{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:start;gap:10px;padding:12px 48px 12px 12px;border:0}
 #billing .patient-identity{grid-template-columns:minmax(120px,1fr) 45px 96px;gap:4px 10px}
@@ -30,9 +30,10 @@
 #workspace>header .save-summary{position:relative}
 #drive-feedback{position:absolute;top:calc(100% + 8px);right:0;z-index:20;max-width:min(300px,calc(100vw - 28px));width:max-content;padding:8px 12px;border:1px solid #cbd8cd;border-radius:7px;background:#f1f7ef;color:#28583b;box-shadow:0 3px 12px #183a2812;font-size:12px;line-height:1.4}
 #drive-feedback[hidden]{display:none}
-@media(min-width:761px){#billing .billing-grid{grid-template-columns:minmax(0,1fr) minmax(280px,40%);gap:18px}}
-@media(min-width:1200px){#billing .billing-grid{grid-template-columns:minmax(0,1fr) minmax(360px,440px)}}
 @media(max-width:1000px){#billing .patient-identity{grid-template-columns:minmax(105px,1fr) 42px;gap:3px 8px}#billing .identity-most{grid-column:1/-1;grid-row:3}#billing .patient-row .patient{padding-left:9px;gap:7px;grid-template-columns:34px minmax(0,1fr)}}
 @media(max-width:760px){#billing .billing-grid{grid-template-columns:minmax(0,1fr)}#billing .patient-identity{grid-template-columns:minmax(110px,1fr) 42px 84px}#billing .identity-most{grid-column:3;grid-row:2}}
 @media(max-width:420px){#billing .patient-identity{grid-template-columns:minmax(100px,1fr) 42px}#billing .identity-most{grid-column:1/-1;grid-row:3}}
 @media(pointer:coarse){#billing .patient-card-history{width:44px;height:44px;top:4px;right:3px}}
+/* The original list/editor column proportions come from balanced.css. */
+@container (max-width:460px){#billing .patient-identity{grid-template-columns:minmax(0,1fr) 42px;gap:3px 8px}#billing .identity-most{grid-column:1/-1;grid-row:3}#billing .next-billing .billing-date-icon::after{left:0;right:auto}}
+@container (max-width:340px){#billing .patient-identity{grid-template-columns:minmax(0,1fr)}#billing .identity-age{grid-column:1;grid-row:3;text-align:left}#billing .identity-most{grid-row:4}}

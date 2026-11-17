@@ -3,12 +3,12 @@
 ## Billing card cleanup — November 17, 2026
 
 - Compact patient cards share the Roster billing-history icon and patient identity/flag controls.
-- A clock labels the previous billing date on hover or keyboard focus. A calendar-arrow labels the next routine billing date. Both retain the weekday, month, day and year.
+- A left-arrow calendar labels the previous billing date on hover or keyboard focus. A right-arrow calendar labels the next routine billing date. Both retain the weekday, month, day and year.
 - The existing qualifying-billing calculation and 14-day routine-review rules are unchanged.
 - A green edge identifies the open patient. Charges entered, Needs information and Handed over describe billing for the selected service date independently of selection; the header continues to report save status.
 - Removed the redundant search-scope sentence and repeated date. The list summary shows patients with billing and incomplete entries.
 - Successful refresh feedback appears briefly beside the save status. Pending-work and error messages remain visible.
-- The patient list has more space, the empty editor is smaller, and card fields wrap for tablet and phone widths.
+- The patient list retains its original narrower width beside the editor. The empty editor is smaller, and card fields wrap within the available card width.
 - Synthetic regression coverage verifies history navigation, PHN copying, accessible date tooltips, selection without billing, live entry-status changes, unchanged stored records and responsive layout.
 
 Release validation: 298 unit tests and syntax checks passed. The Billing card, billing search, billing diagnosis, review/history, roster/billing and mode browser scenarios passed. The older balanced-layout, patient-layout and session scenarios also failed at the same steps against unchanged production commit `4fb72bc`; those baseline failures are outside this UI change.
