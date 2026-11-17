@@ -8,16 +8,23 @@ import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261111-be
 import {escapeHTML as esc} from './core.mjs?v=20261105-flags1';
 import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261116-oatlink1';
 import {laptopRuntime} from './runtime.mjs';
+export const PROFILE_FILE_ID='1UEPiPwQyd9wMswfem8lL6LIKwMn_ST3r';
 const digest=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join('');
 const dataURL=file=>new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Could not read the selected file.'));reader.readAsDataURL(file);});
 const needsAttention=item=>['held','error','identity-review','attention'].includes(item.status)||(item.status==='waiting'&&item.attempts>0)||(item.status!=='completed'&&((item.issues||[]).length||(item.items||[]).some(i=>i.status==='attention')));
-export function documentIntakeUI({state,notes,onProfiles=()=>{},onRecordsConnected=()=>{}}){
+export function documentIntakeUI({state,notes,onProfiles=()=>{},onProfileStatus=()=>{},onRecordsConnected=()=>{}}){
  let patient,files=[],busy=false,upload=null,timer=null,cloud,adapter,recordsAdapter,epoch=0,recordsNeeded=false;let previews=[];let incomingAttempt=null,trackedRequestId=null,processingPending=false;
  const dialog=document.createElement('dialog');dialog.id='document-intake';dialog.className='document-intake';document.body.append(dialog);
  function repo(){const a=state().adapter;if(!a)throw new Error('Connect your workspace first.');if(adapter!==a){adapter=a;recordsAdapter=null;cloud=a.mode==='cloud'&&!laptopRuntime()?new DriveIntake(a):null;}return a;}
- let localAdapter;
- const post=async(route,body)=>{let a=repo();if(a.mode!=='local'){if(!laptopRuntime())throw new Error('Open the laptop app to apply or retry analysis.');if(!localAdapter){localAdapter=new LocalAdapter();try{await localAdapter.connect();}catch(e){localAdapter=null;throw e;}}a=localAdapter;}return a.request(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
- async function local(){if(!localAdapter){localAdapter=new LocalAdapter();try{await localAdapter.connect();}catch(e){localAdapter=null;throw e;}}return localAdapter;}
+ let localConnection;
+ function local(){
+   if(!localConnection){
+     const connection=new LocalAdapter();
+     localConnection=connection.connect().then(()=>connection).catch(error=>{localConnection=null;throw error;});
+   }
+   return localConnection;
+ }
+ const post=async(route,body)=>{let a=repo();if(a.mode!=='local'){if(!laptopRuntime())throw new Error('Open the laptop app to apply or retry analysis.');a=await local();}return a.request(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});};
  const connectButton=document.createElement('button');connectButton.id='connect-patient-records';connectButton.className='text-button';connectButton.textContent='Connect patient records';connectButton.hidden=true;document.querySelector('.app-utility').append(connectButton);
  const permission=document.createElement('dialog');permission.id='patient-records-connection';permission.innerHTML='<div class="dialog-body"><h2>Connect patient records</h2><p>Load the existing MAID and OAT FH rosters, read age and MOST from patient summaries, and upload documents to Routine notes / Incoming.</p><p>Google will ask for permission to see, edit, create and delete files in your Google Drive. This permission covers your whole Drive; TRIM uses it for your existing private TRIM, MAID and OAT AI folders.</p><p>You can use the laptop app with its existing Drive folder instead.</p><p data-records-message role="status"></p><div class="actions"><button data-records-continue class="primary">Continue to Google</button><a href="http://127.0.0.1:4317/" target="_blank" rel="noopener">Open laptop app</a><button data-records-cancel>Cancel</button></div></div>';document.body.append(permission);
  connectButton.onclick=()=>permission.showModal();permission.querySelector('[data-records-cancel]').onclick=()=>permission.close();
@@ -39,11 +46,32 @@ export function documentIntakeUI({state,notes,onProfiles=()=>{},onRecordsConnect
   const attention=result.service?.error||jobs.some(needsAttention)||requests.some(needsAttention),pending=jobs.filter(j=>j.status!=='accepted').length;
   queueState(attention?'Document intake · needs attention':pending?'Document intake · '+pending+' processing':requests.some(r=>!['completed','attention'].includes(r.status))?'Document intake · waiting / processing':'Document intake',!!attention,result.service?.error||'');
  }
+ let profileRequest=0,profileOwner,profileDataset;
  async function profiles(){
-  const a=repo();setProfileDisplay(null);onProfiles();
+  const a=repo(),dataset=state().ledger?.datasetId,request=++profileRequest;
+  const current=()=>request===profileRequest&&state().adapter===a&&state().ledger?.datasetId===dataset;
+  if(profileOwner!==a||profileDataset!==dataset){
+    profileOwner=a;profileDataset=dataset;setProfileDisplay(null);onProfiles();onProfileStatus('Loading MOST from patient histories…');
+  }
   connectButton.hidden=!recordsNeeded;
-  try{const data=laptopRuntime()?await (await local()).request('/api/patient-display'):(await new DriveNotesRepository(recordsAdapter||a).load('patient-display.json')).data;if(state().adapter!==a)return;if(data?.datasetId===state().ledger?.datasetId){setProfileDisplay(data);onProfiles();}else throw new Error('Patient display file is not synced for this workspace yet.');}
-  catch{if(state().adapter===a){setProfileDisplay(null);onProfiles();connectButton.hidden=laptopRuntime();}}
+  try{
+    let data;
+    if(laptopRuntime())data=await (await local()).request('/api/patient-display');
+    else if(a.hostedAccess&&!recordsAdapter){
+      const url='https://www.googleapis.com/drive/v3/files/'+PROFILE_FILE_ID;
+      const file=await a.request(url+'?fields=name,trashed,permissions(role,type)');
+      if(file.name!=='patient-display.json'||file.trashed||!file.permissions?.length||file.permissions.some(p=>p.role!=='owner'||p.type!=='user'))throw new Error('Check the private patient display file.');
+      data=await a.request(url+'?alt=media');
+    }else data=(await new DriveNotesRepository(recordsAdapter||a).load('patient-display.json')).data;
+    if(!current())return;
+    if(!dataset||data?.datasetId!==dataset||data.app!=='trim-patient-display'||data.schema!==1||data.mostSchema!==1||!data.patients||typeof data.patients!=='object'||Array.isArray(data.patients))throw new Error('Patient display file is not synced for this workspace.');
+    setProfileDisplay(data);onProfiles();onProfileStatus('');
+  }catch(error){
+    if(!current())return;
+    setProfileDisplay(null);onProfiles();connectButton.hidden=laptopRuntime();
+    const link=!!(a.hostedAccess&&!recordsAdapter&&[403,404].includes(error.status));
+    onProfileStatus('Patient histories unavailable. MOST values from PMHx are hidden.',link?'link':'retry');
+  }
  }
  function lock(value){busy=value;dialog.querySelectorAll('button,input,textarea').forEach(el=>el.disabled=value);}
  function showFiles(){previews.forEach(url=>URL.revokeObjectURL(url));previews=[];dialog.querySelector('[data-intake-files]').innerHTML=files.map((f,i)=>{const url=f.type.startsWith('image/')?URL.createObjectURL(f):null;if(url)previews.push(url);return `<li>${url?'<img class="intake-preview" src="'+url+'" alt="Image selected for upload">':''}<span>${esc(f.name)} <small>${Math.ceil(f.size/1024)} KB</small></span> <button type="button" data-remove-file="${i}" aria-label="Remove ${esc(f.name)}">×</button></li>`;}).join('');dialog.querySelectorAll('[data-remove-file]').forEach(b=>b.onclick=()=>{if(upload){message('Retry the current upload before changing its sources.',true);return;}files.splice(Number(b.dataset.removeFile),1);showFiles();});}

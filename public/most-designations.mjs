@@ -32,14 +32,18 @@ export function latestDocumentedMost(evidence){
     const prospective=/\b(possible|potential|propos\w*|consider\w*|future|recommend\w*)\b/i.test(prefix)&&!/\b(confirmed|ordered|established)\b/i.test(prefix);
     const proposalAfter=/^\s*(?:was\s+)?(?:propos\w*|recommend\w*|under consideration|not (?:ordered|confirmed)|not an order)\b/i.test(after);
     const blank=/\b(?:unfilled|blank|template alternatives)\b/i.test(before);
-    if(prospective||proposalAfter||blank){uncertain=true;continue;}
+    const negated=/\b(?:not|no(?: subsequent)?|never|declined)\s+(?:(?:for|an?|documented|confirmed)\s+)*$/i.test(before)||/^\s+(?:was\s+)?(?:declined|ruled out)\b/i.test(after);
+    if(negated||prospective||proposalAfter||blank){uncertain=true;continue;}
     const historical=(transition&&i===0)||(supersedes&&i===1)||/\b(earlier|previous|prior|historical|formerly|initially)\b/i.test(before)||/\bchanged?\s+from\s*$/i.test(before);
     const current=(transition&&i===1)||(supersedes&&i===0)||/\b(current|latest documented|review records|retains?|retained|remains?|continues?|continued|left|leave)\b/i.test(before+' '+after);
-    candidates.push({status,date:sourceDate(before+' '+after),historical,current});
+    const latest=/\b(?:latest documented (?:MOST|status|designation)\s*(?:is|was|:)|superseded for latest-known status by)\s*(?:(?:the\s+)?\d{4}-\d{2}-\d{2}\s+)?[“"']?\s*$/i.test(before);
+    candidates.push({status,date:sourceDate(before+' '+after),historical:historical&&!latest,current,latest});
    }
   }
  }
- let pool=candidates.filter(c=>!c.historical);if(!pool.length)pool=candidates;
+ let pool=candidates.filter(c=>!c.historical);
+ const latestStated=pool.filter(c=>c.latest);
+ if(latestStated.length)pool=latestStated;
  if(pool.length>1&&pool.every(c=>c.date)){const latest=pool.map(c=>c.date).sort().at(-1);pool=pool.filter(c=>c.date===latest);}
  else {const current=pool.filter(c=>c.current);if(current.length)pool=current;}
  const statuses=[...new Set(pool.map(c=>c.status))],ambiguous=explicitConflict||statuses.length>1;

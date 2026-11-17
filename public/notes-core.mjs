@@ -36,9 +36,9 @@ export function ensurePatientContexts(context,roster){
     const existing=context.patients[identity.key];
     if(existing){
       if(existing.patient?.phn!==phn||existing.patient?.key!==identity.key)throw new Error('Existing Notes identity does not match the roster PHN.');
-    }else additions.push(identity);
+    }else additions.push({patient:identity,mostStatus:p.mostStatus||null});
   }
-  for(const patient of additions)context.patients[patient.key]={patient,summaryMarkdown:''};
+  for(const {patient,mostStatus} of additions)context.patients[patient.key]={patient,summaryMarkdown:'',mostStatus};
   return additions.length;
 }
 export function startVisit(day,p,units,ledger){

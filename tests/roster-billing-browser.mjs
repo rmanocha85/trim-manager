@@ -72,9 +72,15 @@ try {
   await page.waitForFunction(()=>!document.querySelector('#sync').textContent.includes('Saving') && document.querySelector('#local-changes').dataset.state!=='busy');
   assert.match(await page.locator('#local-changes').innerText(),/Saved to folder/,await page.locator('#session-status').textContent());
   await page.reload();await page.locator('.patient').first().waitFor();await tab.click();
-  assert.match(await row('second').locator('[data-roster-tip]').getAttribute('data-roster-tip'),/Partner/);
+  assert.match(await row('second').locator('.family-contact [data-roster-tip]').getAttribute('data-roster-tip'),/Partner/);
   assert.equal(await row('second').locator('.family-contact a').getAttribute('href'),'tel:6045550188');
   assert.equal(await record.locator('.family-contact').count(),2);
+  for (const label of ['Open billing','Billing history']) {
+    const action = record.getByRole('button',{name:label,exact:true});
+    await action.focus();
+    assert.equal(await root.locator('.roster-tip:popover-open').innerText(),label);
+    assert.equal(await action.locator('svg').isVisible(),true);
+  }
   for(const [id,key] of [['second','roster:second'],['sample','phn:0000000001']]){
     await row(id).getByRole('button',{name:'Open billing',exact:true}).click();
     await page.locator('#billing #editor h2').waitFor();

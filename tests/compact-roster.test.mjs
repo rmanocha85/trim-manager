@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeMost,latestDocumentedMost} from '../public/most-designations.mjs';
-import {profileDisplay} from '../public/profile-display.mjs';
+import {legacyMost as profileDisplay} from '../public/profile-display.mjs';
 import {addOther} from '../public/patients-core.mjs';
 test('MOST uses the six form designations and does not infer an ambiguous C2',()=>{
  for(const value of ['CPR C2','DNACPR C2','DNACPR C1','DNACPR M3','DNACPR M2','DNACPR M1'])assert.equal(normalizeMost(value),value);

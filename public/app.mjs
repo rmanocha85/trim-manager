@@ -1,7 +1,7 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261115-roster1';
-import {documentIntakeUI} from './intake-ui.mjs?v=20261116-oatlink1';
+import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261116-most2';
 import {billingUI} from './billing-ui.mjs?v=20261116-oatlink1';
-import {patientsUI} from './patients-ui.mjs?v=20261116-names1';
+import {patientsUI} from './patients-ui.mjs?v=20261116-billingicons1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261116-oatlayout1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261116-oatlayout1';
@@ -149,7 +149,21 @@ async function start(){
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261113-history1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid','oat-fh'].includes(wanted)?wanted:section);status();},saveSession});
-  intake=documentIntakeUI({state:()=>billing.state(),notes,onRecordsConnected:refreshClinics,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
+  const rosterRoot=$('patients-workspace').shadowRoot;
+  const profileBanner=document.createElement('div'),profileMessage=document.createElement('span'),profileAction=document.createElement('button');
+  profileBanner.className='profile-status';profileBanner.hidden=true;profileMessage.setAttribute('role','status');profileAction.type='button';profileAction.className='btn btn-ghost btn-sm';
+  profileBanner.append(profileMessage,profileAction);rosterRoot.querySelector('.roster-search').after(profileBanner);
+  function profileStatus(message,action){
+    profileBanner.hidden=!message;profileMessage.textContent=message;profileAction.hidden=!action;
+    profileAction.textContent=action==='link'?'Link patient histories':'Retry';
+    profileAction.onclick=async()=>{
+      profileAction.disabled=true;
+      try{if(action==='link')await linkClinicFile(PROFILE_FILE_ID,intake.profiles);else await intake.profiles();}
+      catch(error){profileMessage.textContent='Patient histories unavailable. '+error.message;}
+      finally{profileAction.disabled=false;}
+    };
+  }
+  intake=documentIntakeUI({onProfileStatus:profileStatus,state:()=>billing.state(),notes,onRecordsConnected:refreshClinics,onProfiles:()=>{refreshIdentities(document);refreshIdentities($('patients-workspace').shadowRoot); }});
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
     {name:'MAID',state:maidRoster.state,save:async()=>{}},

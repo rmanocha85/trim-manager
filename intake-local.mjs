@@ -3,7 +3,7 @@ import {mkdir,readdir,readFile,writeFile,rename,open,unlink,stat,lstat} from 'no
 import path from 'node:path';
 import os from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
-import {checkJobId,checkManifest,signatureMatches,identityMatches,reconciledFields,validateReconciliation,safeFileName,MAX_UPLOAD_BYTES} from './public/intake-core.mjs';
+import {checkJobId,checkManifest,signatureMatches,identityMatches,reconcileMost,reconciledFields,validateReconciliation,safeFileName,MAX_UPLOAD_BYTES} from './public/intake-core.mjs';
 import {contextRecord,snapshotPatient} from './public/notes-core.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex'),fingerprint=c=>hash(JSON.stringify(c||null));
 const mimeFor={'.pdf':'application/pdf','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.txt':'text/plain'};
@@ -22,7 +22,7 @@ export class DocumentIntake{
  relative(file){return path.relative(this.root,file).split(path.sep).join('/');}
  async read(id){return checkManifest(JSON.parse(await readFile(this.file(id),'utf8')));}
  async write(job){checkManifest(job);await mkdir(this.jobs,{recursive:true});const file=this.file(job.id),temp=file+'.'+randomUUID()+'.tmp';await writeFile(temp,JSON.stringify(job,null,2)+'\n',{mode:0o600});await rename(temp,file);return this.read(job.id);}
- async patient(job){const roster=await this.roster(),ledger=await this.ledger();if(ledger.datasetId!==job.datasetId)throw stop('The document belongs to a different workspace.');const matches=[...(roster.patients||[]),...(roster.otherPatients||[])].filter(p=>String(p.phn||'').replace(/\D/g,'')===job.phn);if(matches.length!==1)throw stop('The source PHN must match exactly one saved roster patient.');return snapshotPatient({...matches[0],phn:job.phn,key:'phn:'+job.phn},roster.units);}
+ async patient(job){const roster=await this.roster(),ledger=await this.ledger();if(ledger.datasetId!==job.datasetId)throw stop('The document belongs to a different workspace.');const matches=[...(roster.patients||[]),...(roster.otherPatients||[])].filter(p=>String(p.phn||'').replace(/\D/g,'')===job.phn);if(matches.length!==1)throw stop('The source PHN must match exactly one saved roster patient.');return {...snapshotPatient({...matches[0],phn:job.phn,key:'phn:'+job.phn},roster.units),mostStatus:matches[0].mostStatus||null};}
  async submit({job,documents}){
   checkManifest(job);await this.patient(job);if(!Array.isArray(documents)||documents.length!==job.files.length)throw new Error('Missing upload content.');
   const buffers=documents.map((data,i)=>{if(typeof data!=='string'||!/^data:[\w/+.-]+;base64,[A-Za-z0-9+/=]+$/.test(data))throw new Error('Invalid upload encoding.');const b=Buffer.from(data.split(',')[1],'base64'),f=job.files[i];if(b.length!==f.size||hash(b)!==f.sha256||!signatureMatches(b,f.mime))throw new Error('File contents did not match the upload.');return b;});
@@ -153,7 +153,7 @@ export class DocumentIntake{
    const proposal=validateReconciliation(await this.ai.analyzeDocuments({model,patient,context:current,documents:indices.map(i=>documents[i])}));
    if(!identityMatches(proposal,job.phn,indices.length))throw stop('Every source must contain the selected patient’s exact PHN.');
    job={...job,proposal};await this.write(job);
-   const now=new Date().toISOString(),fields=reconciledFields(current||{},proposal,now);
+   const now=new Date().toISOString(),fields={...reconciledFields(current||{},proposal,now),...reconcileMost(current||{mostStatus:patient.mostStatus},proposal.mostFindings,indices.map(i=>job.files[i]),now)};
    // Interpretation is best effort. Identity, source integrity and conditional-save
    // checks remain mandatory; an AI content-quality opinion cannot veto an import.
    for(let attempt=0;attempt<4;attempt++){

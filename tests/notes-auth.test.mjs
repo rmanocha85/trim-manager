@@ -36,14 +36,14 @@ test('generation sends only supported Responses fields; unfinished output does n
 });
 
 test('document intake sends typed history as untrusted UTF-8 text in attachment order',async()=>{
- let sent;const result={documentPhns:[['0000000001'],['0000000001']],summaryMarkdown:'Synthetic',reviewIssues:[],sourceSummary:'Synthetic'};
+ let sent;const result={mostFindings:[null,null],documentPhns:[['0000000001'],['0000000001']],summaryMarkdown:'Synthetic',reviewIssues:[],sourceSummary:'Synthetic'};
  const c=new ChatGPTConnection({store:store(signedIn()),fetchImpl:async(_url,o)=>{sent=JSON.parse(o.body);return new Response(stream([{type:'response.output_text.delta',delta:JSON.stringify(result)},{type:'response.completed',response:{status:'completed'}}]));}});
  await c.analyzeDocuments({model:'chosen',patient:{phn:'0000000001'},documents:[{name:'history.txt',mime:'text/plain',dataUrl:'data:text/plain;base64,'+Buffer.from('PHN: 0000000001\nHistory: café — surgery').toString('base64')},{name:'image.png',mime:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgo='}]});
  const content=sent.input[0].content;assert.equal(content[1].type,'input_text');assert.match(content[1].text,/café — surgery/);assert.equal(content[2].type,'input_image');assert.match(sent.instructions,/untrusted/);assert.match(sent.instructions,/best of your ability/);assert.match(sent.instructions,/discontinuations by drug name/);assert.match(sent.instructions,/never turn historical discontinuations into new stop orders/);assert.ok(!sent.instructions.includes('Do not add routine medication-confirmation tasks or stopped-drug logs'));assert.equal(sent.store,false);
 });
 
 test('identification, extraction and audit all receive the same EMR patient-card scope',async()=>{
- const requests=[],result={documentPhns:[['0000000001']],summaryMarkdown:'Synthetic selected result.',reviewIssues:[],sourceSummary:'Synthetic',safeToSave:true,issues:[]};
+ const requests=[],result={mostFindings:[null],documentPhns:[['0000000001']],summaryMarkdown:'Synthetic selected result.',reviewIssues:[],sourceSummary:'Synthetic',safeToSave:true,issues:[]};
  const c=new ChatGPTConnection({store:store(signedIn()),fetchImpl:async(_url,o)=>{requests.push(JSON.parse(o.body));return new Response(stream([{type:'response.output_text.delta',delta:JSON.stringify(result)},{type:'response.completed',response:{status:'completed'}}]));}});
  const documents=[{name:'screen.png',mime:'image/png',dataUrl:'data:image/png;base64,iVBORw0KGgo='}],args={model:'chosen',patient:{phn:'0000000001'},documents};
  await c.identifyDocuments({model:args.model,documents});await c.analyzeDocuments(args);await c.verifyDocuments({...args,proposal:result});
