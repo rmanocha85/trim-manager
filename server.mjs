@@ -45,6 +45,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const allowed=new Set(['index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
   const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
   allowed.add('context-refresh.mjs');allowed.add('service-lifecycle.mjs');
+  allowed.add('billing-icons.mjs');allowed.add('billing-cards.css');
   allowed.add('clinic-roster.mjs');
   allowed.add('maid-lifecycle.mjs');
   allowed.add('maid-assessment.mjs');

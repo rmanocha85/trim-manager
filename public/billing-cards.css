@@ -1,0 +1,38 @@
+/* Shared identity fields, compact billing dates, and a direct history action. */
+#billing .patient-row{position:relative;border-bottom:1px solid var(--line)}
+#billing .patient-row:last-child{border-bottom:0}
+#billing .patient-row .patient{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:start;gap:10px;padding:12px 48px 12px 12px;border:0}
+#billing .patient-identity{grid-template-columns:minmax(120px,1fr) 45px 96px;gap:4px 10px}
+#billing .identity-new{grid-row:auto}
+#billing .billing-card-content{min-width:0}
+#billing .billing-card-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:5px 14px;margin-top:6px}
+#billing .last-billing{display:inline-flex;align-items:center;gap:5px;margin:0}
+#billing .last-billing svg{width:15px;height:15px;flex:none}
+#billing .patient-right{margin:0;min-width:0;text-align:left;flex-wrap:wrap}
+#billing .next-billing{display:inline-flex;align-items:center;gap:5px}
+#billing .billing-date-icon{position:relative;display:inline-flex;flex:none;color:inherit;cursor:help}
+#billing .billing-date-icon svg{width:15px;height:15px}
+#billing .billing-date-icon::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 6px);left:0;z-index:5;display:none;padding:6px 9px;border-radius:5px;background:#243d2d;color:white;font:12px/1.3 var(--sans);white-space:nowrap;pointer-events:none}
+#billing .next-billing .billing-date-icon::after{left:auto;right:0}
+#billing .billing-date-icon:is(:hover,:focus)::after{display:block}
+#billing .billing-date-icon:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:2px}
+#billing .patient.selected{box-shadow:inset 3px 0 var(--green)}
+#billing .patient-right .billing-entry-status{display:inline-block;margin:0;font-size:11px;color:var(--green)}
+#billing .patient-right .billing-entry-status.needs-information{color:#805615}
+#billing .patient-card-history{position:absolute;top:9px;right:8px;display:grid;place-items:center;width:32px;height:32px;padding:6px;background:transparent;border:0;border-radius:5px;color:var(--green);text-decoration:none}
+#billing .patient-card-history svg{width:18px;height:18px}
+#billing .patient-card-history:is(:hover,:focus-visible){background:#e9f0e7}
+#billing .patient-card-history:focus-visible{outline:2px solid var(--green);outline-offset:1px}
+#billing #day-summary{margin:8px 0 10px}
+#billing .empty-editor{text-align:left;padding:8px 2px}
+#billing .empty-editor h2{font-size:18px;margin:0 0 8px}
+#billing .empty-editor p{margin:0 0 9px;line-height:1.5}
+#workspace>header .save-summary{position:relative}
+#drive-feedback{position:absolute;top:calc(100% + 8px);right:0;z-index:20;max-width:min(300px,calc(100vw - 28px));width:max-content;padding:8px 12px;border:1px solid #cbd8cd;border-radius:7px;background:#f1f7ef;color:#28583b;box-shadow:0 3px 12px #183a2812;font-size:12px;line-height:1.4}
+#drive-feedback[hidden]{display:none}
+@media(min-width:761px){#billing .billing-grid{grid-template-columns:minmax(0,1fr) minmax(280px,40%);gap:18px}}
+@media(min-width:1200px){#billing .billing-grid{grid-template-columns:minmax(0,1fr) minmax(360px,440px)}}
+@media(max-width:1000px){#billing .patient-identity{grid-template-columns:minmax(105px,1fr) 42px;gap:3px 8px}#billing .identity-most{grid-column:1/-1;grid-row:3}#billing .patient-row .patient{padding-left:9px;gap:7px;grid-template-columns:34px minmax(0,1fr)}}
+@media(max-width:760px){#billing .billing-grid{grid-template-columns:minmax(0,1fr)}#billing .patient-identity{grid-template-columns:minmax(110px,1fr) 42px 84px}#billing .identity-most{grid-column:3;grid-row:2}}
+@media(max-width:420px){#billing .patient-identity{grid-template-columns:minmax(100px,1fr) 42px}#billing .identity-most{grid-column:1/-1;grid-row:3}}
+@media(pointer:coarse){#billing .patient-card-history{width:44px;height:44px;top:4px;right:3px}}

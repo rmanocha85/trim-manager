@@ -1,0 +1,107 @@
+// Fictional patients, temporary data and isolated browser; no live services.
+import assert from 'node:assert/strict';
+import {mkdtemp,writeFile,readFile,rm,mkdir} from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import {chromium} from 'playwright';
+import {createServer} from './server-fixture.mjs';
+import {blankLedger,upsertEntry,today,addDays} from '../public/core.mjs';
+import {formatDate} from '../public/dates.mjs';
+const dir=await mkdtemp(path.join(os.tmpdir(),'trim-billing-cards-'));
+await mkdir('work',{recursive:true});
+const names=['Example, Morgan','Example, Jordan','Example, Avery','Example, Cameron','Example, Taylor'];
+const patients=Array.from({length:18},(_,n)=>({id:'demo-'+n,name:names[n%names.length],phn:String(n+1).padStart(10,'0'),unit:'north',room:String(1401+n),codes:'401',dateOfBirth:'1954-03-01',mostStatus:'DNACPR C1',pFlag:n===0,palliativeFlag:n===1}));
+const roster={patients,otherPatients:[],units:[{id:'north',name:'EXAMPLE NORTH',floor:'1'}]};
+let ledger=blankLedger('synthetic-ui-preview');
+for(const p of patients)ledger.baselines['phn:'+p.phn]={date:addDays(today(),-12)};
+const person={...patients[0],key:'phn:'+patients[0].phn,panel:true};
+ledger=upsertEntry(ledger,person,addDays(today(),-5),[{code:'14077',units:1,diagnosis:'401',reason:'Synthetic example'}]);
+const rosterPath=path.join(dir,'roster.json'),billingPath=path.join(dir,'billing.json');
+await writeFile(rosterPath,JSON.stringify(roster));await writeFile(billingPath,JSON.stringify(ledger));
+const server=createServer({rosterPath,billingPath,notesPath:path.join(dir,'notes'),lockPath:path.join(dir,'billing.lock'),maidPath:path.join(dir,'maid.json'),oatPath:path.join(dir,'oat.json')});
+await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+const browser=await chromium.launch({channel:'chrome',headless:true});
+const page=await browser.newPage({viewport:{width:1600,height:1050},permissions:['clipboard-read','clipboard-write']});
+page.setDefaultTimeout(10000);
+const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('https://**/*',route=>route.abort());
+try{
+  await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('.patient').first().waitFor();
+  assert.equal(await page.locator('#search-scope').count(),0);
+  assert.equal(await page.locator('#day-summary').innerText(),'0 patients with billing · 0 incomplete');
+  const card=page.locator('.patient-row').first(),history=card.locator('[data-card-history]');
+  assert.equal(await history.innerText(),'');assert.equal(await history.locator('svg').count(),1);
+  const historySvg=await history.locator('svg').evaluate(el=>el.outerHTML);
+  assert.equal(await card.locator('.last-billing svg').count(),1);
+  assert.equal(await card.locator('.last-billing').innerText(),formatDate(addDays(today(),-12)));
+  assert.equal(await card.locator('.next-billing').innerText(),formatDate(addDays(today(),2)));
+  const lastSymbol=card.getByRole('img',{name:'Last billing',exact:true}),nextSymbol=card.getByRole('img',{name:'Next routine billing',exact:true});
+  await lastSymbol.hover();
+  assert.equal(await lastSymbol.evaluate(el=>getComputedStyle(el,'::after').content),'"Last billing"');
+  assert.equal(await lastSymbol.evaluate(el=>getComputedStyle(el,'::after').display),'block');
+  await lastSymbol.click();assert.equal(await page.locator('.patient.selected').count(),0);
+  await nextSymbol.focus();assert.equal(await nextSymbol.evaluate(el=>getComputedStyle(el,'::after').display),'block');
+  await nextSymbol.press('Enter');assert.equal(await page.locator('.patient.selected').count(),0);
+  await page.locator('#search').focus();
+  assert.equal(await card.locator('.flag-psych').count(),1);assert.equal(await card.locator('.pflag').count(),0);
+  const box=await card.boundingBox(),empty=await page.locator('#editor').boundingBox(),list=await page.locator('.roster-area').boundingBox();
+  assert.ok(box.height<130,JSON.stringify(box));assert.ok(empty.height<180,JSON.stringify(empty));assert.ok(list.width>empty.width);
+  const searchTop=(await page.locator('#search').boundingBox()).y;
+  await page.locator('#roster').evaluate(el=>el.scrollTop=500);assert.equal((await page.locator('#search').boundingBox()).y,searchTop);await page.locator('#roster').evaluate(el=>el.scrollTop=0);
+  await card.getByRole('button',{name:'Copy PHN for '+patients[0].name,exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patients[0].phn);assert.equal(await page.locator('.patient.selected').count(),0);
+  await history.press('Enter');await page.locator('#history-content tbody tr').waitFor();assert.match(await page.locator('#history-content').innerText(),/14077/);
+  await page.locator('[data-tab=billing]').click();await card.locator('[data-patient]').press('Enter');assert.match(await page.locator('#editor h2').innerText(),/Example, Morgan/);assert.equal(await page.locator('#editor .code-chip.on').count(),0);
+  await page.screenshot({path:'work/billing-cards-editor-desktop.png'});
+  await page.locator('#search').fill('Example');
+  await page.screenshot({path:'work/billing-cards-desktop.png'});
+  await page.locator('#workspace-more').click();await page.locator('#load-latest').click();
+  await page.locator('#drive-feedback').waitFor();assert.equal(await page.locator('#notice').isVisible(),false);
+  await page.screenshot({path:'work/billing-cards-refresh.png'});
+  await page.locator('#drive-feedback').waitFor({state:'hidden'});
+  for(const width of [1024,850,761,390]){
+    await page.setViewportSize({width,height:1000});await page.screenshot({path:'work/billing-cards-'+width+'.png'});
+    const overflow=await page.evaluate(()=>[document.documentElement.scrollWidth,document.documentElement.clientWidth]);assert.ok(overflow[0]<=overflow[1]+1,JSON.stringify({width,overflow}));
+    const bounds=await history.boundingBox(),parent=await card.boundingBox();assert.ok(bounds.x+bounds.width<=parent.x+parent.width+1);
+    const phn=await card.locator('.identity-phn').boundingBox(),most=await card.locator('.identity-most').boundingBox();
+    assert.ok(most.y>=phn.y+phn.height-1||most.x>=phn.x+phn.width-1,JSON.stringify({width,phn,most}));
+    for(const flag of await card.locator('.patient-flag').all()){
+      const flagBox=await flag.boundingBox();
+      assert.ok(flagBox.x+flagBox.width<=bounds.x||flagBox.y>=bounds.y+bounds.height,JSON.stringify({width,flagBox,bounds}));
+    }
+  }
+  await page.setViewportSize({width:1600,height:1050});await page.locator('[data-section=patients]').click();
+  const rosterHistory=page.locator('[data-roster-patient="demo-0"] .roster-billing-history');
+  assert.equal(await rosterHistory.locator('svg').evaluate(el=>el.outerHTML),historySvg);
+  await rosterHistory.click();await page.locator('#history-content tbody tr').waitFor();assert.match(await page.locator('#history-content').innerText(),/14077/);
+  assert.deepEqual(JSON.parse(await readFile(billingPath,'utf8')),ledger);assert.deepEqual(JSON.parse(await readFile(rosterPath,'utf8')),roster);assert.deepEqual(errors,[]);
+  // An open editor and entered charges are independent visual states.
+  await page.locator('[data-tab=billing]').click();await card.locator('[data-patient]').press('Enter');
+  assert.equal(await card.locator('[data-patient]').getAttribute('aria-pressed'),'true');
+  assert.equal(await card.locator('.billing-entry-status').count(),0);
+  await page.locator('[data-code="00127"]').click();
+  assert.equal(await card.locator('.billing-entry-status').innerText(),'Charges entered');
+  assert.equal(await card.locator('.billing-entry-status').isVisible(),true);
+  await page.locator('[data-code="14077"]').click();
+  const diagnosis=page.locator('.code-details').filter({has:page.locator('[data-remove-code="14077"]')}).locator('[data-field="diagnosis"]');
+  await diagnosis.fill('401 250 311 414');
+  assert.equal(await card.locator('.billing-entry-status').innerText(),'Needs information');
+  assert.equal(await card.locator('.billing-entry-status.needs-information').count(),1);
+  await diagnosis.fill('401');assert.equal(await card.locator('.billing-entry-status').innerText(),'Charges entered');
+  await page.locator('[data-code="14077"]').click();
+  assert.equal(await card.locator('.billing-entry-status').innerText(),'Charges entered');
+  const second=page.locator('.patient-row').nth(1);await second.locator('[data-patient]').press('Enter');
+  assert.equal(await card.locator('[data-patient]').getAttribute('aria-pressed'),'false');
+  assert.equal(await card.locator('.billing-entry-status').innerText(),'Charges entered');
+  assert.equal(await second.locator('[data-patient]').getAttribute('aria-pressed'),'true');
+  assert.equal(await second.locator('.billing-entry-status').count(),0);
+  assert.equal(await page.locator('#editor .code-chip.on').count(),0);
+  const groupBox=await page.locator('#roster .unit').first().boundingBox(),secondBox=await second.boundingBox();
+  await page.screenshot({path:'work/billing-card-symbols.png',clip:{x:groupBox.x,y:groupBox.y,width:groupBox.width,height:secondBox.y+secondBox.height-groupBox.y}});
+  await second.getByRole('img',{name:'Last billing',exact:true}).hover();
+  await page.screenshot({path:'work/billing-card-clock-hover.png',clip:{x:groupBox.x,y:groupBox.y,width:groupBox.width,height:secondBox.y+secondBox.height-groupBox.y}});
+  assert.deepEqual(JSON.parse(await readFile(billingPath,'utf8')),ledger);assert.deepEqual(errors,[]);
+  console.log('PASS compact cards, weekday dates, shared history action, PHN copying, unchanged selection/billing, sticky search, transient refresh feedback, desktop/tablet/mobile layout, and unchanged fixture files.');
+}finally{
+  await browser.close();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));
+  if(!path.resolve(dir).startsWith(path.resolve(os.tmpdir())+path.sep))throw new Error('Unexpected temporary path');
+  await rm(dir,{recursive:true,force:true});
+}
