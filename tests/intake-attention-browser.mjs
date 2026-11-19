@@ -40,7 +40,7 @@ try{
    const read=async()=>{const r=await fetch('/api/intake');const value=await r.json();if(!r.ok)throw Error(value.error);return value;};
    DriveIntake.prototype.list=async()=> (await read()).jobs;DriveIntake.prototype.incomingRequests=async()=> (await read()).requests;
    DriveIntake.prototype.requestIncoming=async input=>{const r=await fetch('/api/intake/incoming',{method:'POST',body:JSON.stringify(input)});return r.json();};
-   const {documentIntakeUI}=await import('./intake-ui.mjs?v=20261111-best-effort1');
+   const {documentIntakeUI}=await import('./intake-ui.mjs?v=20261119-most-connection1');
    globalThis.intake=documentIntakeUI({state:()=>({adapter:{mode:mode==='web'?'cloud':'local',request:async(route,options)=>{const r=await fetch(route,options);const data=await r.json();if(!r.ok)throw Error(data.error);return data;}},ledger:{datasetId:'synthetic-intake'},people:[]}),notes:{}});
   },mode);
   const indicator=page.locator('#document-intake-queue');

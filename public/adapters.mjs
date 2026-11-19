@@ -1,5 +1,5 @@
 import {blankLedger,validateLedger,normalizeRoster,assertImmutable} from './core.mjs?v=20261031-compact1';
-import {hostedBilling,HostedBillingAccess} from './hosted-billing-access.mjs?v=20261116-oatlink1';
+import {hostedBilling,HostedBillingAccess} from './hosted-billing-access.mjs?v=20261119-most-connection1';
 const CLIENT='1078252705311-p24iq4gls53251o1o95hb2fbtb7uv53n.apps.googleusercontent.com';
 const ROSTER='1AaGORl08dctBiZiLAEshmnIMJ6U_GBX3';
 const ACCOUNT_KEY='trim:drive-account';

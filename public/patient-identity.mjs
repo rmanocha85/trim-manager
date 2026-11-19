@@ -1,4 +1,4 @@
-import {withProfile} from './profile-display.mjs?v=20261113-history1';
+import {withProfile} from './profile-display.mjs?v=20261119-most-connection1';
 import {avaChartUrl} from './patient-links.mjs';
 import {formatTimestamp} from './dates.mjs';
 import {today,dateParts} from './patients-core.mjs?v=20261105-flags1';
@@ -22,7 +22,10 @@ export function avaHTML(p){const url=avaChartUrl(p);return url?`<a class="identi
 export function phnHTML(p){const phn=String(p.phn||'').replace(/\D/g,'');return `<span class="identity-phn">${esc(phn||'—')}${/^\d{10}$/.test(phn)?`<button type="button" class="identity-copy billing-phn-copy" data-copy-value="${phn}" aria-label="Copy PHN for ${esc(p.name)}" title="Copy PHN"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button>`:''}</span>`;}
 export function demographicsHTML(p,asOf=today()){
   const raw=p;p=withProfile(p);const age=ageOn(p.dateOfBirth,asOf),most=p.mostStatus||'';
-  return `<span class="identity-demographics" data-profile-phn="${esc(raw.phn)}" data-profile-dob="${esc(raw.dateOfBirth||raw.dob||'')}" data-profile-most="${esc(raw.mostStatus||'')}" data-profile-new="${raw.newPanelPatient?'yes':''}" data-profile-added="${esc(raw.panelAddedDate||'')}"><span class="identity-age">${age===null?'Age —':age+' y'}</span><span class="identity-most" title="${esc([p.mostReview,p.mostEvidence].filter(Boolean).join('\n')||(most?'Documented MOST status':'No documented designation available'))}">${p.mostReview?'Review MOST':most?esc(most):'—'}</span>${newPatient(p,asOf)?'<span class="identity-new">New patient</span>':''}</span>`;
+  const unavailable=p.profileAvailability!=='ready';
+  const label=unavailable?(p.profileAvailability==='loading'?'Loading MOST…':'MOST unavailable'):p.mostReview?'Review MOST':most||'—';
+  const title=unavailable?'The saved MOST file has not been loaded. This does not mean no designation is recorded.':[p.mostReview,p.mostEvidence].filter(Boolean).join('\n')||(most?'Documented MOST status':'No documented designation available');
+  return `<span class="identity-demographics" data-profile-phn="${esc(raw.phn)}" data-profile-dob="${esc(raw.dateOfBirth||raw.dob||'')}" data-profile-most="${esc(raw.mostStatus||'')}" data-profile-new="${raw.newPanelPatient?'yes':''}" data-profile-added="${esc(raw.panelAddedDate||'')}"><span class="identity-age">${age===null?'Age —':age+' y'}</span><span class="identity-most" title="${esc(title)}">${esc(label)}</span>${newPatient(p,asOf)?'<span class="identity-new">New patient</span>':''}</span>`;
 }
 export function identityHTML(p,{asOf=today(),compact=false}={}){return `<span class="patient-identity${compact?' compact':''}"><span class="identity-top">${nameHTML(p)}</span><span class="identity-details">${phnHTML(p)}${demographicsHTML(p,asOf)}</span></span>`;}
 export function bindIdentity(root){

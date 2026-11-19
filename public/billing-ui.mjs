@@ -1,10 +1,10 @@
 import {billingHistoryIcon,lastBillingIcon,nextBillingIcon} from './billing-icons.mjs?v=20261117-cards4';
-import {identityHTML,nameCopy,bindIdentity} from './patient-identity.mjs?v=20261113-history1';
+import {identityHTML,nameCopy,bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
 import {formatDate,formatTimestamp,enhanceDateInputs} from './dates.mjs?v=20261007-dates1';
 import {normalizeRoster,CODES,COMMON_CODES,CONFERENCE_CODES,REASON_PRESETS,timeDefaults,roundedPacificTime,tenMinutesLater,editBillingTime,calendarDays,codeInfo,clone,sameBillingContent,today,validDate,patientKey,rosterView,dueState,lastBilling,upsertInteractiveEntry,removeEntry,batchEntries,entryIssues,finalizeBatch,escapeHTML as esc,validateLedger,parseImport,mergeImport,importSummary,heldImports,blankLedger} from './core.mjs?v=20261107-workflow1';
 import {cancelBillingCodes,undoBillingCancellation,inheritConferenceDiagnoses} from './core.mjs?v=20261107-workflow1';
 import {timeField,bindTimeFields} from './time-entry.mjs?v=20261107-workflow1';
-import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261116-oatlink1';
+import {LocalAdapter,DriveAdapter,preferredDriveAccount} from './adapters.mjs?v=20261119-most-connection1';
 import {hostedBilling,HostedBillingAccess} from './hosted-billing-access.mjs';
 import {avaChartUrl} from './patient-links.mjs';
 import {planNewPatients} from './core.mjs?v=20261107-workflow1';

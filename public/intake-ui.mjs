@@ -1,12 +1,12 @@
 import {incomingLabel,incomingMessage} from './incoming-request.mjs?v=20261111-intake-status1';
 import {typedHistorySource,clipboardImages} from './intake-sources.mjs?v=20261111-roster1';
-import {identityHTML} from './patient-identity.mjs?v=20261113-history1';
+import {identityHTML} from './patient-identity.mjs?v=20261119-most-connection1';
 import {DriveIntake} from './intake-drive.mjs?v=20261111-best-effort1';
 import {DriveNotesRepository,LocalNotesRepository,savePatientBirthDate} from './notes-storage.mjs?v=20261117-profile1';
-import {setProfileDisplay} from './profile-display.mjs?v=20261113-history1';
+import {setProfileDisplay} from './profile-display.mjs?v=20261119-most-connection1';
 import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261117-profile1';
 import {escapeHTML as esc} from './core.mjs?v=20261105-flags1';
-import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261116-oatlink1';
+import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261119-most-connection1';
 import {laptopRuntime} from './runtime.mjs';
 export const PROFILE_FILE_ID='1UEPiPwQyd9wMswfem8lL6LIKwMn_ST3r';
 const digest=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join('');
@@ -47,30 +47,36 @@ export function documentIntakeUI({state,notes,onProfiles=()=>{},onProfileStatus=
   queueState(attention?'Document intake · needs attention':pending?'Document intake · '+pending+' processing':requests.some(r=>!['completed','attention'].includes(r.status))?'Document intake · waiting / processing':'Document intake',!!attention,result.service?.error||'');
  }
  let profileRequest=0,profileOwner,profileDataset;
- async function profiles(){
+ async function profiles({required=false}={}){
   const a=repo(),dataset=state().ledger?.datasetId,request=++profileRequest;
   const current=()=>request===profileRequest&&state().adapter===a&&state().ledger?.datasetId===dataset;
   if(profileOwner!==a||profileDataset!==dataset){
-    profileOwner=a;profileDataset=dataset;setProfileDisplay(null);onProfiles();onProfileStatus('Loading MOST from patient histories…');
+    profileOwner=a;profileDataset=dataset;setProfileDisplay(null,'loading');onProfiles();onProfileStatus('Loading MOST from patient histories…');
   }
   connectButton.hidden=!recordsNeeded;
   try{
     let data;
     if(laptopRuntime())data=await (await local()).request('/api/patient-display');
-    else if(a.hostedAccess&&!recordsAdapter){
+    else if(a.hostedAccess){
+      // MOST must work through the renewable workspace connection. A separate
+      // in-memory, broader document connection must not mask a missing file grant.
       const url='https://www.googleapis.com/drive/v3/files/'+PROFILE_FILE_ID;
       const file=await a.request(url+'?fields=name,trashed,permissions(role,type)');
       if(file.name!=='patient-display.json'||file.trashed||!file.permissions?.length||file.permissions.some(p=>p.role!=='owner'||p.type!=='user'))throw new Error('Check the private patient display file.');
       data=await a.request(url+'?alt=media');
     }else data=(await new DriveNotesRepository(recordsAdapter||a).load('patient-display.json')).data;
-    if(!current())return;
+    if(!current()){if(required)throw new Error('The workspace changed while verifying MOST. Retry the connection.');return false;}
     if(!dataset||data?.datasetId!==dataset||data.app!=='trim-patient-display'||data.schema!==1||data.mostSchema!==1||!data.patients||typeof data.patients!=='object'||Array.isArray(data.patients))throw new Error('Patient display file is not synced for this workspace.');
-    setProfileDisplay(data);onProfiles();onProfileStatus('');
+    setProfileDisplay(data);onProfiles();onProfileStatus('');return true;
   }catch(error){
-    if(!current())return;
-    setProfileDisplay(null);onProfiles();connectButton.hidden=laptopRuntime();
-    const link=!!(a.hostedAccess&&!recordsAdapter&&[403,404].includes(error.status));
-    onProfileStatus('Patient histories unavailable. MOST values from PMHx are hidden.',link?'link':'retry');
+    if(!current()){if(required)throw error;return false;}
+    setProfileDisplay(null,'unavailable');onProfiles();
+    const link=!!(a.hostedAccess&&[403,404].includes(error.status));
+    connectButton.hidden=laptopRuntime()||link;
+    const reason=link?'TRIM cannot access the saved MOST file with this Google connection. Link MOST to restore it after reopening.':'MOST could not be loaded. '+error.message;
+    onProfileStatus(reason,link?'link':'retry');
+    if(required)throw new Error(reason);
+    return false;
   }
  }
  function lock(value){busy=value;dialog.querySelectorAll('button,input,textarea').forEach(el=>el.disabled=value);}

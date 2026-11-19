@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readFile,writeFile,rm,mkdir} from 'node:fs/promises';
 import os from 'node:os';import path from 'node:path';import {randomUUID,createHash} from 'node:crypto';
 import {ageOn,newPatient,demographicsHTML} from '../public/patient-identity.mjs';
-import {legacyMost as profileDisplay,setProfileDisplay} from '../public/profile-display.mjs?v=20261113-history1';
+import {legacyMost as profileDisplay,setProfileDisplay} from '../public/profile-display.mjs?v=20261119-most-connection1';
 import {DocumentIntake} from '../intake-local.mjs';
 import {LocalNotesStore} from '../notes-local.mjs';
 import {contextRecord} from '../public/notes-core.mjs';

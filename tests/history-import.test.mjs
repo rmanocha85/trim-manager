@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 import {savedHistoryImport,isHistoryDocument} from '../history-import.mjs';
-import {profileDisplay,legacyMost,setProfileDisplay} from '../public/profile-display.mjs?v=20261113-history1';
-import {pmhxUploadedHTML} from '../public/patient-identity.mjs?v=20261113-history1';
+import {profileDisplay,legacyMost,setProfileDisplay} from '../public/profile-display.mjs?v=20261119-most-connection1';
+import {pmhxUploadedHTML} from '../public/patient-identity.mjs?v=20261119-most-connection1';
 test('history recognition uses source content and explicit classifications, not retained merged history',()=>{
  for(const sourceSummary of ['LTC Admission Note with transfer history.','Past medical history and allergies.','Discharge summary.','Typed history.'])assert.equal(isHistoryDocument({sourceSummary}),true);
  for(const sourceSummary of ['CBC and electrolytes results.','Medication list only.','Appointment confirmation.'])assert.equal(isHistoryDocument({sourceSummary}),false);

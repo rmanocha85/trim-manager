@@ -1,7 +1,7 @@
-import {refreshIdentities} from './patient-identity.mjs?v=20261115-roster1';
-import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261117-purple1';
-import {billingUI} from './billing-ui.mjs?v=20261117-cards4';
-import {patientsUI} from './patients-ui.mjs?v=20261117-cards4';
+import {refreshIdentities} from './patient-identity.mjs?v=20261119-most-connection1';
+import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261119-most-connection1';
+import {billingUI} from './billing-ui.mjs?v=20261119-most-connection1';
+import {patientsUI} from './patients-ui.mjs?v=20261119-most-connection1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261117-purple1';
@@ -161,7 +161,7 @@ async function start(){
   for(const clinic of Object.keys(oatClinics))oatViews.set(clinic,createOatView(clinic));
   patients=await patientsUI({onBirthDate:(...args)=>intake.updateBirthDate(...args),host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onBilling:key=>billing.openPatientBilling(key),onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
-  notes=laptop?(await import('./notes-ui.mjs?v=20261117-profile1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
+  notes=laptop?(await import('./notes-ui.mjs?v=20261119-most-connection1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
   billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid',...oatViews.keys()].includes(wanted)?wanted:section);status();},saveSession});
   const rosterRoot=$('patients-workspace').shadowRoot;
   const profileBanner=document.createElement('div'),profileMessage=document.createElement('span'),profileAction=document.createElement('button');
@@ -169,10 +169,10 @@ async function start(){
   profileBanner.append(profileMessage,profileAction);rosterRoot.querySelector('.roster-search').after(profileBanner);
   function profileStatus(message,action){
     profileBanner.hidden=!message;profileMessage.textContent=message;profileAction.hidden=!action;
-    profileAction.textContent=action==='link'?'Link patient histories':'Retry';
+    profileAction.textContent=action==='link'?'Link MOST':'Retry';
     profileAction.onclick=async()=>{
       profileAction.disabled=true;
-      try{if(action==='link')await linkClinicFile(PROFILE_FILE_ID,intake.profiles);else await intake.profiles();}
+      try{if(action==='link')await linkClinicFile(PROFILE_FILE_ID,()=>intake.profiles({required:true}));else await intake.profiles();}
       catch(error){profileMessage.textContent='Patient histories unavailable. '+error.message;}
       finally{profileAction.disabled=false;}
     };
@@ -213,7 +213,7 @@ async function start(){
   window.addEventListener('beforeunload',e=>{if(patients.hasChanges()){e.preventDefault();e.returnValue='';}});
 
   if(laptop){
-    const {LocalAdapter}=await import('./adapters.mjs?v=20261116-oatlink1');
+    const {LocalAdapter}=await import('./adapters.mjs?v=20261119-most-connection1');
     const {keepLaptopService}=await import('./service-lifecycle.mjs?v=20261111-on-demand1');
     const serviceAdapter=new LocalAdapter();await serviceAdapter.connect();
     keepLaptopService({api:(...args)=>serviceAdapter.request(...args)});

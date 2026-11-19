@@ -48,6 +48,7 @@ export class HostedBillingAccess {
         channel.onmessage = ({data})=>{
           if (data?.state !== state) return;
           if (data.error || !data.code) finish(null,'Google connection was cancelled.');
+          else if (pickFileId && !data.pickedFileIds?.includes(pickFileId)) finish(null,'The required file was not selected. Link it again and select the displayed file.');
           else finish(data.code);
         };
         try { popup.location.replace('https://accounts.google.com/o/oauth2/v2/auth?'+params); }
@@ -58,6 +59,16 @@ export class HostedBillingAccess {
       const renewed = await post('/renew',binding);
       if (result.email !== renewed.email) throw Error('Billing account changed. Reconnect.');
       localStorage.setItem(KEY,binding);
+      if (pickFileId) {
+        // A completed OAuth flow is not proof that the renewed, narrow grant
+        // can read the selected file. Verify that exact grant before success.
+        const response = await fetch('https://www.googleapis.com/drive/v3/files/'+encodeURIComponent(pickFileId)+'?fields=id,trashed', {
+          cache:'no-store', headers:{Authorization:'Bearer '+renewed.access_token}, signal:AbortSignal.timeout(20000)
+        });
+        if (!response.ok) throw Error('Google connected, but TRIM still cannot read the selected file. Link it again; the connection is not complete.');
+        const file = await response.json();
+        if (file.id !== pickFileId || file.trashed) throw Error('The selected file is unavailable. The connection is not complete.');
+      }
       return renewed;
     } finally { channel.close(); popup.close(); }
   }

@@ -1,5 +1,5 @@
 import {organizePatient,fullProfileSummary,editProfileSection} from './clinical-profile.mjs?v=20261117-profile1';
-import {identityHTML,bindIdentity,nameCopy} from './patient-identity.mjs?v=20261113-history1';
+import {identityHTML,bindIdentity,nameCopy} from './patient-identity.mjs?v=20261119-most-connection1';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
 import {escapeHTML as esc,clone,isPostHospitalReview} from './core.mjs?v=20261105-flags1';
 import {formatDate} from './dates.mjs';

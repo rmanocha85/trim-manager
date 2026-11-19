@@ -16,7 +16,7 @@ try{
  await page.goto(origin);
  const result=await page.evaluate(async()=>{
    const {documentIntakeUI,PROFILE_FILE_ID}=await import('./intake-ui.mjs');
-   const {withProfile}=await import('./profile-display.mjs?v=20261113-history1');
+   const {withProfile}=await import('./profile-display.mjs?v=20261119-most-connection1');
    const patient={phn:'0000000001',mostStatus:'CPR C2'};
    let mode='valid',release,started,status;
    const adapter={mode:'cloud',hostedAccess:{},request:async url=>{
