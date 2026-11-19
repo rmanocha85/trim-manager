@@ -10,6 +10,7 @@ const server=createServer({rosterPath,billingPath,lockPath:path.join(dir,'lock')
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.locator('.patient').waitFor();await page.locator('[data-tab="reports"]').click();
  for(const id of ['batch-from','batch-to'])await page.locator('#'+id).evaluate((e,d)=>{e.value=d;e.dispatchEvent(new Event('change'));},date);
+ await page.locator('#report-layout').selectOption('patient');
  await page.locator('#rules-reviewed').check();await page.locator('#generate').click();await page.frameLocator('#report-frame').locator('body').filter({hasText:'SYNTHETIC, Print'}).waitFor();
  await page.screenshot({path:'work/unified-print-batch-synthetic.png',fullPage:true});
  await page.locator('#report-frame').evaluate(frame=>{frame.contentWindow.print=()=>{};});await page.locator('#print-report').click();await page.locator('[data-close="report-dialog"]').click();

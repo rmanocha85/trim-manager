@@ -10,7 +10,7 @@ import {avaChartUrl} from './patient-links.mjs';
 import {planNewPatients} from './core.mjs?v=20261107-workflow1';
 import {deleteRecovery,loadRecovery} from './recovery.mjs?v=20261115-manual1';
 import {backupUI} from './backup-ui.mjs?v=20261114-renew1';
-import {renderReport} from './reports.mjs?v=20261019-fixes1';
+import {renderReport} from './reports.mjs?v=20261119-compact-patients1';
 import {sessionChanges,routineCandidates,addRoutineBatch,undoRoutineBatch,coveragePatient,extractDemographics,matchesPatientSearch,newestBillingFirst,patientHistoryGroups} from './workspace.mjs?v=20261031-history-date1';
 import {mergeSession} from './merge.mjs?v=20261015-immediate1';
 import {laptopRuntime} from './runtime.mjs';
