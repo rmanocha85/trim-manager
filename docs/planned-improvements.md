@@ -1,5 +1,13 @@
 # Planned improvements
 
+## Roster alignment and nursing drafts — November 20, 2026
+
+The roster toolbar now uses caption-free clipboard, speech-bubble, person-plus and hamburger controls with accessible names and hover tips. Search is narrower. Name-copy sits left of each name; an aligned Active issue column after PHN holds the flag and resolve/Undo actions before Hospital status.
+
+Nurse updates prepares editable messages from current active issues in the selected All/My/Other roster. It deduplicates patients and creates separate floor 1+3 and floor 2 drafts. Search filters do not restrict the list. Unknown or conflicting locations are displayed for review and excluded from both drafts. The confirmed mapping places Cedar/Cherry on 1, Fern/Hatzic/Dewdney/Deroche on 2, and Silver/Stave on 3. Default messages omit PHNs and clinical issue descriptions. Editing or deleting text changes only the draft. Copy and an optional Google Messages link support manual recipient selection, pasting and sending; no integration or automatic send is used.
+
+Unit floors can be corrected through Units, staged locally and saved using the existing conditional roster-save flow. No automatic roster or billing migration runs on startup. Private release evidence records the authorized Hatzic correction separately.
+
 ## Verified billing export and roster actions — November 19, 2026
 
 Implemented the authorized next build: compact roster menu and resolve/Undo control; compact editable batch dates defaulting to outstanding billing through Vancouver yesterday; envelope-only verified PDF download and addressed email draft; exact PDF text/charge verification; persistent export receipts and explicit manual send confirmation; separate corrections preserving sent originals; and retained billing history without automatic expiry. Removed the manual review attestation and tab-memory print prerequisite.
