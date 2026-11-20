@@ -16,6 +16,15 @@ try{
  const root=page.locator('#patients-workspace'),dialog=root.locator('#nurse-message-dialog'),row=root.locator('[data-roster-patient="Alex"]').first();
  assert.equal(await root.locator('.toolbar-icon').count(),4);
  for(const button of await root.locator('.toolbar-icon').all()){assert.equal((await button.textContent()).trim(),'');assert.ok(await button.getAttribute('aria-label'));assert.equal(await button.locator('svg').count(),1);}
+ assert.equal((await root.locator('.roster-search').innerText()).trim(),'');
+ assert.equal(await root.locator('.roster-search-symbol').count(),1);
+ const messageButton=row.getByRole('button',{name:'Request patient update',exact:true});
+ const m=await messageButton.boundingBox(),b=await row.getByRole('button',{name:'Open billing',exact:true}).boundingBox();assert.ok(m.x+m.width<=b.x);
+ await messageButton.click();const individual=root.locator('#individual-nurse-dialog');
+ assert.equal(await individual.locator('textarea').inputValue(),'Alex Example - Private symptom details - Could you provide a clinical update?');
+ await individual.locator('textarea').fill('Edited individual clinical update request');await individual.getByRole('button',{name:'Copy message'}).click();
+ assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'Edited individual clinical update request');
+ await individual.getByRole('button',{name:'Close',exact:true}).click();await messageButton.click();assert.equal(await individual.locator('textarea').inputValue(),'Edited individual clinical update request');await individual.getByRole('button',{name:'Close',exact:true}).click();
  const copy=await row.locator('.identity-copy').boundingBox(),name=await row.locator('.identity-name').boundingBox();assert.ok(copy.x+copy.width<=name.x);
  const cells=row.locator('td');assert.equal(await cells.nth(4).locator('.active-issue-badge').count(),1);assert.equal(await cells.nth(4).locator('.resolve-issue').count(),1);assert.equal(await cells.nth(3).locator('.pphn').count(),1);assert.equal(await cells.nth(5).getAttribute('class'),'roster-hospital');assert.equal(await row.locator('.roster-billing-actions .resolve-issue').count(),0);
  assert.ok((await root.locator('#roster-search').boundingBox()).width<=290);
@@ -23,9 +32,10 @@ try{
  await root.locator('#roster-search').fill('Ordinary');await root.getByRole('button',{name:'Request nurse updates',exact:true}).click();await dialog.waitFor();
  const one=dialog.locator('[data-nurse-group="floors-1-3"]'),two=dialog.locator('[data-nurse-group="floor-2"]');
  assert.match(await one.locator('h3').innerText(),/2 patients/);assert.match(await two.locator('h3').innerText(),/2 patients/);assert.match(await dialog.locator('.nurse-unassigned').innerText(),/Unknown Example/);
- assert.match(await two.locator('textarea').inputValue(),/Morgan Example \(HATZIC, Floor 2\)/);assert.doesNotMatch((await one.locator('textarea').inputValue())+(await two.locator('textarea').inputValue()),/000000000|Private symptom/);
+ assert.match(await two.locator('textarea').inputValue(),/Morgan Example \(HATZIC, Floor 2\)/);assert.doesNotMatch((await one.locator('textarea').inputValue())+(await two.locator('textarea').inputValue()),/000000000/);
+ assert.match(await one.locator('textarea').inputValue(),/Private symptom details - Could you provide a clinical update\?/);
  const first=await one.locator('textarea').inputValue();assert.equal((first.match(/Alex Example/g)||[]).length,1);
- const edited=first.replace(/Taylor Example[^]*?vitals\.\n\n/,'').replace('could you update','please update');await one.locator('textarea').fill(edited);await one.getByRole('button',{name:'Copy message'}).click();assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n'),edited);
+ const edited=first.replace(/Taylor Example[^]*?update\?\n\n/,'').replace('could you update','please update');await one.locator('textarea').fill(edited);await one.getByRole('button',{name:'Copy message'}).click();assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n'),edited);
  assert.equal(await one.getByRole('link',{name:'Open Google Messages'}).getAttribute('href'),'https://messages.google.com/web/');
  page.once('dialog',d=>d.dismiss());await dialog.locator('select').selectOption('patients');assert.equal(await dialog.locator('select').inputValue(),'all');assert.equal(await one.locator('textarea').inputValue(),edited);
  await dialog.getByRole('button',{name:'Close nurse updates'}).click();await root.getByRole('button',{name:'Request nurse updates'}).click();assert.equal(await one.locator('textarea').inputValue(),edited);

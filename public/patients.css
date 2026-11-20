@@ -21,7 +21,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .family-contact-dialog input{font:inherit;padding:7px}
 .family-contact-dialog .actions{display:flex;justify-content:flex-end;gap:8px}
 .family-contact-dialog [role=alert]{color:var(--danger)}
-.roster-table .roster-hospital-status{display:flex;align-items:center;gap:8px;min-width:280px}
+.roster-table .roster-hospital-status{display:flex;align-items:flex-start;gap:8px;min-width:110px;flex-wrap:wrap}
+.hospital-stamp{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:48px}
+.hospital-stamp small{font-size:11px;white-space:nowrap;color:var(--muted)}
+.hospital-symbol{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px}
+.hospital-symbol svg{width:21px;height:21px;pointer-events:none}
+.hospital-symbol.in-hospital{background:#fff0d2;color:#78501c}
+.hospital-symbol.past-hospital{background:var(--bg);color:var(--muted)}
+.roster-table .hospital-symbol.roster-return{padding:5px;width:32px;height:32px;cursor:pointer}
+.roster-table .hospital-symbol.returned{background:var(--accent-light);color:var(--accent)}
+.roster-table .col-hospital{width:132px}
 .roster-table .roster-hospital-status .hospital-dates{display:flex;flex-direction:column;flex:0 1 auto;gap:1px;font-size:12px;line-height:14px}
 .roster-table .roster-hospital-status .hospital-dates small{font-size:11px;color:var(--muted)}
 .roster-table .roster-hospital-status .hospital-flag{flex:none;margin:0}

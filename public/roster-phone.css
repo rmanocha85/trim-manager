@@ -62,3 +62,13 @@
 @media(max-width:650px){.nurse-groups{grid-template-columns:1fr}#nurse-message-dialog{padding:16px}#tab-patients .roster-search input{width:min(280px,100%)}.roster-toolbar{flex-wrap:wrap}}
 
 #nurse-message-dialog::backdrop{background:#183c2744}
+
+/* A single labeled search field with its familiar magnifying glass. */
+#tab-patients .roster-search{display:block;width:280px;max-width:100%;position:sticky}
+#tab-patients .roster-search input{width:100%;padding-left:32px}
+.roster-search-symbol{position:absolute;left:9px;top:13px;width:18px;height:18px;color:#617064;pointer-events:none}
+.roster-table .col-actions{width:146px}
+#individual-nurse-dialog{margin:auto;box-sizing:border-box;width:min(570px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid #d6ddd2;border-radius:14px;color:#263b2d}
+#individual-nurse-dialog::backdrop{background:#183c2744}
+#individual-nurse-dialog textarea{box-sizing:border-box;width:100%;display:block;resize:vertical;font:14px/1.55 system-ui,sans-serif;padding:12px;color:#24392c;background:#fff;border:1px solid #bdcbbd;border-radius:8px;margin-top:8px}
+@media(pointer:coarse){.roster-table .col-actions{width:190px}.roster-table .hospital-symbol.roster-return{width:44px;height:44px}}

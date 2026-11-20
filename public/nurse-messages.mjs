@@ -10,7 +10,11 @@ export function messageName(value){
 }
 export function nurseText(rows){
   if(!rows.length)return '';
-  return 'Hey, could you update me on these patients?\n\n'+rows.map(p=>`${p.name} (${p.unit}, Floor ${p.floor})\nRequesting a clinical update with a new set of vitals.`).join('\n\n')+'\n\nThanks!\n- Dr Manocha';
+  return 'Hey, could you update me on these patients?\n\n'+rows.map(p=>`${p.name} (${p.unit}, Floor ${p.floor})${p.issue?' - '+p.issue:''} - Could you provide a clinical update?`).join('\n\n')+'\n\nThanks!\n- Dr Manocha';
+}
+export function individualNurseText(patient){
+  const issue=hasActiveIssue(patient)?patient.activeIssue.description.trim():'';
+  return messageName(patient.name)+(issue?' - '+issue:'')+' - Could you provide a clinical update?';
 }
 export function nurseMessages(roster,scope='all'){
   const units=new Map((roster.units||[]).map(u=>[u.id,unitName(u.name)]));
@@ -21,7 +25,8 @@ export function nurseMessages(roster,scope='all'){
     const key=digits.length===10?'phn:'+digits:p.ava?'ava:'+p.ava:p.id!=null?'id:'+p.id:'row:'+index;
     const unit=units.get(p.unit)||unitName(p.unit),knownId=unitName(p.unit);
     const conflictingUnit=Boolean(NURSING_FLOORS[knownId]&&NURSING_FLOORS[unit]&&knownId!==unit);
-    const entry=people.get(key)||{name:messageName(p.name)||'Name not recorded',locations:new Set(),active:false,conflictingUnit:false};
+    const entry=people.get(key)||{name:messageName(p.name)||'Name not recorded',locations:new Set(),issues:new Set(),active:false,conflictingUnit:false};
+    if(hasActiveIssue(p))entry.issues.add(p.activeIssue.description.trim());
     entry.active ||= hasActiveIssue(p);entry.conflictingUnit ||= conflictingUnit;entry.locations.add(unit);
     people.set(key,entry);
   }
@@ -32,7 +37,7 @@ export function nurseMessages(roster,scope='all'){
     if(entry.conflictingUnit||entry.locations.size!==1||!floor){
       unassigned.push({name:entry.name,location:[...entry.locations].map(u=>u||'Not recorded').join(' / '),reason:entry.conflictingUnit||entry.locations.size>1?'Conflicting unit records':'Nursing floor not assigned'});continue;
     }
-    groups[floor===2?1:0].rows.push({name:entry.name,unit,floor});
+    groups[floor===2?1:0].rows.push({name:entry.name,unit,floor,issue:[...entry.issues].join('; ')});
   }
   for(const group of groups){group.rows.sort((a,b)=>a.floor-b.floor||a.unit.localeCompare(b.unit)||a.name.localeCompare(b.name));group.text=nurseText(group.rows);}
   unassigned.sort((a,b)=>a.name.localeCompare(b.name));

@@ -155,3 +155,10 @@ Install-TRIMLauncher.ps1 compiles launcher/TrimNotesLauncher.cs locally and regi
 Synthetic tests compile the launcher into a temporary folder, reject malformed actions and verify its invocation using an adjacent stub script, without starting the real app or processing patient documents. The cloud browser fixture intercepts native actions and checks the clean-launch and unsaved-change paths.
 
 The compact header shows one save status and a Save button only for pending work or a failed save. More options contains Drive connection, Refresh from Drive, Lock app, and the version switch. Billing patient cards open that patient’s History across all dates; Documents and Billing history share equal button dimensions. Notes uses an N icon; the hosted Manager retains T. Idle cloud intake and clinic polling are disabled; explicitly started document processing still updates its status, and local laptop service heartbeats continue.
+
+
+### Hospital indicators and patient update requests — November 20, 2026
+
+The roster uses a hospital symbol with admission date and a return-arrow button. The return button opens the existing date editor with today selected; recorded returns show the return date and allow corrections. Hospital and return indicators disappear 14 calendar days after return, while the complete stay history remains available through Edit hospital dates. A readmission shows the current stay. Existing save, conflict, and unsaved-return undo protections apply.
+
+A speech-bubble button immediately left of billing opens an editable, copyable update request for that patient. Individual and grouped nurse drafts copy the current active issue, exclude resolved issues, and ask for a clinical update. Drafting does not send messages or change patient records. The roster search uses a magnifying glass and an accessible label without the visible Find a patient caption.

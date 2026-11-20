@@ -59,7 +59,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('clinic-roster-repository.mjs');
   allowed.add('oat-roster-repository.mjs');
   allowed.add('oat-workspace.mjs');allowed.add('oat-schedule.mjs');
-  allowed.add('visit-list.mjs');allowed.add('nurse-messages.mjs');allowed.add('nurse-messages-ui.mjs');
+  allowed.add('visit-list.mjs');allowed.add('nurse-messages.mjs');allowed.add('nurse-messages-ui.mjs');allowed.add('roster-hospital.mjs');
   allowed.add('hosted-billing-access.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
   const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};

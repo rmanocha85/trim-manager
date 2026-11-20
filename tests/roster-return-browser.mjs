@@ -29,37 +29,41 @@ const saved=()=>page.locator('#local-changes').filter({hasText:/Saved to (Drive|
 const save=async()=>{await ready();await page.locator('#sync').click();await saved();};
 const readRoster=async()=>JSON.parse(await readFile(rosterPath,'utf8')),readBilling=async()=>JSON.parse(await readFile(billingPath,'utf8'));
 const tab=async name=>{await page.locator('[data-section=patients]').click();await p(`[data-click="showTab('${name}',this)"]`).click();};
+const returnPatient=async()=>{await p('.roster-return:not(.returned):visible').click();await p('#hospital-returned').waitFor();assert.equal(await p('#hospital-returned').inputValue(),date);await p('#hospital-form [type=submit]').click();};
 try{
  await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('.patient').first().waitFor();await saved();
  await page.locator('[data-day="2026-11-04"]').click();
- await tab('patients');assert.equal(await p('.roster-return:visible').count(),1);
+ await tab('patients');assert.equal(await p('.roster-return:not(.returned):visible').count(),1);
  await page.screenshot({path:'work/roster-return-before.png',fullPage:true});
  // Quick return follows today in Vancouver, not the selected billing date or UTC date.
- await p('.roster-return:visible').click();await ready();assert.equal(await p('.roster-return-undo:visible').count(),1);assert.equal(await p('#ulist .hospital-flag').count(),0);assert.match(await p('#ulist .hospital-dates').innerText(),/Returned today.*Nov 5/s);
+ await returnPatient();await ready();assert.equal(await p('.roster-return-undo:visible').count(),1);assert.equal(await p('#ulist .hospital-flag').count(),0);assert.match(await p('#ulist .roster-hospital-status').innerText(),/5 Nov/);
  assert.deepEqual(dialogs,[]);assert.deepEqual(await readRoster(),roster);assert.deepEqual(await readBilling(),ledger);
  await page.reload();await page.locator('.patient').first().waitFor();await ready();await tab('patients');assert.equal(await p('.roster-return-undo:visible').count(),1);
- await p('.roster-return-undo:visible').click();await saved();assert.equal(await p('.roster-return:visible').count(),1);assert.deepEqual(await readRoster(),roster);
+ await p('.roster-return-undo:visible').click();await saved();assert.equal(await p('.roster-return:not(.returned):visible').count(),1);assert.deepEqual(await readRoster(),roster);
  // Unfinished demographic input prevents hospital edits without losing the form.
- await p('#add-patient > summary').click();await p('#in-name').fill('Unfinished');assert.equal(await p('.roster-return:visible').isDisabled(),true);await p('#in-name').fill('');await p('#add-patient > summary').click();await saved();assert.equal(await p('.roster-return:visible').isEnabled(),true);
+ await p('#add-patient > summary').click();await p('#in-name').fill('Unfinished');assert.equal(await p('.roster-return:not(.returned):visible').isDisabled(),true);await p('#in-name').fill('');await p('#add-patient > summary').click();await saved();assert.equal(await p('.roster-return:not(.returned):visible').isEnabled(),true);
  // Keep a pending charge while returning a patient, then save both.
  await page.locator('[data-section=billing]').click();await page.locator('[data-day="2026-11-05"]').click();await page.locator('#search').fill(people[0].phn);await page.locator('.patient').click();
  await page.locator('[data-code="14077"]').click();await page.locator('[data-field=start]').fill('10:00');await page.locator('[data-field=start]').blur();await page.locator('[data-field=end]').fill('10:10');await page.locator('[data-field=end]').blur();await ready();
- await tab('patients');await p('.roster-return:visible').click();await ready();await page.screenshot({path:'work/roster-return-pending.png',fullPage:true});await save();
+ await tab('patients');await returnPatient();await ready();await page.screenshot({path:'work/roster-return-pending.png',fullPage:true});await save();
  const returned=await readRoster(),billed=await readBilling();assert.equal(returned.patients[0].hospitalStays[0].returnedDate,date);assert.deepEqual(returned.otherPatients,roster.otherPatients);assert.equal(await p('.roster-return-undo:visible').count(),0);
  for(const entry of ledger.entries)assert.deepEqual(billed.entries.find(e=>e.id===entry.id),entry);
  assert.ok(billed.entries.some(e=>e.date===date&&e.items.some(i=>i.code==='14077')),JSON.stringify(billed.entries));
  await page.locator('[data-section=billing]').click();await page.locator('#search').fill(people[0].phn);await page.locator('.patient').click();assert.equal(await page.locator('#editor .hospital-flag').count(),0);assert.equal(await page.locator('[data-code="00114"]').isEnabled(),true);
  // Other Patients supports the same quick return and exact undo.
- await tab('other-patients');await p('.roster-return:visible').click();await ready();await p('.roster-return-undo:visible').click();await saved();assert.deepEqual(await readRoster(),returned);await p('.roster-return:visible').click();await save();assert.equal((await readRoster()).otherPatients[0].hospitalStays[0].returnedDate,date);assert.deepEqual(await readBilling(),billed);
+ await tab('other-patients');await returnPatient();await ready();await p('.roster-return-undo:visible').click();await saved();assert.deepEqual(await readRoster(),returned);await returnPatient();await save();assert.equal((await readRoster()).otherPatients[0].hospitalStays[0].returnedDate,date);assert.deepEqual(await readBilling(),billed);
  // Correct dates from the roster menu; this is the same hospital editor as Billing.
- await tab('patients');await p('.patient-actions-toggle:visible').click();await p('[data-click="editHospitalDates(\'sample-1\')"]').click();
+ await tab('patients');await p('.patient-actions-toggle:visible').click();await p('.patient-actions-menu [data-click="editHospitalDates(\'sample-1\')"]').click();
  assert.equal(await p('#roster-hospital-dialog').isVisible(),true);await p('#hospital-returned').fill('2026-11-04');await p('#hospital-form [type=submit]').click();await save();assert.equal((await readRoster()).patients[0].hospitalStays[0].returnedDate,'2026-11-04');
- await page.reload();await page.locator('.patient').first().waitFor();await saved();await tab('patients');assert.equal(await p('.roster-return-undo:visible,.roster-return:visible').count(),0);assert.match(await p('#ulist .hospital-dates').innerText(),/Nov 4/);
+ await page.reload();await page.locator('.patient').first().waitFor();await saved();await tab('patients');assert.equal(await p('.roster-return-undo:visible,.roster-return:not(.returned):visible').count(),0);assert.match(await p('#ulist .roster-hospital-status').innerText(),/4 Nov/);
+ await page.clock.setFixedTime(new Date('2026-11-17T20:00:00Z'));await p('#roster-search').fill('Example');assert.equal(await p('#ulist .roster-hospital-status').count(),1);
+ await page.clock.setFixedTime(new Date('2026-11-18T20:00:00Z'));await p('#roster-search').fill('');assert.equal(await p('#ulist .roster-hospital-status').count(),0);
+ await page.clock.setFixedTime(new Date('2026-11-06T07:30:00Z'));await p('#roster-search').fill('Example');
  for(const width of [1440,1024,390]){await page.setViewportSize({width,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
  // A competing hospital-date correction must require review, never be overwritten.
  await page.setViewportSize({width:1440,height:1000});
  const reopened=await readRoster();reopened.patients[0].hospitalStays[0].returnedDate=null;await writeFile(rosterPath,JSON.stringify(reopened));
- await page.locator('#workspace-more').click();await page.locator('#load-latest').click();await p('.roster-return:visible').waitFor();await saved();await p('.roster-return:visible').click();await ready();
+ await page.locator('#workspace-more').click();await page.locator('#load-latest').click();await p('.roster-return:not(.returned):visible').waitFor();await saved();await returnPatient();await ready();
  const competing=structuredClone(reopened);competing.patients[0].hospitalStays[0].returnedDate='2026-11-03';competing.patients[0].hospitalStays[0].updatedAt='2026-11-05T12:00:00Z';await writeFile(rosterPath,JSON.stringify(competing));
  await page.locator('#sync').click();await p('#roster-conflict-dialog').waitFor();assert.deepEqual(await readRoster(),competing);assert.deepEqual(await readBilling(),billed);
  assert.deepEqual(errors,[]);assert.deepEqual(dialogs,[]);
