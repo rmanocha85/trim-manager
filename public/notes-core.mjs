@@ -1,7 +1,7 @@
 import {organizePatient,profileUpdate,clinicalLabs} from './clinical-profile.mjs?v=20261117-profile1';
 // Clinical working records are separate from the roster and billing ledger.
 import {hospitalAt,latestHospitalReturn} from './hospital.mjs?v=20261024-hospital2';
-import {validDate, clone, dueState, isPostHospitalReview} from './core.mjs?v=20261031-compact1';
+import {validDate, clone, dueState, isPostHospitalReview} from './core.mjs?v=20261119-export1';
 export const MODES = {combined:'No new concerns reported by nursing/patient.', nursing:'No new concerns reported by nursing.', patient:'No new concerns reported by patient.', custom:''};
 // Stable IDs keep daily selections readable when more phrases are added later.
 export const QUICK_STATEMENTS = {

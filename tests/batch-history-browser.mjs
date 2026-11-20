@@ -38,7 +38,7 @@ try{
  await page.locator('#undo-routine-batch').click();await local();assert.equal(await page.locator('[data-routine-patient]').count(),2);
  await page.locator('#routine-add').click();await local();assert.match(await page.locator('#local-changes').innerText(),/Changes pending/);
  assert.equal(await page.locator('#routine-add').isEnabled(),false);
- await context.setOffline(true);assert.equal(await page.locator('#undo-routine-batch').isEnabled(),false);await context.setOffline(false);await page.locator('#drive-connection:not(:disabled)').waitFor();
+ await context.setOffline(true);assert.equal(await page.locator('#undo-routine-batch').isEnabled(),false);await context.setOffline(false);await page.locator('#drive-connection:not(:disabled)').waitFor({state:'attached'});
  await page.locator('#sync').click();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();assert.equal(writes,1);
  assert.equal(cloud.entries.filter(e=>e.date==='2026-10-08').length,3);assert.equal(cloud.entries.flatMap(e=>e.items).filter(i=>i.code==='13334').length,1);
  assert.equal(await page.locator('#undo-routine-batch').count(),0);

@@ -1,6 +1,6 @@
 import {hospitalAt,hospitalBlocks114,latestHospitalStay} from './hospital.mjs?v=20261024-hospital2';
 import {hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
-import {today,escapeHTML as esc} from './core.mjs?v=20261031-compact1';
+import {today,escapeHTML as esc} from './core.mjs?v=20261119-export1';
 export function hospitalEditor({patients,guard,notify,host=document.body,dialogId='hospital-dialog'}){
   const dialog=document.createElement('dialog');dialog.id=dialogId;host.append(dialog);
   let target=null;

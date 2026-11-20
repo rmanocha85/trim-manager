@@ -24,7 +24,7 @@ export function formatRequestTime(value){
 // Retain the ISO-valued source input for existing data handlers. Visible controls
 // always spell the month, independent of the browser/OS regional date format.
 export function enhanceDateInputs(root=document){
-  root.querySelectorAll('input[type=date]:not(#service-date),input[type=datetime-local]').forEach(input=>{
+  root.querySelectorAll('input[type=date]:not(#service-date):not([data-native-date]),input[type=datetime-local]').forEach(input=>{
     if(input._dateControl){input._dateControl();return;}
     const timed=input.type==='datetime-local',label=input.getAttribute('aria-label')||input.closest('label')?.firstChild?.textContent?.trim()||'Date';
     const wrapper=document.createElement('span');wrapper.className='named-date-control';wrapper.setAttribute('role','group');wrapper.setAttribute('aria-label',label);

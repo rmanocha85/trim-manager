@@ -1,4 +1,4 @@
-import {validateLedger} from './core.mjs?v=20261031-compact1';
+import {validateLedger} from './core.mjs?v=20261119-export1';
 
 const API='https://www.googleapis.com/drive/v3/files';
 const OWNER='trim-billing-backup-v1';

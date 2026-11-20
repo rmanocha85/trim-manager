@@ -1,5 +1,5 @@
 // Three-way session merge. Never treat an old complete file as a replacement for Drive.
-import {clone,validateLedger,assertImmutable} from './core.mjs?v=20261031-compact1';
+import {clone,validateLedger,assertImmutable} from './core.mjs?v=20261119-export1';
 const stable=v=>JSON.stringify(v,(_k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.fromEntries(Object.keys(x).sort().map(k=>[k,x[k]])):x);
 const equal=(a,b)=>stable(a)===stable(b);
 const entryKey=e=>`${e.patientKey}|${e.date}`;
@@ -31,6 +31,8 @@ export function mergeSession(base,local,remote,choices={}){
   const name=e=>local.patients[e.patientKey]?.name||remote.patients[e.patientKey]?.name||'Patient';
   array('entries',entryKey,e=>`${name(e)} · ${e.date}`,(b,l,r)=>({entry:true,locked:Boolean(r?.batchId||b?.batchId||(remote.historicalBillings||[]).some(h=>entryKey(h)===entryKey(l||b||r)))}));
   array('nonPanel',p=>p.key,p=>`${p.name} — patient details`);
+  array('corrections',e=>e.id,()=> 'Billing correction',(_b,_l,r)=>({locked:Boolean(r?.batchId)}));
+  array('exports',x=>x.id,()=> 'Billing export',(_b,_l,r)=>({locked:r?.state==='sent'}));
   array('cancellations',c=>c.id,()=> 'Billing removal record');
   for(const [field,key] of [['batches','id'],['historicalBillings','id'],['imports','sourceDatasetId'],['reviewResolutions','key']])array(field,x=>x[key],()=>field,(_b,_l,r)=>({locked:Boolean(r)}));
   for(const field of ['patients','baselines','settings','routineStarts','newPatientStarts']){
@@ -42,7 +44,7 @@ export function mergeSession(base,local,remote,choices={}){
       if(value!==undefined)result[field][k]=clone(value);
     }
   }
-  const known=new Set(['entries','nonPanel','cancellations','batches','historicalBillings','imports','reviewResolutions','patients','baselines','settings','routineStarts','newPatientStarts','app','schema','datasetId','revision','updatedAt','localWriter']);
+  const known=new Set(['corrections','exports','entries','nonPanel','cancellations','batches','historicalBillings','imports','reviewResolutions','patients','baselines','settings','routineStarts','newPatientStarts','app','schema','datasetId','revision','updatedAt','localWriter']);
   for(const k of new Set([...Object.keys(base),...Object.keys(local),...Object.keys(remote)]))if(!known.has(k)){
     const value=choose(`field:${k}`,`Workspace: ${k}`,base[k],local[k],remote[k]);
     if(value===undefined)delete result[k];else result[k]=clone(value);

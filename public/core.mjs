@@ -112,6 +112,13 @@ export function validateLedger(l) {
   if(l?.app!==APP||l.schema!==SCHEMA||typeof l.datasetId!=='string'||!Number.isInteger(l.revision)||l.revision<0) throw new Error('Unsupported billing file; original roster files are never writable here.');
   for(const k of ['entries','nonPanel','units','batches']) if(!Array.isArray(l[k])) throw new Error(`Invalid ${k}.`);
   for(const k of ['patients','baselines','settings']) if(!l[k]||typeof l[k]!=='object'||Array.isArray(l[k])) throw new Error(`Invalid ${k}.`);
+  if(l.exports!==undefined&&!Array.isArray(l.exports))throw Error('Invalid export history.');
+  const exportIds=new Set();for(const x of l.exports||[]){
+    if(!x.id||exportIds.has(x.id)||x.datasetId!==l.datasetId||!validDate(x.from)||!validDate(x.to)||x.from>x.to||!['prepared','verified','downloaded','sent','cancelled'].includes(x.state)||!Array.isArray(x.snapshots)||!x.snapshots.length||new Set(x.snapshots.map(s=>s.entry?.id)).size!==x.snapshots.length)throw Error('Invalid export record.');
+    exportIds.add(x.id);if(x.snapshots.some(s=>!s.entry?.id||!s.identity?.name||!s.fingerprint))throw Error('Invalid export snapshot.');
+    if(x.state==='sent'&&(!['user-confirmed-existing','user-confirmed-email'].includes(x.delivery?.basis)||!x.delivery.at||(x.delivery.basis==='user-confirmed-email'&&(!x.pdfHash||!x.verification?.passed))))throw Error('Missing delivery evidence.');
+  }
+  if((l.exports||[]).filter(x=>!['sent','cancelled'].includes(x.state)).length>1)throw Error('Finish the existing pending export first.');
   const ids=new Set();
   for(const e of l.entries) {
     if(!e.id||ids.has(e.id)||!e.patientKey||!validDate(e.date)||!Array.isArray(e.items)) throw new Error('Invalid/duplicate billing entry.');
@@ -141,25 +148,34 @@ export function validateLedger(l) {
   if(l.reviewResolutions!==undefined&&!Array.isArray(l.reviewResolutions))throw new Error('Invalid review resolutions.');
   const resolved=new Set(),held=allHeldImports(l);
   for(const r of l.reviewResolutions||[]){if(!r.key||resolved.has(r.key)||!held.some(h=>heldKey(h)===r.key)||!['included','excluded'].includes(r.disposition)||!r.reason?.trim()||!r.resolvedAt||(r.disposition==='included'&&!r.entryId))throw new Error('Invalid or duplicate held-item resolution.');resolved.add(r.key);}
+  if(l.corrections!==undefined&&!Array.isArray(l.corrections))throw Error('Invalid corrections.');
+  const corrected=new Set();for(const e of l.corrections||[]){const source=[...l.entries,...l.corrections].find(s=>s.id===e.correctionOf);if(!e.id||ids.has(e.id)||!source?.batchId||source.id===e.id||source.patientKey!==e.patientKey||source.date!==e.date||!e.correctionReason?.trim()||corrected.has(e.correctionOf)||!Array.isArray(e.items)||!e.items.length||e.items.some(i=>!/^\d{5}$/.test(i.code)||!Number.isInteger(Number(i.units))||Number(i.units)<1||Number(i.units)>99))throw Error('Invalid billing correction.');ids.add(e.id);corrected.add(e.correctionOf);}
   const batchIds=new Set();
   for(const b of l.batches) {
     if(!b.id||batchIds.has(b.id)||!Array.isArray(b.entryIds)||new Set(b.entryIds).size!==b.entryIds.length) throw new Error('Invalid batch.');
     batchIds.add(b.id);
-    for(const id of b.entryIds) if(!l.entries.some(e=>e.id===id&&e.batchId===b.id)) throw new Error('Batch/entry mismatch.');
+    for(const id of b.entryIds) if(![...l.entries,...l.corrections||[]].some(e=>e.id===id&&e.batchId===b.id)) throw new Error('Batch/entry mismatch.');
   }
-  for(const e of l.entries) if(e.batchId&&!l.batches.some(b=>b.id===e.batchId&&b.entryIds.includes(e.id))) throw new Error('Finalized entry has no batch.');
+  for(const e of [...l.entries,...l.corrections||[]]) if(e.batchId&&!l.batches.some(b=>b.id===e.batchId&&b.entryIds.includes(e.id))) throw new Error('Finalized entry has no batch.');
   return l;
 }
 export function assertImmutable(previous,next) {
   if(previous.datasetId!==next.datasetId) throw new Error('Wrong billing dataset.');
+  for(const x of previous.exports||[]){
+    const n=next.exports?.find(n=>n.id===x.id);if(!n)throw Error('Export history cannot be removed.');
+    if(x.state==='sent'&&JSON.stringify(x)!==JSON.stringify(n))throw Error('Sent export evidence cannot be altered.');
+    for(const field of ['snapshots','recipient','datasetId','from','to','layout','roster','createdAt','parallel'])if(JSON.stringify(x[field])!==JSON.stringify(n[field]))throw Error('Prepared export content cannot be altered.');
+    if(x.pdfHash&&x.pdfHash!==n.pdfHash)throw Error('Verified PDF identity cannot be altered.');
+  }
   for(const b of previous.batches) if(JSON.stringify(b)!==JSON.stringify(next.batches.find(x=>x.id===b.id))) throw new Error('Handed-over batches cannot be altered.');
   for(const e of previous.entries.filter(e=>e.batchId)) if(JSON.stringify(e)!==JSON.stringify(next.entries.find(x=>x.id===e.id))) throw new Error('Handed-over billing cannot be altered.');
+  for(const e of previous.corrections||[])if(e.batchId&&JSON.stringify(e)!==JSON.stringify(next.corrections?.find(x=>x.id===e.id)))throw Error('Sent corrections cannot be altered.');
   for(const h of previous.historicalBillings||[])if(JSON.stringify(h)!==JSON.stringify(next.historicalBillings?.find(x=>x.id===h.id)))throw new Error('Already-billed history cannot be altered.');
   for(const i of previous.imports||[])if(JSON.stringify(i)!==JSON.stringify(next.imports?.find(x=>x.sourceDatasetId===i.sourceDatasetId)))throw new Error('Import receipts cannot be altered.');
   for(const r of previous.reviewResolutions||[])if(JSON.stringify(r)!==JSON.stringify(next.reviewResolutions?.find(x=>x.key===r.key)))throw new Error('Review resolutions cannot be altered.');
 }
 export function lastBilling(ledger,key,asOf='9999-12-31',resetOnly=false,excludeId=null) {
-  const dates=ledger.entries.filter(e=>e.patientKey===key&&e.date<=asOf&&e.id!==excludeId&&(!resetOnly||e.items.some(i=>RESET_CODES.includes(i.code)))).map(e=>e.date);
+  const dates=effectiveBillingEntries(ledger).filter(e=>e.patientKey===key&&e.date<=asOf&&e.id!==excludeId&&(!resetOnly||e.items.some(i=>RESET_CODES.includes(i.code)))).map(e=>e.date);
   dates.push(...(ledger.historicalBillings||[]).filter(h=>h.patientKey===key&&h.date<=asOf&&(!resetOnly||h.codes.some(c=>RESET_CODES.includes(c)))).map(h=>h.date));
   const base=ledger.baselines[key];if(base?.date<=asOf) dates.push(base.date);
   return dates.sort().at(-1)||null;
@@ -277,10 +293,11 @@ export function validDiagnoses(value){
   const codes=String(value||'').trim().split(/[,;\s]+/).filter(Boolean);
   return codes.length>=1&&codes.length<=3&&codes.every(validDiagnosis);
 }
-export function batchEntries(ledger,from,to) {return ledger.entries.filter(e=>!e.batchId&&e.date>=from&&e.date<=to).sort((a,b)=>a.date.localeCompare(b.date)||a.patientKey.localeCompare(b.patientKey));}
+export function effectiveBillingEntries(ledger){const all=[...ledger.entries,...ledger.corrections||[]],replaced=new Set((ledger.corrections||[]).map(e=>e.correctionOf));return all.filter(e=>!replaced.has(e.id));}
+export function batchEntries(ledger,from,to) {return [...ledger.entries,...ledger.corrections||[]].filter(e=>!e.batchId&&e.date>=from&&e.date<=to).sort((a,b)=>a.date.localeCompare(b.date)||a.patientKey.localeCompare(b.patientKey));}
 export function entryIssues(entry,ledger,patient) {
   const errors=[]; const required=(ok,msg)=>{if(!ok)errors.push(msg);};
-  const codes=entry.items.map(i=>i.code); const all=ledger.entries;
+  const codes=entry.items.map(i=>i.code); const all=effectiveBillingEntries(ledger);
   if(codes.includes('00114')&&hospitalBlocks114(patient,entry.date))errors.push('00114: patient was in hospital on this date. Correct the dates or remove this charge; 14077 is still allowed.');
   if(entry.date>today()) errors.push('Future service date.');
   if(new Set(codes).size!==codes.length) errors.push('Duplicate code on the same entry.');
@@ -339,8 +356,8 @@ export function entryIssues(entry,ledger,patient) {
 }
 export function finalizeBatch(ledger,entries,{from,to,layout,reviewed=false,delivered=false}) {
   if(ledger.settings.parallel) throw new Error('Paper comparison mode is active. Explicitly end it in Settings before final handoff.');
-  if(!reviewed||!delivered||!entries.length) throw new Error('Confirm review and actual delivery before finalizing.');
-  if(entries.some(e=>e.batchId||!ledger.entries.some(x=>x.id===e.id))) throw new Error('Batch selection changed.');
+  if(!delivered||!entries.length) throw new Error('Confirm actual delivery before finalizing.');
+  if(entries.some(e=>e.batchId||!ledger.entries.some(x=>x.id===e.id&&JSON.stringify(x)===JSON.stringify(e)))) throw new Error('Batch selection changed.');
   const l=clone(ledger);const b={id:crypto.randomUUID(),from,to,layout,entryIds:entries.map(e=>e.id),handedOverAt:new Date().toISOString()};
   l.batches.push(b);for(const e of l.entries) if(b.entryIds.includes(e.id)) e.batchId=b.id;return l;
 }

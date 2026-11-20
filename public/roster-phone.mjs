@@ -1,4 +1,4 @@
-import {escapeHTML as esc} from './core.mjs';
+import {escapeHTML as esc} from './core.mjs?v=20261119-export1';
 import {phoneLink} from './clinic-contacts.mjs?v=20261108-closeout1';
 
 export const handset = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M21 16.5v2.8a1.6 1.6 0 0 1-1.8 1.6A18.3 18.3 0 0 1 3.1 4.8 1.6 1.6 0 0 1 4.7 3h2.8l1.6 4.8-2 1.8a13.7 13.7 0 0 0 7.3 7.3l1.8-2z"/></svg>';

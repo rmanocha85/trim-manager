@@ -11,7 +11,7 @@ ledger.historicalBillings=[{id:'historical-1',patientKey:patients[0].key,date:'2
 const initial=structuredClone(ledger);let revision=1,failedSave=false,expired=false,writes=0;
 const server=createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true});const context=await browser.newContext({viewport:{width:1366,height:768}});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-const syncClick=async()=>{await page.locator('#load-latest:not(:disabled)').waitFor();if(await page.locator('#sync').isEnabled())await page.locator('#sync').click();else{await page.locator('#drive-connection').click();await page.locator('#drive-connection:not(:disabled)').waitFor();if(await page.locator('#sync').isEnabled())await page.locator('#sync').click();}};
+const syncClick=async()=>{await page.waitForFunction(()=>!document.querySelector('#load-latest').disabled);if(await page.locator('#sync').isEnabled())await page.locator('#sync').click();else{await page.locator('#workspace-more').click();await page.locator('#drive-connection').click();await page.locator('#drive-connection:not(:disabled)').waitFor({state:'attached'});if(await page.locator('#sync').isEnabled())await page.locator('#sync').click();}};
 try{
  // Keep the September/October fixture independent of the execution month.
  await page.clock.setFixedTime(new Date('2026-10-30T20:00:00Z'));
@@ -68,7 +68,7 @@ try{
  assert.equal(await page.locator('[data-field=start]').isEnabled(),false);
  await context.setOffline(false);await syncClick();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
  assert.deepEqual(ledger.entries.find(x=>x.date==='2026-09-22'),initial.entries[0]);assert.deepEqual(ledger.historicalBillings,initial.historicalBillings);
- // Proactive auth check locks the workspace without altering any saved entry.
- const before=structuredClone(ledger);expired=true;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.locator('#billing-lock').filter({hasText:'Billing locked'}).waitFor();assert.equal(await page.locator('[data-code="00114"]').isEnabled(),false);assert.deepEqual(ledger,before);expired=false;await syncClick();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
+ // Explicit refresh verifies auth without altering saved entries.
+ const before=structuredClone(ledger);expired=true;await page.locator('#workspace-more').click();await page.locator('#drive-connection').click();await page.locator('#billing-lock').filter({hasText:'Billing locked'}).waitFor();await page.waitForFunction(()=>!document.querySelector('#load-latest').disabled);assert.equal(await page.locator('#billing-lock').isVisible(),true);assert.equal(await page.locator('[data-code="00114"]').isEnabled(),false);assert.deepEqual(ledger,before);expired=false;await syncClick();await page.locator('#local-changes').filter({hasText:/Saved to (Drive|folder)/}).waitFor();
  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.deepEqual(errors,[]);console.log('PASS balanced layout: existing data untouched, calendar, four codes, per-charge ICD, bonus uniqueness, laptop fold, focus recovery, failed-save lock/retry, auth lock and responsive layout.');
 }finally{await browser.close();await new Promise(r=>server.close(r));}

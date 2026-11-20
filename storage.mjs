@@ -4,6 +4,14 @@ import {createHash,randomUUID} from 'node:crypto';
 import {blankLedger,validateLedger,assertImmutable} from './public/core.mjs';
 export const digest = data => createHash('sha256').update(data).digest('hex');
 export class Conflict extends Error {constructor(message='Billing changed elsewhere. Your draft is safe; reload and reconcile before saving.') {super(message);this.status=409;}}
+// Windows indexers/readers can briefly deny replacement. Keep the save lock and
+// recheck the source revision on every attempt; never retry a changed file.
+export async function replaceBillingFile(temp,target,recheck,{replace=rename,pause=ms=>new Promise(r=>setTimeout(r,ms))}={}){
+  for(let attempt=0;;attempt++){
+    await recheck();
+    try{return await replace(temp,target);}catch(error){if(!['EPERM','EACCES','EBUSY'].includes(error.code)||attempt>=5)throw error;await pause(40*(attempt+1));}
+  }
+}
 export class BillingStore {
   constructor(path,lockPath,writerId){this.path=path;this.lockPath=lockPath;this.writerId=writerId;this.initial=blankLedger(digest(path).slice(0,32));}
   async load(){try {const raw=await readFile(this.path,'utf8');return {ledger:validateLedger(JSON.parse(raw)),etag:digest(raw)};}catch(e){if(e.code==='ENOENT')return {ledger:structuredClone(this.initial),etag:'new'};throw e;}}
@@ -18,8 +26,7 @@ export class BillingStore {
       const ledger={...next,revision:current.ledger.revision+1,localWriter:this.writerId,updatedAt:new Date().toISOString()};
       const raw=JSON.stringify(ledger,null,2);await mkdir(dirname(this.path),{recursive:true});
       const f=await open(temp,'wx');try{await f.writeFile(raw);await f.sync();}finally{await f.close();}
-      const recheck=await this.load();if(recheck.etag!==current.etag)throw new Conflict();
-      await rename(temp,this.path);
+      await replaceBillingFile(temp,this.path,async()=>{const recheck=await this.load();if(recheck.etag!==current.etag)throw new Conflict();});
       const verified=await this.load();if(verified.etag!==digest(raw))throw new Conflict('Read-back differs from saved data. Stop editing and reconcile.');
       return verified;
     } finally {await unlink(temp).catch(()=>{});await lock.close();await unlink(this.lockPath).catch(()=>{});}

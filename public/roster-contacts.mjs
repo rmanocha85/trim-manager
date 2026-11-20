@@ -1,7 +1,7 @@
-import {escapeHTML as esc} from './core.mjs';
+import {escapeHTML as esc} from './core.mjs?v=20261119-export1';
 import {phoneLink} from './clinic-contacts.mjs?v=20261108-closeout1';
 
-import {phoneControls} from './roster-phone.mjs';
+import {phoneControls} from './roster-phone.mjs?v=20261119-export1';
 
 export function familyContactsCell(patient) {
   const rows = (patient.familyContacts || []).map(contact => {

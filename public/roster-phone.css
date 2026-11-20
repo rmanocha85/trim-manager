@@ -19,3 +19,15 @@
   .roster-billing-actions .roster-icon{width:44px;height:44px}
   .roster-table .col-actions{width:146px}
 }
+
+/* Compact row actions and a single, consistent popover menu. */
+.roster-table .col-actions{width:148px}
+.patient-actions-menu{width:244px;max-width:calc(100vw - 16px);padding:6px;border-radius:10px}
+.patient-actions-menu .btn{display:flex;align-items:center;gap:10px;min-height:38px;margin:0;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:#26392e;font-size:14px;line-height:1.3;box-shadow:none}
+.patient-actions-menu .btn:hover,.patient-actions-menu .btn:focus-visible{background:#edf3ed;color:#203d2b}
+.patient-actions-menu .btn-danger{color:#a12727}
+.patient-actions-menu .btn-danger:hover{background:#fbeeed;color:#8a2020}
+.patient-actions-menu .flag-check{margin-left:auto}
+.patient-actions-menu hr{border:0;border-top:1px solid #e2e6e0;margin:5px 4px}
+.patient-actions-menu svg{flex:none;width:19px;height:19px}
+@media(pointer:coarse){.patient-actions-menu .btn{min-height:44px}.roster-table .col-actions{width:190px}}

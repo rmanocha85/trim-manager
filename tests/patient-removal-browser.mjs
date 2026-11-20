@@ -44,10 +44,11 @@ try{
  await openRemoval(other.id);await p('#delmv').getByRole('button',{name:'Remove',exact:true}).click();await ready();
  assert.equal(await p('#other-list tbody tr').count(),0);assert.match(await p('#roster-count').innerText(),/0 other patients/);
  assert.deepEqual(await readRoster(),roster);assert.deepEqual(await readBilling(),ledger);
- await page.reload();await page.locator('.patient').first().waitFor();await ready();
+ // Billing edits require an explicit session save before reload.
+ await page.locator('#sync').click();await saved();
+ await page.reload();await page.locator('.patient').first().waitFor();await saved();
  await tab('other-patients');assert.equal(await p('#other-list tbody tr').count(),0);
  await tab('removed');assert.match(await p('#removed-list').innerText(),/Example, 2/);
- await page.locator('#sync').click();await saved();
  const removed=await readRoster(),billed=await readBilling();
  assert.deepEqual(removed.patients,roster.patients);assert.deepEqual(removed.otherPatients,[]);
  assert.deepEqual(removed.removedPatients,[{...other,removedDate:today()}]);

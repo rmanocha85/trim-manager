@@ -1,4 +1,4 @@
-import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs';
+import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
 import {bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
 import {assessmentPlanningText} from './maid-assessment.mjs?v=20261112-provision1';
 import {dateCalendar} from './maid-date-calendar.mjs';

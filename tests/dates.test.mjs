@@ -15,12 +15,12 @@ test('save timestamps use Pacific but request wall-time date remains unchanged',
   assert.equal(formatTimestamp('2026-10-07T02:35:00Z'),'Tue, Oct 6, 2026 · 7:35 PM');
   assert.equal(formatRequestTime('2026-10-07T00:10'),'Wed, Oct 7, 2026 · 00:10');
 });
-test('both report layouts spell service dates while preserving source data',()=>{
+test('report headings spell dates and compact rows use ISO dates without changing data',()=>{
   const p={key:'synthetic',id:'synthetic',name:'SYNTHETIC',phn:'0000000001',unit:'cedar',room:'101',panel:true};
   const roster={patients:[p],units:[{id:'cedar',name:'CEDAR'}]};
   const ledger=upsertEntry(blankLedger(),p,'2026-09-24',[{code:'00114',units:1}]);const before=JSON.stringify(ledger);
   assert.equal(reportGroups(ledger,roster,ledger.entries,'date')[0].title,'TRIM List · Thu, Sep 24, 2026');
-  assert.match(reportGroups(ledger,roster,ledger.entries,'patient')[0].rows[0].html,/Thu, Sep 24, 2026/);
+  assert.match(reportGroups(ledger,roster,ledger.entries,'patient')[0].rows[0].html,/2026-09-24/);
   assert.match(reportLines({items:[{code:'00115',requestAt:'2026-09-24T18:30'}]}),/Thu, Sep 24, 2026 · 18:30/);
   assert.equal(JSON.stringify(ledger),before);
 });

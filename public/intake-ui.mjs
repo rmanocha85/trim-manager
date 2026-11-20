@@ -5,7 +5,7 @@ import {DriveIntake} from './intake-drive.mjs?v=20261111-best-effort1';
 import {DriveNotesRepository,LocalNotesRepository,savePatientBirthDate} from './notes-storage.mjs?v=20261117-profile1';
 import {setProfileDisplay} from './profile-display.mjs?v=20261119-most-connection1';
 import {MAX_UPLOAD_BYTES,signatureMatches} from './intake-core.mjs?v=20261117-profile1';
-import {escapeHTML as esc} from './core.mjs?v=20261105-flags1';
+import {escapeHTML as esc} from './core.mjs?v=20261119-export1';
 import {LocalAdapter,DriveAdapter} from './adapters.mjs?v=20261119-most-connection1';
 import {laptopRuntime} from './runtime.mjs';
 export const PROFILE_FILE_ID='1UEPiPwQyd9wMswfem8lL6LIKwMn_ST3r';

@@ -2,7 +2,7 @@ import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
 import {avaChartUrl} from './patient-links.mjs';
 import {appointmentsForDate,upcomingFriday,pacificDate} from './oat-schedule.mjs?v=20261117-purple1';
 import {dateCalendar} from './maid-date-calendar.mjs?v=20261113-combined1';
-import {formatDate} from './dates.mjs';
+import {formatDate} from './dates.mjs?v=20261119-export1';
 export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onLink,onFinish,onSave=onFinish,onChange=()=>{}}){
   const calendarId=clinic==='oat-fh'?'oat-calendar':'oat-purple-calendar';
   host.classList.add('clinic-workspace','oat-workspace');

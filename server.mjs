@@ -41,10 +41,11 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const rosterStore=new RosterStore(rosterPath,path.dirname(lockPath),snapshotPaths||(rosterPath===defaults.roster?[path.join(home,'My Drive','02. TRIM','TRIM AI','Backups','Roster'),path.join(home,'My Drive','TRIM Snapshots')]:[path.join(path.dirname(rosterPath),'roster-snapshots')]));
   const session=randomBytes(32).toString('hex');
   const notes=new LocalNotesStore(notesPath,path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMNotes','locks'));
-  const types={'.js':'text/javascript','.gz':'application/gzip','.txt':'text/plain','.html':'text/html','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};
+  const types={'.ttf':'font/ttf','.js':'text/javascript','.gz':'application/gzip','.txt':'text/plain','.html':'text/html','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};
   const allowed=new Set(['index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
   const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
   allowed.add('context-refresh.mjs');allowed.add('service-lifecycle.mjs');
+  for(const name of ['billing-corrections.mjs','billing-export.mjs','billing-pdf.mjs','billing-export-ui.mjs','billing-export.css','vendor/pdf/jspdf.umd.min.mjs','vendor/pdf/pdf.mjs','vendor/pdf/pdf.worker.mjs','vendor/pdf/NotoSans-Regular.ttf','vendor/pdf/NotoSans-Bold.ttf'])allowed.add(name);
   allowed.add('billing-icons.mjs');allowed.add('billing-cards.css');
   allowed.add('clinic-roster.mjs');
   allowed.add('maid-lifecycle.mjs');

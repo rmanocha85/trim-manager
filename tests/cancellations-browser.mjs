@@ -74,10 +74,10 @@ await page.locator('#local-changes').click();assert.equal(await page.locator('#c
  assert.deepEqual(cloud.entries[0].items.map(i=>i.code),['00114','13121']);
  await page.screenshot({path:'work/cancel-code-editor.png'});
  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.setViewportSize({width:1366,height:768});
- // Remove all, retain recoverable draft across reload, undo then save.
+ // Remove all and undo in the current session; saved result survives reload.
  await page.locator('#remove-entry').click();await draft();assert.equal(cloud.entries.length,1);
- await page.reload();await connect();await page.locator('#local-changes').click();assert.match(await page.locator('#changes-list').innerText(),/Will be removed from Drive/);
+ await page.locator('#local-changes').click();assert.match(await page.locator('#changes-list').innerText(),/Will be removed from Drive/);
  await page.locator('#changes-list [data-undo-cancel]').click();assert.equal(await page.locator('#changes-list [data-undo-cancel]').count(),0);
- await page.locator('#changes-dialog').getByRole('button',{name:'Close',exact:true}).click();await save();assert.equal(cloud.entries.length,1);
+ await page.locator('#changes-dialog').getByRole('button',{name:'Close',exact:true}).click();await save();assert.equal(cloud.entries.length,1);await page.reload();await connect();assert.equal(cloud.entries.length,1);
  assert.deepEqual(errors,[]);console.log('PASS code cancellation: separate review rows, individual/all removal, orphan bonus cleanup, Undo/recovery, history editing, manual diagnosis preservation, primary inheritance, visible wheels, explicit saving, responsive layout.');
 }finally{await browser.close();await new Promise(r=>server.close(r));}

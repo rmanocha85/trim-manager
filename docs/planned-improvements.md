@@ -1,5 +1,15 @@
 # Planned improvements
 
+## Verified billing export and roster actions — November 19, 2026
+
+Implemented the authorized next build: compact roster menu and resolve/Undo control; compact editable batch dates defaulting to outstanding billing through Vancouver yesterday; envelope-only verified PDF download and addressed email draft; exact PDF text/charge verification; persistent export receipts and explicit manual send confirmation; separate corrections preserving sent originals; and retained billing history without automatic expiry. Removed the manual review attestation and tab-memory print prerequisite.
+
+The envelope saves the exact export, verifies and downloads its PDF. The operator attaches it manually and sends using their email app, then chooses Mark sent to Suzy. Only unchanged entries in that frozen export are closed. No Gmail connection, mailbox access or automatic email is included, following Rahul's simplification request. Downloads follow the browser's configured download location. Sent confirmation does not imply claim submission or payment.
+
+Private requirements and the audited existing-delivery record remain in the owner's TRIM Working records. Existing deliveries can be recorded without regenerating or resending their PDF. Live reconciliation uses current content matching and the usual conditional Drive save; no old ledger is restored wholesale.
+
+Validation: 306 unit tests (including Windows atomic replacement and explicit send confirmation), syntax checks, actual PDF extraction and save/reload confirmation, dense 400-charge/17-page PDF, and browser regression coverage. Live deployment/setup evidence is maintained privately; no patient data or private recipient configuration is committed.
+
 ## Billing card cleanup — November 17, 2026
 
 - Compact patient cards share the Roster billing-history icon and patient identity/flag controls.
