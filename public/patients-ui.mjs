@@ -1,5 +1,5 @@
-import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from './roster-hospital.mjs?v=20261120-hospital-messages2';
-import {nurseMessageDialog,individualNurseDialog} from './nurse-messages-ui.mjs?v=20261120-hospital-messages2';
+import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from './roster-hospital.mjs?v=20261121-individual-template1';
+import {nurseMessageDialog,individualNurseDialog} from './nurse-messages-ui.mjs?v=20261121-individual-template1';
 import {billingHistoryIcon} from './billing-icons.mjs?v=20261117-cards4';
 import {handset,bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
 import {familyContactsCell,familyContactDialog} from './roster-contacts.mjs?v=20261116-phone1';
@@ -48,11 +48,11 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261120-hospital-messages2');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261121-individual-template1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   const identityCSS=await fetch('./patient-identity.css?v=20261115-roster1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
-  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261120-hospital-messages2',import.meta.url);root.append(phoneStyles);
+  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261121-individual-template1',import.meta.url);root.append(phoneStyles);
   const hideRosterTip=bindRosterTips(root);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
@@ -69,7 +69,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   visitDialog.querySelector('[data-close-visits]').onclick=()=>visitDialog.close();
   visitDialog.querySelector('[data-copy-visits]').onclick=async()=>{const field=visitDialog.querySelector('textarea');try{await navigator.clipboard.writeText(field.value);visitDialog.querySelector('[role=status]').textContent='Copied.';}catch{field.focus();field.select();visitDialog.querySelector('[role=status]').textContent='Select and copy the highlighted text.';}};
   const nurseDialog=nurseMessageDialog(root),individualDialog=individualNurseDialog(root);
-  function openPatientMessage(id){if(!ready||inHistoryView)return;individualDialog.show(hospitalPatient(id));}
+  function openPatientMessage(id){if(!ready||inHistoryView)return;individualDialog.show(hospitalPatient(id),liveRoster().units||[]);}
   function openNurseMessages(){if(!ready||inHistoryView)return;nurseDialog.show(()=>({roster:liveRoster(),dirty}),activeRosterTab==='patients'?'patients':activeRosterTab==='other-patients'?'otherPatients':'all');}
   const contactEditor=familyContactDialog(root,async (target,fields)=>{
     if(!canEdit())throw new Error('The roster is busy. Try saving the contact again.');

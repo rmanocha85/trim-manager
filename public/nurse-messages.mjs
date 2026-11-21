@@ -12,9 +12,11 @@ export function nurseText(rows){
   if(!rows.length)return '';
   return 'Hey, could you update me on these patients?\n\n'+rows.map(p=>`${p.name} (${p.unit}, Floor ${p.floor})${p.issue?' - '+p.issue:''} - Could you provide a clinical update?`).join('\n\n')+'\n\nThanks!\n- Dr Manocha';
 }
-export function individualNurseText(patient){
+export function individualNurseText(patient,units=[]){
   const issue=hasActiveIssue(patient)?patient.activeIssue.description.trim():'';
-  return messageName(patient.name)+(issue?' - '+issue:'')+' - Could you provide a clinical update?';
+  const name=String(patient.name||'').trim().replace(/\s*,\s*/,', ');
+  const unit=unitName(units.find(u=>u.id===patient.unit)?.name||patient.unit);
+  return `Re: ${name}${unit?' on '+unit+' unit':''}\n\n${issue?issue+' - ':''}could you let me know how he is doing today?\n\nThanks!\nDr Rahul Manocha`;
 }
 export function nurseMessages(roster,scope='all'){
   const units=new Map((roster.units||[]).map(u=>[u.id,unitName(u.name)]));

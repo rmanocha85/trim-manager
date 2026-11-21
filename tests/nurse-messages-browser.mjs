@@ -21,7 +21,9 @@ try{
  const messageButton=row.getByRole('button',{name:'Request patient update',exact:true});
  const m=await messageButton.boundingBox(),b=await row.getByRole('button',{name:'Open billing',exact:true}).boundingBox();assert.ok(m.x+m.width<=b.x);
  await messageButton.click();const individual=root.locator('#individual-nurse-dialog');
- assert.equal(await individual.locator('textarea').inputValue(),'Alex Example - Private symptom details - Could you provide a clinical update?');
+ const expectedIndividual='Re: Example, Alex on CEDAR unit\n\nPrivate symptom details - could you let me know how he is doing today?\n\nThanks!\nDr Rahul Manocha';
+ assert.equal(await individual.locator('textarea').inputValue(),expectedIndividual);
+ await individual.getByRole('button',{name:'Copy message'}).click();assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n'),expectedIndividual);
  await individual.locator('textarea').fill('Edited individual clinical update request');await individual.getByRole('button',{name:'Copy message'}).click();
  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'Edited individual clinical update request');
  await individual.getByRole('button',{name:'Close',exact:true}).click();await messageButton.click();assert.equal(await individual.locator('textarea').inputValue(),'Edited individual clinical update request');await individual.getByRole('button',{name:'Close',exact:true}).click();
