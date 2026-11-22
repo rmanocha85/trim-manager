@@ -1,4 +1,4 @@
-import {nurseMessages,individualNurseText,messageName} from './nurse-messages.mjs?v=20261121-individual-template1';
+import {nurseMessages,individualNurseText,messageName} from './nurse-messages.mjs?v=20261122-symbol-menu1';
 
 export function individualNurseDialog(root){
   const dialog=document.createElement('dialog');dialog.id='individual-nurse-dialog';dialog.setAttribute('aria-labelledby','individual-nurse-title');
@@ -8,7 +8,12 @@ export function individualNurseDialog(root){
   field.oninput=()=>{drafts.get(key).text=field.value;copy.disabled=!field.value.trim();status.textContent='';};
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
   copy.onclick=async()=>{try{await navigator.clipboard.writeText(field.value);status.textContent='Copied. Paste into your nurse conversation.';}catch{field.focus();field.select();status.textContent='Select and copy the highlighted text.';}};
-  return {show(patient,units=[]){
+  return {copy(patient,units=[]){
+    const original=individualNurseText(patient,units),prior=drafts.get(String(patient.id));
+    // Reuse an edited draft only while its patient context still matches.
+    // A plain copy never prompts or opens a dialog; stale edits remain for review.
+    return navigator.clipboard.writeText(prior?.original===original?prior.text:original);
+  },show(patient,units=[]){
     key=String(patient.id);const original=individualNurseText(patient,units),prior=drafts.get(key);
     if(!prior||prior.original!==original){
       if(prior&&prior.text!==prior.original&&!window.confirm('The active issue changed. Replace your edited draft with the current issue?')){status.textContent='Kept your edited draft. Review it against the current active issue.';}

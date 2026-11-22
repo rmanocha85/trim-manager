@@ -24,8 +24,8 @@ test('name formatting preserves spelling and punctuation',()=>{
 });
 test('individual draft copies the active issue verbatim and excludes resolved issues',()=>{
  const patient=person(1,'cedar',{name:'Example, Morgan',activeIssue:{status:'active',description:'Influenza A — cough <improving>'}});
- assert.equal(individualNurseText(patient),'Re: Example, Morgan on CEDAR unit\n\nInfluenza A — cough <improving> - could you let me know how he is doing today?\n\nThanks!\nDr Rahul Manocha');
- patient.activeIssue.status='resolved';assert.equal(individualNurseText(patient),'Re: Example, Morgan on CEDAR unit\n\ncould you let me know how he is doing today?\n\nThanks!\nDr Rahul Manocha');
+ assert.equal(individualNurseText(patient),'Re: Example, Morgan on CEDAR unit\n\nInfluenza A — cough <improving> - Could you please let me know how the patient is doing?\n\nThanks!\nDr Rahul Manocha');
+ patient.activeIssue.status='resolved';assert.equal(individualNurseText(patient),'Re: Example, Morgan on CEDAR unit\n\nCould you please let me know how the patient is doing?\n\nThanks!\nDr Rahul Manocha');
 });
 test('individual header resolves unit IDs through roster metadata and omits unavailable location',()=>{
  const patient={name:"D’Arcy-Smith,Élodie Jane",unit:'unit-42'};

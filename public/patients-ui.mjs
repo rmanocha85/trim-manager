@@ -1,7 +1,7 @@
-import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from './roster-hospital.mjs?v=20261121-individual-template1';
-import {nurseMessageDialog,individualNurseDialog} from './nurse-messages-ui.mjs?v=20261121-individual-template1';
+import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from './roster-hospital.mjs?v=20261122-symbol-menu1';
+import {nurseMessageDialog,individualNurseDialog} from './nurse-messages-ui.mjs?v=20261122-symbol-menu1';
 import {billingHistoryIcon} from './billing-icons.mjs?v=20261117-cards4';
-import {handset,bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
+import {bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
 import {familyContactsCell,familyContactDialog} from './roster-contacts.mjs?v=20261116-phone1';
 import {withProfile} from './profile-display.mjs?v=20261119-most-connection1';
 import {patientKey} from './core.mjs?v=20261119-export1';
@@ -48,11 +48,11 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261121-individual-template1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261122-symbol-menu1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   const identityCSS=await fetch('./patient-identity.css?v=20261115-roster1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
-  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261121-individual-template1',import.meta.url);root.append(phoneStyles);
+  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261122-symbol-menu1',import.meta.url);root.append(phoneStyles);
   const hideRosterTip=bindRosterTips(root);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
@@ -70,6 +70,20 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   visitDialog.querySelector('[data-copy-visits]').onclick=async()=>{const field=visitDialog.querySelector('textarea');try{await navigator.clipboard.writeText(field.value);visitDialog.querySelector('[role=status]').textContent='Copied.';}catch{field.focus();field.select();visitDialog.querySelector('[role=status]').textContent='Select and copy the highlighted text.';}};
   const nurseDialog=nurseMessageDialog(root),individualDialog=individualNurseDialog(root);
   function openPatientMessage(id){if(!ready||inHistoryView)return;individualDialog.show(hospitalPatient(id),liveRoster().units||[]);}
+  const messageFeedback=document.createElement('div');messageFeedback.className='patient-message-feedback';messageFeedback.setAttribute('role','status');messageFeedback.setAttribute('aria-live','polite');root.append(messageFeedback);let messageFeedbackTimer;
+  async function copyPatientMessage(id){
+    if(!ready||inHistoryView)return;
+    let text;
+    try{await individualDialog.copy(hospitalPatient(id),liveRoster().units||[]);text='Message copied';}
+    catch{text='Could not copy. Right-click the message button to edit and copy.';}
+    messageFeedback.textContent=text;messageFeedback.classList.add('visible');clearTimeout(messageFeedbackTimer);messageFeedbackTimer=setTimeout(()=>{messageFeedback.classList.remove('visible');messageFeedback.textContent='';},4500);
+  }
+  function editMessageFromButton(event){
+    const button=event.target.closest?.('.roster-patient-message');if(!button)return;
+    event.preventDefault();hideRosterTip();openPatientMessage(button.closest('[data-roster-patient]').dataset.rosterPatient);
+  }
+  root.addEventListener('contextmenu',editMessageFromButton);
+  root.addEventListener('keydown',event=>{if(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10'))editMessageFromButton(event);});
   function openNurseMessages(){if(!ready||inHistoryView)return;nurseDialog.show(()=>({roster:liveRoster(),dirty}),activeRosterTab==='patients'?'patients':activeRosterTab==='other-patients'?'otherPatients':'all');}
   const contactEditor=familyContactDialog(root,async (target,fields)=>{
     if(!canEdit())throw new Error('The roster is busy. Try saving the contact again.');
@@ -176,7 +190,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     document.getElementById('patients-print-frame').srcdoc='<!doctype html><html><head><meta charset="utf-8"><title>'+esc(title)+'</title><link rel="stylesheet" href="'+new URL('./patients.css?v=20261105-flags1',location.href).href+'"><style>'+identityCSS+'body{background:white}.patient-flag{width:14px;height:14px;font-size:13px}.patient-flag svg{width:12px;height:12px}#print-trim,#print-billing{display:block!important}</style></head><body class="drive-connected'+(billing?' pb':'')+'"><div id="'+(billing?'print-billing':'print-trim')+'">'+body+'</div></body></html>';
     dialog.showModal();
   }
-  const actions={openPatientMessage,recordHospitalReturn,openNurseMessages,changeUnitFloor,resolveIssueFromRow,undoIssueFromRow,editFamilyContact,openBilling,openVisitList,openActiveIssue,updateToolbar,openBillingHistory,togglePmhxUploaded,toggleMedReconciliation,togglePatientFlag,returnToday,undoReturn,editHospitalDates,showPatientActions,renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
+  const actions={copyPatientMessage,openPatientMessage,recordHospitalReturn,openNurseMessages,changeUnitFloor,resolveIssueFromRow,undoIssueFromRow,editFamilyContact,openBilling,openVisitList,openActiveIssue,updateToolbar,openBillingHistory,togglePmhxUploaded,toggleMedReconciliation,togglePatientFlag,returnToday,undoReturn,editHospitalDates,showPatientActions,renderUList,uploadDocuments,showTab,addPatient,addUnit,calNext,calPrev,calSelectDay,cancelEdit,cancelSeen,clearDates,closeModal,confirmDel,confirmSeen,copyPhn,delUnit,editSeen,exitHistoryView,gConnect,printBilling,printTrim,promptDel,removeDate,saveEdit,startEdit,toggleU,viewSnapshot,renderOtherPatients};
   function argumentsFor(text,element){
     if(!text.trim())return [];const parts=text.match(/'(?:[^']*)'|\bthis\b|\d+/g)||[];
     if(parts.join(',').replace(/\s/g,'')!==text.replace(/\s/g,''))throw new Error('Invalid patient action.');
@@ -616,15 +630,25 @@ function issueActions(p){
 
   return `<span class="roster-issue-actions">${activeIssueSummary(p)}${resolve}</span>`;
 }
+function patientActionsMenu(p,other,secondary){
+  const id=esc(p.id),disabled=hospitalEditable()?'':'disabled';
+  const svg=paths=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+  const documents=svg('<path d="M8 3h8l4 4v13H8zM16 3v5h4M4 7v14h11"/>');
+  const edit=svg('<path d="M12 5H4v15h15v-8M14 4l6 6M10 14l2-6 6-6 4 4-6 6z"/>');
+  const remove=svg('<circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M17 9h6"/>');
+  const button=(label,icon,action,attrs='',className='')=>`<button type="button" class="btn btn-ghost menu-symbol ${className}" aria-label="${label}" data-roster-tip="${label}" data-click="${action}" ${attrs}>${icon}</button>`;
+  const flags=['palliativeFlag','pFlag'].map(flag=>button(flag==='pFlag'?'Psychiatric consult':'Palliative protocol',flagIcon(flag)+`<span class="flag-check" aria-hidden="true">${p[flag]?'✓':''}</span>`,`togglePatientFlag('${id}','${flag}')`,`data-patient-flag-action data-flag="${flag}" aria-pressed="${p[flag]===true}" ${disabled}`,flag==='pFlag'?'menu-psych':'menu-palliative')).join('');
+  return `<div popover ${secondary?'':`id="patient-actions-${id}"`} class="patient-actions-menu" role="group" aria-label="Patient actions">${button('Active issue',activeIssueIcon+`<span class="flag-check" aria-hidden="true">${TrimRoster.hasActiveIssue(p)?'✓':''}</span>`,`openActiveIssue('${id}')`,`data-active-issue-action ${disabled}`,'menu-active-issue')}${flags}${button('Hospital dates',hospitalSymbol,`editHospitalDates('${id}')`,`data-hospital-roster-action ${disabled}`)}${button('Documents',documents,`uploadDocuments('${id}')`,'','upload-documents')}${button(other?'Edit unit & room':'Edit patient',edit,`startEdit('${id}'${secondary?',1':''})`,`data-roster-edit-action ${disabled}`)}<hr>${button('Remove from roster',remove,`promptDel('${id}')`,`data-roster-edit-action ${disabled}`,'btn-danger')}</div>`;
+}
 function billingActions(p) {
   const icon = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
   const id = esc(p.id);
-  const message = `<button type="button" class="roster-icon roster-patient-message" aria-label="Request patient update" data-roster-tip="Request patient update" data-click="openPatientMessage('${id}')"><svg ${icon}><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3zM7 8h10M7 12h7"/></svg></button>`;
+  const message = `<button type="button" class="roster-icon roster-patient-message" aria-label="Copy patient update" aria-description="Right-click or press Shift+F10 to edit the message" data-roster-tip="Copy patient update · Right-click to edit" data-click="copyPatientMessage('${id}')"><svg ${icon}><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3zM7 8h10M7 12h7"/></svg></button>`;
   const billing = `<button type="button" class="roster-icon" aria-label="Open billing" data-roster-tip="Open billing" data-click="openBilling('${id}')"><svg ${icon}><circle cx="12" cy="12" r="9.5"/><path d="M12 5.5v13m3-10h-4.2a2.1 2.1 0 0 0 0 4.2h2.4a2.1 2.1 0 0 1 0 4.2H9"/></svg></button>`;
   const history = `<button type="button" class="roster-icon roster-billing-history" aria-label="Billing history" data-roster-tip="Billing history" data-click="openBillingHistory('${id}')">${billingHistoryIcon}</button>`;
   return `<span class="roster-billing-actions">${inHistoryView ? '' : message+billing}${history}</span>`;
 }
-function rosterRow(p,other=false,pinned=false,secondary=false){return `<tr data-roster-patient="${esc(p.id)}"><td>${pinned?'<small class="pinned-unit">'+esc(state.units.find(u=>u.id===p.unit)?.name||p.unit||'—')+'</small>':''}<span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm roster-name">${nameHTML(p)}</div></td>${familyContactsCell(p)}<td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td class="roster-issue">${issueActions(p)}</td><td class="roster-hospital">${rosterHospital(p)}</td><td>${other?`<select class="sel doctor-select" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" title="${esc(p.doctor||'Unassigned')}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select>`:`<span class="pcd">${esc(p.codes)||'—'}</span>`}</td><td class="roster-profile">${rosterDemographics(p)}</td><td class="roster-actions-cell">${billingActions(p)}<button class="btn btn-ghost btn-sm patient-actions-toggle" aria-label="Actions for ${esc(p.name)}" data-click="showPatientActions('${esc(p.id)}',this)">⋯</button><div popover ${secondary?'':`id="patient-actions-${esc(p.id)}"`} class="patient-actions-menu"><button class="btn btn-ghost flag-toggle" data-active-issue-action ${hospitalEditable()?'':'disabled'} data-click="openActiveIssue('${esc(p.id)}')">${activeIssueIcon}<span>Active issue…</span><span class="flag-check" aria-hidden="true">${TrimRoster.hasActiveIssue(p)?'✓':''}</span></button>${inHistoryView?'':`<button class="btn btn-ghost flag-toggle" data-roster-edit-action data-click="editFamilyContact(this)" ${hospitalEditable()?'':'disabled'}>${handset}<span>Family contacts…</span></button>`}<hr>${['pFlag','palliativeFlag'].map(flag=>`<button class="btn btn-ghost flag-toggle" role="menuitemcheckbox" aria-checked="${p[flag]===true}" data-patient-flag-action data-flag="${flag}" ${hospitalEditable()?'':'disabled'} data-click="togglePatientFlag('${esc(p.id)}','${flag}')">${flagIcon(flag)}<span>${flag==='pFlag'?'Psychiatric consult':'Palliative protocol'}</span><span class="flag-check" aria-hidden="true">${p[flag]?'✓':''}</span></button>`).join('')}<button class="btn btn-ghost" data-hospital-roster-action ${hospitalEditable()?'':'disabled'} data-click="editHospitalDates('${esc(p.id)}')">Edit hospital dates…</button><button class="btn btn-ghost upload-documents" data-click="uploadDocuments('${esc(p.id)}')">Documents</button><button class="btn btn-ghost needs-connect" data-roster-edit-action ${hospitalEditable()?'':'disabled'} data-click="startEdit('${esc(p.id)}'${secondary?',1':''})">${other?'Edit unit & room':'Edit'}</button><hr><button class="btn btn-danger needs-connect" data-click="promptDel('${esc(p.id)}')">Remove from roster</button></div></td></tr>`;}
+function rosterRow(p,other=false,pinned=false,secondary=false){return `<tr data-roster-patient="${esc(p.id)}"><td>${pinned?'<small class="pinned-unit">'+esc(state.units.find(u=>u.id===p.unit)?.name||p.unit||'—')+'</small>':''}<span class="prm">${esc(p.room)||'—'}</span></td><td><div class="pnm roster-name">${nameHTML(p)}</div></td>${familyContactsCell(p)}<td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td class="roster-issue">${issueActions(p)}</td><td class="roster-hospital">${rosterHospital(p)}</td><td>${other?`<select class="sel doctor-select" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" title="${esc(p.doctor||'Unassigned')}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select>`:`<span class="pcd">${esc(p.codes)||'—'}</span>`}</td><td class="roster-profile">${rosterDemographics(p)}</td><td class="roster-actions-cell">${billingActions(p)}<button class="btn btn-ghost btn-sm patient-actions-toggle" aria-label="Actions for ${esc(p.name)}" data-click="showPatientActions('${esc(p.id)}',this)">⋯</button>${patientActionsMenu(p,other,secondary)}</td></tr>`;}
 function rosterEditRow(p,other=false){
  if(other){const unknown=p.unit&&!state.units.some(u=>u.id===p.unit);return `<tr data-location-edit="${esc(p.id)}"><td colspan="9"><div class="roster-edit location-edit"><strong>${esc(p.name)}</strong><label>Unit<select class="sel" id="eu-${esc(p.id)}"><option value=""${!p.unit?' selected':''}>Unit not recorded</option>${unknown?'<option value="'+esc(p.unit)+'" selected>Unit not recorded · '+esc(p.unit)+'</option>':''}${state.units.map(u=>'<option value="'+esc(u.id)+'"'+(p.unit===u.id?' selected':'')+'>'+esc(u.name)+'</option>').join('')}</select></label><label>Room<input class="einp" id="er-${esc(p.id)}" value="${esc(p.room||'')}" placeholder="Not recorded"></label><div class="pact"><button class="btn btn-green btn-sm" data-click="saveEdit('${esc(p.id)}')">Save</button><button class="btn btn-ghost btn-sm" data-click="cancelEdit()">Cancel</button></div></div></td></tr>`;}
  return `<tr><td colspan="9"><div class="roster-edit">

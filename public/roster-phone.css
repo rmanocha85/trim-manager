@@ -72,3 +72,17 @@
 #individual-nurse-dialog::backdrop{background:#183c2744}
 #individual-nurse-dialog textarea{box-sizing:border-box;width:100%;display:block;resize:vertical;font:14px/1.55 system-ui,sans-serif;padding:12px;color:#24392c;background:#fff;border:1px solid #bdcbbd;border-radius:8px;margin-top:8px}
 @media(pointer:coarse){.roster-table .col-actions{width:190px}.roster-table .hospital-symbol.roster-return{width:44px;height:44px}}
+
+/* Patient action rail: visible symbols, accessible names and hover labels. */
+.patient-actions-menu{box-sizing:border-box;width:62px;min-width:62px;padding:7px;border-radius:12px}
+.patient-actions-menu .menu-symbol{position:relative;display:flex;align-items:center;justify-content:center;min-width:44px;width:44px;min-height:40px;height:40px;padding:8px;margin:0 0 2px;gap:0;cursor:pointer}
+.patient-actions-menu .menu-symbol svg{width:22px;height:22px}
+.patient-actions-menu .menu-symbol .flag-check{position:absolute;right:1px;top:1px;margin:0;font-size:11px;line-height:1;color:#315e43}
+.patient-actions-menu .menu-active-issue{color:#b82727}
+.patient-actions-menu .menu-palliative{color:#8145ae}
+.patient-actions-menu .menu-psych{color:#32678f;font-size:28px}
+.patient-actions-menu [aria-pressed=true]{background:#edf3ed}
+.patient-actions-menu hr{width:28px;margin:5px auto}
+.patient-message-feedback{position:fixed;right:20px;bottom:24px;z-index:1000;max-width:calc(100vw - 40px);padding:10px 16px;border-radius:8px;background:#243c30;color:#fff;box-shadow:0 4px 12px #17342628;pointer-events:none;opacity:0;font:14px/1.4 system-ui,sans-serif}
+.patient-message-feedback.visible{opacity:1}
+@media(pointer:coarse){.patient-actions-menu .menu-symbol{height:44px;min-height:44px}}

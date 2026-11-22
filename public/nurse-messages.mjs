@@ -16,7 +16,7 @@ export function individualNurseText(patient,units=[]){
   const issue=hasActiveIssue(patient)?patient.activeIssue.description.trim():'';
   const name=String(patient.name||'').trim().replace(/\s*,\s*/,', ');
   const unit=unitName(units.find(u=>u.id===patient.unit)?.name||patient.unit);
-  return `Re: ${name}${unit?' on '+unit+' unit':''}\n\n${issue?issue+' - ':''}could you let me know how he is doing today?\n\nThanks!\nDr Rahul Manocha`;
+  return `Re: ${name}${unit?' on '+unit+' unit':''}\n\n${issue?issue+' - ':''}Could you please let me know how the patient is doing?\n\nThanks!\nDr Rahul Manocha`;
 }
 export function nurseMessages(roster,scope='all'){
   const units=new Map((roster.units||[]).map(u=>[u.id,unitName(u.name)]));

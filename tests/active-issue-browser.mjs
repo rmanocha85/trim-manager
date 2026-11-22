@@ -12,7 +12,7 @@ if(process.env.TRIM_ASSET_BASE)await page.route('**/*',async route=>{const u=new
 const r=s=>page.locator('#patients-workspace').locator(s),row=id=>r('[data-roster-patient="'+id+'"]').first(),tab=n=>r(`[data-click="showTab('${n}',this)"]`).click(),dialog=()=>r('#active-issue-dialog'),disk=async()=>JSON.parse(await readFile(rosterPath,'utf8'));
 const save=async()=>{await page.locator('#sync:not([disabled])').click();await page.locator('#local-changes').filter({hasText:'Saved to folder'}).waitFor();};
 const settle=async()=>{await r('#ss').filter({hasText:/Saved locally|Saved in Drive/}).waitFor({state:'attached'});};
-const open=async id=>{await settle();await row(id).locator('.patient-actions-toggle').click();await row(id).locator('[data-active-issue-action]').filter({hasText:'Active issue…'}).click();await dialog().waitFor();};
+const open=async id=>{await settle();await row(id).locator('.patient-actions-toggle').click();await row(id).locator('.patient-actions-menu').getByRole('button',{name:'Active issue',exact:true}).click();await dialog().waitFor();};
 const stage=async()=>{await dialog().locator('[type=submit]').click();await dialog().waitFor({state:'hidden'});await settle();};
 const reload=async()=>{await page.reload();await page.locator('.patient').first().waitFor();if(!await dialog().isVisible())await page.locator('[data-section=patients]').click();};
 try{
@@ -26,7 +26,7 @@ try{
  await tab('all-patients');assert.equal(await r('[data-roster-patient]').count(),6);assert.equal(await r('.active-issue-priority [data-roster-patient]').count(),2);assert.equal(await r('.usec').nth(1).getAttribute('aria-label'),'Medication reconciliation outstanding');assert.equal(await r('.usec').nth(2).getAttribute('aria-label'),'Palliative patients');
  const secondary=r('.palliative-section [data-roster-patient="mine"]');
  await secondary.locator('.patient-actions-toggle').click();
- await secondary.locator('.patient-actions-menu').getByRole('button',{name:'Edit',exact:true}).click();
+ await secondary.locator('.patient-actions-menu').getByRole('button',{name:'Edit patient',exact:true}).click();
  assert.equal(await r('#en-mine').count(),1);assert.equal(await r('.palliative-section #en-mine').count(),1);
  await r('.palliative-section').getByRole('button',{name:'Cancel',exact:true}).click();await settle();
  await r('#roster-search').fill('swelling');assert.equal(await r('[data-roster-patient]').count(),1);assert.equal(await r('[data-roster-patient]').getAttribute('data-roster-patient'),'other');await r('#roster-search').fill('');
