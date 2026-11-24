@@ -85,4 +85,12 @@
 .patient-actions-menu hr{width:28px;margin:5px auto}
 .patient-message-feedback{position:fixed;right:20px;bottom:24px;z-index:1000;max-width:calc(100vw - 40px);padding:10px 16px;border-radius:8px;background:#243c30;color:#fff;box-shadow:0 4px 12px #17342628;pointer-events:none;opacity:0;font:14px/1.4 system-ui,sans-serif}
 .patient-message-feedback.visible{opacity:1}
+.issue-descriptions-toggle{display:inline-flex;align-items:center;justify-content:center;width:36px;height:32px;padding:6px;border:1px solid #b5bda8;border-radius:6px;background:#fffdf6;color:#2e5b40;cursor:pointer}
+.issue-descriptions-toggle svg{width:19px;height:19px;pointer-events:none}
+.issue-descriptions-toggle[aria-expanded=true]{background:#2e5b40;color:#fff;border-color:#2e5b40}
+.issue-descriptions-toggle:hover{box-shadow:0 0 0 2px #2e5b4020}
+.active-issue-description-row[hidden]{display:none}
+.roster-table .active-issue-description-row td{padding:0;background:#fffaf0;white-space:normal}
+.active-issue-description{box-sizing:border-box;max-width:min(100%,calc(100vw - 64px));padding:12px 16px 14px;border-top:1px solid #eee6d3;color:#455244;font:14px/1.5 system-ui,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+@media(pointer:coarse){.issue-descriptions-toggle{width:44px;height:44px}}
 @media(pointer:coarse){.patient-actions-menu .menu-symbol{height:44px;min-height:44px}}

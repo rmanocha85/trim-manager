@@ -24,6 +24,27 @@ try{
  await tab('other-patients');await open('other');await dialog().locator('textarea').fill('Recheck swelling next visit.');await stage();assert.equal(await r('.usec').first().getAttribute('aria-label'),'Active issues');assert.equal(await r('[data-roster-patient]').first().getAttribute('data-roster-patient'),'other');await save();
  await row('other').locator('.active-issue-badge').click();await dialog().locator('textarea').fill('Swelling improving; reassess in two days.');await stage();await save();await reload();await tab('other-patients');assert.equal(await row('other').locator('.active-issue-badge').getAttribute('data-roster-tip'),'Swelling improving; reassess in two days.');
  await tab('all-patients');assert.equal(await r('[data-roster-patient]').count(),6);assert.equal(await r('.active-issue-priority [data-roster-patient]').count(),2);assert.equal(await r('.usec').nth(1).getAttribute('aria-label'),'Medication reconciliation outstanding');assert.equal(await r('.usec').nth(2).getAttribute('aria-label'),'Palliative patients');
+ const descriptions=r('.active-issue-description-row'),toggle=r('.issue-descriptions-toggle');
+ const beforeToggle=await readFile(rosterPath,'utf8'),beforeBilling=await readFile(billingPath,'utf8');
+ assert.equal(await descriptions.count(),2);assert.equal(await descriptions.locator('visible=true').count(),0);
+ assert.equal(await toggle.getAttribute('aria-expanded'),'false');assert.equal((await toggle.textContent()).trim(),'');
+ await toggle.hover();assert.equal(await r('.roster-tip:popover-open').innerText(),'Show all active-issue descriptions');
+ await toggle.click();assert.equal(await r('.active-issue-description-row:visible').count(),2);
+ assert.equal(await descriptions.first().locator('.active-issue-description').innerText(),description);assert.equal(await descriptions.locator('b').count(),0);
+ assert.equal(await r('.palliative-section .active-issue-description-row').count(),0);
+ assert.equal(await toggle.getAttribute('aria-expanded'),'true');
+ await r('#roster-search').fill('swelling');assert.equal(await r('.active-issue-description-row:visible').count(),1);
+ await r('#roster-search').fill('');assert.equal(await r('.active-issue-description-row:visible').count(),2);
+ await tab('other-patients');assert.equal(await r('.active-issue-description-row:visible').count(),1);
+ await tab('all-patients');assert.equal(await r('.active-issue-description-row:visible').count(),2);
+ await toggle.focus();await toggle.press('Enter');assert.equal(await r('.active-issue-description-row:visible').count(),0);
+ assert.equal(await r('#ub-active-issues').isVisible(),true);
+ await r('.active-issue-priority .unm').click();assert.equal(await r('#ub-active-issues').isVisible(),false);
+ await toggle.click();assert.equal(await r('.active-issue-description-row:visible').count(),2);
+ for(const width of [1440,390]){await page.setViewportSize({width,height:1000});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);assert.equal(await descriptions.first().locator('.active-issue-description').evaluate(e=>e.scrollWidth>e.clientWidth),false);await page.screenshot({path:'work/active-descriptions-'+width+'.png',fullPage:true});}
+ await page.setViewportSize({width:1440,height:1000});
+ assert.equal(await readFile(rosterPath,'utf8'),beforeToggle);assert.equal(await readFile(billingPath,'utf8'),beforeBilling);
+ await reload();assert.equal(await toggle.getAttribute('aria-expanded'),'false');assert.equal(await r('.active-issue-description-row:visible').count(),0);
  const secondary=r('.palliative-section [data-roster-patient="mine"]');
  await secondary.locator('.patient-actions-toggle').click();
  await secondary.locator('.patient-actions-menu').getByRole('button',{name:'Edit patient',exact:true}).click();
