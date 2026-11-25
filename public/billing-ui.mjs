@@ -699,12 +699,12 @@ async function openLaptopWorkspace(){
       if(!hostedBilling() || !new HostedBillingAccess().saved)return;
       const file=localStorage.getItem(hostedFileKey);
       if(!file)return;
-      const message=$('gate').querySelector('.gate-card p');
-      message.textContent='Reconnecting to Google Drive…';
-      $('connect').disabled=true;
+      const message=$('gate-error');
+      message.hidden=true;message.textContent='';
+      $('connect').disabled=true;$('connect').setAttribute('aria-busy','true');
       try{
-        if(!await connect('cloud',false,false,file))message.textContent=$('connection-error').textContent;
-      }finally{$('connect').disabled=false;}
+        if(!await connect('cloud',false,false,file)){message.textContent=$('connection-error').textContent;message.hidden=false;}
+      }finally{$('connect').disabled=false;$('connect').removeAttribute('aria-busy');}
     },
     render:renderAll,
     state:()=>({adapter,ledger,roster,date:date(),people:ledger?people():[]}),
