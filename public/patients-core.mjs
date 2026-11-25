@@ -43,6 +43,45 @@ export function sameRosterContent(a,b){
   const stable=value=>value&&typeof value==='object'?(Array.isArray(value)?value.map(stable):Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])]))):value;
   return JSON.stringify(stable(normalize(a)))===JSON.stringify(stable(normalize(b)));
 }
+
+// Compare the local roster with its saved baseline without fetching or writing records.
+export function pendingRosterChanges(before,after){
+  if(!before||!after)return [];
+  const stable=value=>value&&typeof value==='object'?(Array.isArray(value)?value.map(stable):Object.fromEntries(Object.keys(value).filter(key=>!['updatedAt','createdAt'].includes(key)).sort().map(key=>[key,stable(value[key])]))):value;
+  const equal=(a,b)=>JSON.stringify(stable(a))===JSON.stringify(stable(b));
+  const ignored=new Set(['id','updatedAt','createdAt','revision','schema','version','app']);
+  const labels={name:'Name',phn:'PHN',ava:'Ava chart ID',unit:'Unit',room:'Room',codes:'ICD codes',doctor:'Doctor',dateOfBirth:'Date of birth',dob:'Date of birth',mostStatus:'MOST',pFlag:'Psychiatric consult',palliativeFlag:'Palliative protocol',activeIssue:'Active issue',hospitalStays:'Hospital dates',familyContacts:'Family contacts',medReconciliationDate:'Medication reconciliation',pmhxUploadedDate:'PMHx uploaded',newPanelPatient:'New patient',panelAddedDate:'Panel added date',removedDate:'Removal date',billingDates:'Billing dates',floor:'Floor',status:'Status',description:'Description',history:'History',admittedDate:'Admitted',returnedDate:'Returned'};
+  const label=key=>labels[key]||key.replace(/([a-z])([A-Z])/g,'$1 $2').replace(/^./,s=>s.toUpperCase());
+  function display(value,key,roster){
+    if(value===undefined||value===null||value==='')return 'Not recorded';
+    if(typeof value==='boolean')return value?'Yes':'No';
+    if(key==='activeIssue')return `${value.status==='resolved'?'Resolved':'Active'} — ${value.description||'No description'}${value.history?.length?'\n'+value.history.length+' previous issue(s)':''}`;
+    if(key==='unit')return roster.units?.find(unit=>unit.id===value)?.name||String(value);
+    if(Array.isArray(value))return value.length?value.map(item=>display(item,'',roster)).join('\n'):'None';
+    if(typeof value==='object')return Object.entries(value).filter(([key])=>!ignored.has(key)).map(([key,item])=>`${label(key)}: ${display(item,key,roster)}`).join('\n')||'None';
+    return String(value);
+  }
+  function fields(a={},b={}){
+    return [...new Set([...Object.keys(a),...Object.keys(b)])].filter(key=>!ignored.has(key)&&!equal(a[key],b[key])).map(key=>({label:label(key),before:display(a[key],key,before),after:display(b[key],key,after)}));
+  }
+  const collections={patients:'My Patients',otherPatients:'Other Patients',removedPatients:'Removed patients'};
+  const index=roster=>new Map(Object.keys(collections).flatMap(collection=>(roster[collection]||[]).map(patient=>[String(patient.id),{patient,collection}])));
+  const old=index(before),current=index(after),changes=[];
+  for(const id of new Set([...old.keys(),...current.keys()])){
+    const a=old.get(id),b=current.get(id),changed=fields(a?.patient,b?.patient);
+    if(a?.collection!==b?.collection)changed.unshift({label:'Roster',before:a?collections[a.collection]:'Not on roster',after:b?collections[b.collection]:'Not on roster'});
+    if(changed.length)changes.push({name:b?.patient.name||a.patient.name,kind:!a?'Patient added':!b?'Patient removed':a.collection!==b.collection?'Patient moved':'Patient updated',fields:changed});
+  }
+  const oldUnits=new Map((before.units||[]).map(unit=>[String(unit.id),unit])),newUnits=new Map((after.units||[]).map(unit=>[String(unit.id),unit]));
+  for(const id of new Set([...oldUnits.keys(),...newUnits.keys()])){
+    const a=oldUnits.get(id),b=newUnits.get(id),changed=fields(a,b);
+    if(changed.length)changes.push({name:b?.name||a.name,kind:!a?'Unit added':!b?'Unit removed':'Unit updated',fields:changed});
+  }
+  const settings=roster=>Object.fromEntries(Object.entries(roster).filter(([key])=>!Object.hasOwn(collections,key)&&key!=='units'));
+  const changed=fields(settings(before),settings(after));
+  if(changed.length)changes.push({name:'Roster settings',kind:'Settings updated',fields:changed});
+  return changes;
+}
 export function expire(raw,asOf=today()){
     dateParts(asOf);
     const roster=normalize(raw);

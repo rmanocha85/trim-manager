@@ -1,5 +1,5 @@
-import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from './roster-hospital.mjs?v=20261124-name-issues1';
-import {nurseMessageDialog,individualNurseDialog} from './nurse-messages-ui.mjs?v=20261124-name-issues1';
+import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from './roster-hospital.mjs?v=20261125-pending-review1';
+import {nurseMessageDialog,individualNurseDialog} from './nurse-messages-ui.mjs?v=20261125-pending-review1';
 import {billingHistoryIcon} from './billing-icons.mjs?v=20261117-cards4';
 import {bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
 import {familyContactsCell,familyContactDialog} from './roster-contacts.mjs?v=20261116-phone1';
@@ -11,7 +11,7 @@ import {returnFromHospitalToday,canUndoHospitalReturn,undoHospitalReturn} from '
 import {hospitalEditor} from './hospital-entry.mjs?v=20261105-return1';
 import {formatDate,formatTimestamp} from './dates.mjs?v=20261119-export1';
 import {hospitalFlag,hospitalSummary} from './hospital-ui.mjs?v=20261024-hospital2';
-import * as TrimRoster from './patients-core.mjs?v=20261117-profile1';
+import * as TrimRoster from './patients-core.mjs?v=20261125-pending-review1';
 import {rosterPrintPages} from './roster-print.mjs';
 import {visitList} from './visit-list.mjs?v=20261113-combined1';
 import {RosterRepository} from './roster-repository.mjs';
@@ -48,11 +48,11 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 
 
   const root=host.attachShadow({mode:'open'});
-  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261124-name-issues1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
+  const [html,css]=await Promise.all(['patients.html','patients.css'].map(async file=>{const r=await fetch('./'+file+'?v=20261125-pending-review1');if(!r.ok)throw new Error('Could not load TRIM Patients.');return r.text();}));
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   const identityCSS=await fetch('./patient-identity.css?v=20261115-roster1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
-  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261124-name-issues1',import.meta.url);root.append(phoneStyles);
+  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261125-pending-review1',import.meta.url);root.append(phoneStyles);
   const hideRosterTip=bindRosterTips(root);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
@@ -221,7 +221,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     if(before&&!before.returnedDate&&fields.returnedDate){const after=hospitalPatient(p.id).hospitalStays.find(s=>s.id===fields.id);hospitalReturns[p.id]={key,patientId:p.id,before:structuredClone(before),after:structuredClone(after)};}
     await stageRoster();render();updateStatus();
   }
-  const api={activate:()=>{if(issueDraft)renderIssueEditor();else if(!hasForm())showTab('all-patients');},render,setHospitalStay,connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
+  const api={pendingChanges:()=>dirty&&loadedRosterJSON?TrimRoster.pendingRosterChanges(JSON.parse(loadedRosterJSON),liveRoster()):[],activate:()=>{if(issueDraft)renderIssueEditor();else if(!hasForm())showTab('all-patients');},render,setHospitalStay,connect,save,refresh,reload:gConnect,state:()=>({dirty,busy:saving||refreshing||pendingSaves>0,error:localError||writeBlocked,ready,mode:repository?.mode,draft:hasForm()}),hasChanges:()=>dirty||hasForm()||pendingSaves>0,beforeLock:async()=>{await serial;},roster:()=>liveRoster()};
   const rosterHospitalEditor=hospitalEditor({patients:api,guard:guardHospitalEdit,notify:text=>setSS(text,true),host:root,dialogId:'roster-hospital-dialog'});
   function hospitalEditable(){return ready&&!inHistoryView&&!writeBlocked&&!saving&&!refreshing&&!pendingSaves&&!localError&&!hasForm();}
   function guardHospitalEdit(){if(!hospitalEditable())throw new Error('Finish or resolve the current Patient edit before changing hospital dates.');}

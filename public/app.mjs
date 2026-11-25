@@ -1,7 +1,7 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261119-most-connection1';
 import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261119-most-connection1';
-import {billingUI} from './billing-ui.mjs?v=20261124-name-issues1';
-import {patientsUI} from './patients-ui.mjs?v=20261124-name-issues1';
+import {billingUI} from './billing-ui.mjs?v=20261125-pending-review1';
+import {patientsUI} from './patients-ui.mjs?v=20261125-pending-review1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261117-purple1';
@@ -121,6 +121,9 @@ function status(){
   $('local-changes').textContent=indicator.label;
   $('local-changes').dataset.state=indicator.state;
   $('local-changes').title=indicator.detail;
+  $('local-changes').disabled=!states.some(s=>s.ready)&&!pending.length&&!unfinished;
+  $('local-changes').setAttribute('aria-label',indicator.label.replace(/^[^\p{L}]+/u,'')+' — review changes');
+  if(pending.length||unfinished)$('local-changes').title='Review pending changes before saving';
   $('sync').textContent=session.saving?'Saving…':session.lastError?'Retry save':'Save to Drive';
   $('sync').disabled=busy||!pending.length;
   $('sync').hidden=!pending.length&&!session.saving&&!session.lastError;
@@ -132,7 +135,8 @@ function status(){
   if($('changes-dialog').open){const tools=document.querySelector('.patient-review-tools');if(tools)tools.hidden=!patients.state().dirty&&!patients.state().error;
     let overview=$('session-changes');
     if(!overview){overview=document.createElement('p');overview.id='session-changes';$('changes-title').after(overview);}
-    overview.hidden=true;overview.textContent=states.map(s=>`${s.name}: ${s.error?'needs attention':s.dirty?'local changes pending':s.ready?'saved':'not connected'}`).join(' · ');
+    overview.hidden=false;overview.textContent=states.filter(s=>s.dirty||s.error).map(s=>`${s.name}: ${s.error?'needs attention':'changes pending'}`).join(' · ')||(unfinished?'Patient form in progress.':'No changes waiting to save.');
+    renderPendingRoster();
   }
   $('changes-discard').textContent='Discard local billing changes';
   $('session-status').textContent=session.message||indicator.detail;
@@ -142,6 +146,31 @@ function status(){
   document.querySelector('.app-utility').inert=session.saving;
   $('lock').disabled=busy;
   if($('load-latest'))$('load-latest').disabled=busy||!billing.state().adapter||!navigator.onLine;
+}
+function renderPendingRoster(){
+  const container=$('roster-pending-changes');if(!container)return;
+  container.replaceChildren();
+  const changes=patients.pendingChanges(),state=patients.state();
+  container.hidden=!changes.length&&!state.dirty&&!state.draft;
+  const add=(parent,tag,text,className)=>{const node=document.createElement(tag);node.textContent=text;if(className)node.className=className;parent.append(node);return node;};
+  if(!container.hidden){
+    add(container,'h3','Roster changes');
+    for(const change of changes){
+      const article=add(container,'article','','change-row roster-change');
+      add(article,'strong',change.name);add(article,'p',change.kind,'hint');
+      for(const field of change.fields){
+        const detail=add(article,'div','','pending-field');add(detail,'h4',field.label);
+        const values=add(detail,'div','','pending-values');
+        const before=add(values,'div','','pending-before');add(before,'small','Saved');add(before,'p',field.before);
+        const after=add(values,'div','','pending-after');add(after,'small','Pending');add(after,'p',field.after);
+      }
+    }
+    if(state.dirty&&!changes.length)add(container,'p','A recovered roster is pending save; no field differences are available against its saved baseline.');
+    if(state.draft)add(container,'p','A patient form is unfinished. Finish or cancel the form in Roster before saving.');
+  }
+  const notesNotice=$('pending-notes-notice');
+  notesNotice.hidden=!notes?.status?.().dirty;
+  notesNotice.textContent=notesNotice.hidden?'':'Notes has unsaved work. Open Notes to review the patient summaries and visit drafts before saving.';
 }
 async function saveSession(){try{await billing.state().adapter?.ensureConnected?.();await session.save();billing.notify('');if(!session.state().some(s=>s.dirty||s.error||s.busy)&&!patients.state().draft&&$('changes-dialog').open)$('changes-dialog').close();}catch(e){if(patients.state().error)showSection('patients');session.lastError=e.message;if(!session.message)session.message=e.message;billing.notify('');}finally{status();}}
 async function linkClinicFile(fileId,refresh){
@@ -185,6 +214,10 @@ async function start(){
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
   ],status);
+  const rosterChanges=document.createElement('section');rosterChanges.id='roster-pending-changes';rosterChanges.setAttribute('aria-label','Pending roster changes');$('changes-summary').before(rosterChanges);
+  const notesNotice=document.createElement('p');notesNotice.id='pending-notes-notice';notesNotice.hidden=true;rosterChanges.after(notesNotice);
+  const openChanges=$('local-changes').onclick;
+  $('local-changes').onclick=()=>{openChanges();status();};
   const latest=document.createElement('button');latest.id='load-latest';latest.textContent='Refresh from Drive';$('drive-connection').after(latest);
   latest.onclick=async()=>{try{$('workspace-menu').hidePopover();session.message='';await billing.loadLatest();await refreshClinics();await intake.refreshQueue();await intake.profiles();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
   const patientReview=document.createElement('div');patientReview.className='actions patient-review-tools';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
