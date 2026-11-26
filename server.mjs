@@ -32,6 +32,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const maidStore=new MaidStore(maidPath);
   oatPath ||= live?path.join(home,'My Drive','01. Active List','05. OAT','OAT AI','oat-fh-roster.json'):path.join(path.dirname(rosterPath),'oat-fh-roster.json');
   purplePath ||= live?path.join(home,'My Drive','01. Active List','07. Purple Medical OAT','oat-purple-roster.json'):path.join(path.dirname(rosterPath),'oat-purple-roster.json');
+  const pleasantviewPath = live ? path.join(home,'My Drive','01. Active List','06. Pleasantview','pleasantview-patients-data.json') : path.join(path.dirname(rosterPath),'pleasantview-patients-data.json');
   const ilRosterPath = live ? path.join(home,'My Drive','01. Active List','01 Assisted living','il-rosters.json') : path.join(path.dirname(rosterPath),'il-rosters.json');
   const oatStores=new Map([['/api/oat-fh/roster',new OatStore(oatPath)],['/api/oat-purple/roster',new OatStore(purplePath,'oat-purple')]]);
 
@@ -52,6 +53,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('clinic-roster.mjs');
   allowed.add('il-roster.mjs');
   allowed.add('il-data.mjs');
+  allowed.add('il-roster.css');
   allowed.add('maid-lifecycle.mjs');
   allowed.add('maid-assessment.mjs');
   allowed.add('maid-provision.mjs');
@@ -97,13 +99,14 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         }
         if(!req.headers.cookie?.split(';').some(c=>c.trim()===`trim_session=${session}`)||req.headers['x-trim-session']!==session)return json(401,{error:'Connect this laptop first.'});
         if(!['GET','HEAD'].includes(req.method)&&!origins.includes(req.headers.origin))return json(403,{error:'Origin required.'});
-        if(url.pathname==='/api/il/rosters' && req.method==='GET') {
-          return json(200,await readFacilityFile(ilRosterPath));
+        if(['/api/il/rosters','/api/pleasantview/roster'].includes(url.pathname) && req.method==='GET') {
+          return json(200,await readFacilityFile(url.pathname==='/api/pleasantview/roster'?pleasantviewPath:ilRosterPath));
         }
         const readJSON=async()=>{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>20000000)throw Object.assign(new Error('Clinical request is too large.'),{status:413});}return JSON.parse(raw||'{}');};
-        if(url.pathname==='/api/il/rosters' && req.method==='POST') {
-          const {site,patient}=await readJSON();
-          return json(200,await addToFacilityFile(ilRosterPath,req.headers['if-match'],site,patient));
+        if(['/api/il/rosters','/api/pleasantview/roster'].includes(url.pathname) && req.method==='POST') {
+          const {site,...action}=await readJSON();
+          if((site==='pleasantview') !== (url.pathname==='/api/pleasantview/roster'))return json(400,{error:'Roster destination does not match the site.'});
+          return json(200,await addToFacilityFile(site==='pleasantview'?pleasantviewPath:ilRosterPath,req.headers['if-match'],site,action.type?action:{type:'add',patient:action.patient}));
         }
         if(url.pathname==='/api/service/heartbeat'&&req.method==='POST'){const value=await readJSON();lifecycle.heartbeat(value.id,value.release===true);return json(200,lifecycle.status());}
         if(url.pathname==='/api/service/stop'&&req.method==='POST'){

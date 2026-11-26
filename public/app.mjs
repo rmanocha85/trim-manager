@@ -1,16 +1,16 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261119-most-connection1';
 import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261119-most-connection1';
-import {billingUI} from './billing-ui.mjs?v=20261125-pending-review1';
+import {billingUI} from './billing-ui.mjs?v=20261126-il2';
 import {patientsUI} from './patients-ui.mjs?v=20261125-pending-review1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
-import {facilityNames, facilityRoster} from './il-roster.mjs';
+import {facilityNames, facilityRoster} from './il-roster.mjs?v=20261126-il2';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261117-purple1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
-import {OatRepository,oatClinics} from './oat-roster-repository.mjs?v=20261117-purple1';
-import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261111-launcher1';
+import {OatRepository,oatClinics} from './oat-roster-repository.mjs?v=20261126-il2';
+import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261126-il2';
 
-if(laptopRuntime()){document.title='TRIM Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261111-n1';}
+if(laptopRuntime()){document.title='Work OS Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261126-work-os';}
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
 const oatViews=new Map();
@@ -187,7 +187,7 @@ async function linkClinicFile(fileId,refresh){
   await refresh();
 }
 async function start(){
-  facilityView = facilityRoster($('il-workspace'), () => intake?.recordsConnection?.() || billing?.state().adapter, linkClinicFile);
+  facilityView = facilityRoster($('il-workspace'), () => billing?.state().adapter?.hostedAccess ? billing.state().adapter : intake?.recordsConnection?.() || billing?.state().adapter, linkClinicFile);
   maidRoster=clinicRosterUI({host:$('maid-workspace'),kind:'maid',onChange:status,onReload:refreshMaid,onLink:()=>linkClinicFile(maidRepository.fileId,refreshMaid),onAction:async action=>{
     if(!maidSnapshot||!maidRepository)throw new Error('Reload MAID before editing.');
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
@@ -216,6 +216,7 @@ async function start(){
   session=new Session([
     {name:'Roster',state:patients.state,save:patients.save},
     {name:'MAID',state:maidRoster.state,save:async()=>{}},
+    {name:'Facility rosters',state:facilityView.state,save:async()=>{}},
     ...Array.from(oatViews,([id,view])=>({name:oatClinics[id].title,state:()=>({busy:view.state().busy}),save:async()=>{}})),
     ...(laptop?[{name:'Notes',state:notes.status,save:notes.save}]:[]),
     {name:'Billing',state:billing.status,save:billing.save}
@@ -239,8 +240,7 @@ async function start(){
   document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{
     session.message='';
     if(!laptop&&b.dataset.section==='notes'){
-      if(notesLaunchBlocked()){switcher.click();return;}
-      billing.switchTab(lastTab.notes);$('open-laptop-notes').click();status();return;
+      billing.switchTab(lastTab.notes);status();return;
     }
     if(['patients','maid',...oatViews.keys(),...facilityNames.keys()].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
     if(b.dataset.section==='maid'&&!maidSnapshot)void refreshMaid();

@@ -6,7 +6,7 @@ const FOLDER='1d90SEhco30YL0AAE20gt11pzFBjOOJUn';
 // The shared roster's existing Drive ID. Google still enforces account and file access.
 export const OAT_FILE_ID='1dyQnrCSdywVJ8GRktgBLyDj_0m5rN9VR';
 export const oatClinics={
-  'oat-fh':{title:'OAT FH',folder:FOLDER,fileId:OAT_FILE_ID},
+  'oat-fh':{title:'OAT Fraser Health',folder:FOLDER,fileId:OAT_FILE_ID},
   'oat-purple':{title:'OAT Purple',folder:'1JNXOy5TNjSQPQ-AlJkBq3j7yklXXbBj0',fileId:'1EFNxUHzhOXP3U2TLiuHpXx4SDBvYReyr'}
 };
 export function validateOatRoster(data,clinic='oat-fh'){

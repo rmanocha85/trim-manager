@@ -9,10 +9,12 @@ import {facilityNames} from '../public/il-data.mjs';
 
 const temp = await mkdtemp(path.join(os.tmpdir(),'trim-il-'));
 const file = name => path.join(temp,name);
-const sites = Object.fromEntries([...facilityNames.keys()].map((site,i) => [site,{patients:[
+const sites = Object.fromEntries([...facilityNames.keys()].filter(site=>site!=='pleasantview').map((site,i) => [site,{patients:[
   {name:'Test '+site,ava:'12345'+i,phn:i===1?null:'000000000'+i,dob:'1950-01-01'}
 ]}]));
+const pv={schemaVersion:1,facility:'Pleasantview',emrSystem:'Ava',groups:{pleasantview_rc:{patients:[{name:'Test RC',emrNumber:'223456',phn:'0000000011'}]},pleasantview_al:{patients:[{name:'Test AL',emrNumber:'223457',phn:'0000000012'}]}}};
 await Promise.all([
+  writeFile(file('pleasantview-patients-data.json'),JSON.stringify(pv)),
   writeFile(file('il-rosters.json'),JSON.stringify({schemaVersion:1,sites})),
   writeFile(file('roster.json'),JSON.stringify({patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]})),
   writeFile(file('billing.json'),JSON.stringify(blankLedger('synthetic')))
@@ -32,7 +34,7 @@ try {
   await page.goto(origin+'/?section=the-cedars');
   const view = page.locator('#il-workspace');
   await view.getByRole('link',{name:/Open Ava chart for Test the-cedars/}).waitFor();
-  for (const [id,title] of facilityNames) {
+  for (const [id,title] of [...facilityNames].filter(([id])=>id!=='pleasantview')) {
     await page.getByRole('button',{name:title,exact:true}).click();
     const row = view.locator('tbody tr').filter({hasText:'Test '+id});
     const patient = sites[id].patients[0];
@@ -43,10 +45,13 @@ try {
       await copies.click();
       assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patient.phn);
     }
-    await row.getByRole('button',{name:/Copy Ava number/}).click();
-    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patient.ava);
+    await row.getByRole('button',{name:/Copy name/}).click();
+    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patient.name);
+    const a=await row.getByRole('link').boundingBox(),b=await row.getByRole('button',{name:/Copy name/}).boundingBox(),c=await row.locator('td').nth(2).boundingBox();
+    assert.ok(Math.abs(a.y+a.height/2-b.y-b.height/2)<3,'Copy aligned with name');
+    assert.ok(c.x-a.x<340,'PHN next to name');
   }
-  const open = () => view.getByRole('button',{name:'Add patient',exact:true}).click();
+  const open = () => view.getByRole('button',{name:'+ Add patient',exact:true}).click();
   const dialog = page.getByRole('dialog');
   await open();
   await dialog.getByLabel('Patient name').fill('Synthetic Addition');
@@ -73,6 +78,41 @@ try {
     await page.setViewportSize({width,height:900});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Viewport overflow at '+width);
   }
+  await view.getByRole('button',{name:'Actions for Synthetic Addition'}).click();
+  await page.getByRole('button',{name:'Remove from roster',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Remove from roster'}).click();
+  await view.locator('.facility-status').filter({hasText:'Patient removed'}).waitFor();
+  await page.reload();
+  await view.getByRole('link',{name:/Test the-cedars/}).waitFor();
+  assert.equal(await view.getByRole('link',{name:/Synthetic Addition/}).count(),0);
+  await page.getByRole('button',{name:'Pleasantview',exact:true}).click();
+  await view.getByRole('link',{name:/Test RC/}).waitFor();
+  assert.deepEqual(await view.locator('tbody a').allTextContents(),['Test RC','Test AL']);
+  assert.deepEqual(await view.locator('.facility-group h2').allTextContents(),['Residential Care (RC) · 1','Assisted Living (AL) · 1']);
+  await open();
+  await dialog.getByLabel('Care group').selectOption('pleasantview_al');
+  await dialog.getByLabel('Patient name').fill('Added AL');
+  await dialog.getByLabel('Ava chart number').fill('334455');
+  await dialog.getByRole('button',{name:'Add patient',exact:true}).click();
+  await view.getByRole('link',{name:/Added AL/}).waitFor();
+  const savedPV=JSON.parse(await readFile(file('pleasantview-patients-data.json'),'utf8'));
+  assert.deepEqual(savedPV.groups.pleasantview_rc,pv.groups.pleasantview_rc);
+  assert.equal(savedPV.groups.pleasantview_al.patients.at(-1).emrNumber,'334455');
+  await view.getByRole('button',{name:'Actions for Added AL'}).click();
+  await page.getByRole('button',{name:'Remove from roster',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Remove from roster'}).click();
+  await view.locator('.facility-status').filter({hasText:'Patient removed'}).waitFor();
+  assert.equal(await view.getByRole('link',{name:/Added AL/}).count(),0);
+  const beforeFailure=await view.locator('tbody tr').count();
+  await page.route('**/api/pleasantview/roster',r=>r.fulfill({status:503,contentType:'application/json',body:'{"error":"Temporary failure"}'}));
+  await view.getByRole('button',{name:'Reload roster'}).click();
+  await view.locator('.facility-status').filter({hasText:'Showing the last loaded list'}).waitFor();
+  assert.equal(await view.locator('tbody tr').count(),beforeFailure);
+  assert.equal(await view.getByRole('button',{name:'+ Add patient'}).isDisabled(),true);
+  await page.unroute('**/api/pleasantview/roster');
+  await view.getByRole('button',{name:'Reload roster'}).click();
+  await view.getByRole('button',{name:'+ Add patient'}).waitFor();
+  await page.screenshot({path:'work/pleasantview-synthetic.png',fullPage:true});
   assert.deepEqual(errors,[]);
   console.log('PASS facility navigation, chart links, clipboard, missing PHN, add, duplicate, persistence and layout.');
 } finally {

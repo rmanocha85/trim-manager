@@ -161,7 +161,7 @@ async function connect(mode,create=false,selectAccount=false,resumeFile=''){
     adapter=candidate;roster=r;ledger=s.ledger;savedBase=clone(s.ledger);checkedDrive();etag=s.etag;dirty=false;blocked=false;syncFailed=false;connectionVerified=true;selected=null;editingId=null;
     await recoverLegacyDraft();await resetBillingDate();
     if(!blocked)applyNewPatientPlans();
-    document.title=laptopRuntime()?'TRIM Notes':'TRIM';
+    document.title=laptopRuntime()?'Work OS Notes':'Work OS';
     $('storage-note').textContent=mode==='local'?'Laptop connection · saves to this laptop’s Drive folder. Cloud sync is not verified. Roster edits use Save to Drive.':'Google Drive connected · Roster edits use Save to Drive.';
     renderAll();setBillingMode(billingMode);status(blocked?'Draft conflict — action needed':dirty?'Changes pending in this tab':mode==='local'?'Local Drive folder connected':'Saved to Google Drive',blocked||dirty);
     void backups.connected(adapter,s.ledger);

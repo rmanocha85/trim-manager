@@ -1,0 +1,29 @@
+#il-workspace .facility-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}
+#il-workspace .clinic-table-wrap{position:relative}
+#il-workspace .facility-table{table-layout:fixed;min-width:32rem}
+#il-workspace .facility-table th:nth-child(1){width:3rem}
+#il-workspace .facility-table th:nth-child(2){width:clamp(12rem,22vw,19rem)}
+#il-workspace .facility-table th:nth-child(3){width:10rem}
+#il-workspace .facility-table td{vertical-align:middle}
+#il-workspace .facility-name{display:flex;align-items:center;gap:5px;min-width:0}
+#il-workspace .facility-name .identity-name{overflow-wrap:anywhere;min-width:0}
+#il-workspace .identity-copy{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin:0}
+#il-workspace .facility-group{margin:18px 0 28px}
+#il-workspace .facility-group h2{font-size:18px;color:#284b32;margin:0 0 12px}
+#il-workspace .facility-status:empty{display:none}
+#il-workspace .facility-menu-button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;font-size:20px;padding:2px 8px}
+.facility-menu[popover]{position:fixed;inset:auto;margin:0;padding:5px;border:1px solid #c9d5c7;border-radius:8px;box-shadow:0 5px 18px #183c2722;background:white}
+.facility-menu button{border:0;background:white;text-align:left;padding:9px 12px;min-height:40px}
+.facility-menu button:hover{background:#f7eeee}
+#il-workspace dialog{max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box}
+#workspace:has(.notes-launch:not([hidden])) .sidebar{display:none}
+#workspace:has(.notes-launch:not([hidden])) .shell{display:block}
+#workspace:has(.notes-launch:not([hidden])) main.content{display:block;padding:clamp(24px,5vw,64px)}
+.notes-launch-card{max-width:640px;margin:20px auto;padding:clamp(24px,4vw,44px);border:1px solid #d3ded1;border-radius:16px;background:#fff;box-shadow:0 12px 36px #1c382a0a}
+.notes-launch-card h1{font-size:30px;margin:0 0 12px;color:#244b35}
+.notes-launch-card p{font-size:16px;line-height:1.6;color:#59685d;margin:0 0 24px}
+.notes-launch-card .primary{display:inline-flex;align-items:center;justify-content:center;padding:13px 20px;border-radius:8px;background:#285d43;color:white;font-weight:600;text-decoration:none}
+
+.work-os-icon{width:52px;height:52px;margin-bottom:12px}
+
+.work-os-brand{display:inline-flex;align-items:center;gap:7px;font-weight:650;font-size:13px;color:#285d43;margin-right:14px;white-space:nowrap}.work-os-brand img{width:24px;height:24px}

@@ -55,7 +55,9 @@ try {
             $patients += $manual
         }
     }
-    $data.sites[$Site] = [ordered]@{source=$filename; patients=$patients}
+    $removed = @($previous.removedPatients)
+    $patients = @($patients | Where-Object { $_.ava -notin $removed.ava })
+    $data.sites[$Site] = [ordered]@{source=$filename; patients=$patients; removedPatients=$removed}
     $temp = "$Roster.$([guid]::NewGuid()).tmp"
     try {
         [IO.File]::WriteAllText($temp, ($data | ConvertTo-Json -Depth 7))
