@@ -1,8 +1,8 @@
-# TRIM
+# Work OS
 
 Billing review displays an amber star/count in the sidebar whenever its all-date, not-yet-handed-over review list contains issues. It updates on local edits and refresh, disappears at zero, and does not change billing records. The October 22 `20261022-review1` UI update passed the review/history, balanced-layout and patient-layout browser scenarios, including resolving/reintroducing an issue without opening the review tab, mobile layout and zero Drive writes in the review test; all 83 release syntax checks passed.
 
-One maintained application for **TRIM Patients**, **TRIM Notes** and **TRIM Billing**, owned by Dr. Rahul Manocha. Local development: `C:\Users\rmano\Documents\Codex\trim-app`. Records and reusable workflows remain in the existing TRIM AI folders in Drive. Never commit patient data, auth material, browser profiles or backups.
+One maintained application for **TRIM Patients**, **TRIM Notes**, **TRIM Billing**, OAT and facility rosters, owned by Dr. Rahul Manocha. Carrington, SCEDARBROOKE and The Cedars each have a roster tab; Pleasantview groups Residential Care above Assisted Living. Local development: `C:\Users\rmano\Documents\Codex\trim-app`. Records and reusable workflows remain in their existing Drive folders. Never commit patient data, auth material, browser profiles or backups.
 
 The header order is **Patient → Billing → Notes**, with Settings in a persistent bottom-left utility bar. The patient roster has no count cap; both roster print layouts add continuation pages for larger units and include custom units. Billing uses a Sunday-first calendar. Concern and Routine Billing show independent Ava chart links for valid stored chart IDs. New code 127 selections default to editable ICD-9 `V66.7`; existing saved diagnoses are preserved. Code 14077 offers an optional multiline note, retained in recovery, Drive, history and print reports through its existing `reason` field.
 
@@ -16,7 +16,7 @@ For physician-directed JSON updates, verify the exact PHN first, then use `scrip
 
 Use `Start-TRIM.cmd` (or `Start-TRIM.ps1`). The app uses `http://127.0.0.1:4317/`, preserving the previous laptop origin and encrypted recovery keys. One laptop/profile edits the synced folder; other computers use verified Google Drive access. Save billing to Drive before closing, locking, or reloading the tab.
 
-The static cloud entry is `https://rmanocha85.github.io/trim-manager/`. Patients and Billing connect directly to Google Drive; no hosted backend is required. Notes is available only through the laptop service, including when Patients and Billing use the direct Google connection. Its AI credentials and working files stay with that service. The cloud Notes tab opens `http://127.0.0.1:4317/?connection=cloud&section=notes` after the session is saved. Start the desktop shortcut first.
+The static cloud entry is `https://rmanocha85.github.io/trim-manager/`. Patients and Billing connect directly to Google Drive; no hosted backend is required. Notes is available only through the laptop service, including when Patients and Billing use the direct Google connection. Its AI credentials and working files stay with that service. The cloud Notes tab displays a landing page; only its **Open TRIM Notes** button invokes the installed laptop launcher.
 
 Both Google origins must be registered on the existing OAuth client: `https://rmanocha85.github.io` and `http://127.0.0.1:4317`. No client secret belongs in browser code. Use the registered laptop address, including its port.
 
@@ -148,7 +148,7 @@ Stop-TRIM.cmd / Stop-TRIM.ps1 requests a safe authenticated stop and refuses act
 
 ### Website Notes launcher — November 11, 2026
 
-Clicking Notes in the hosted app opens its Notes panel and invokes the fixed trim-notes://open action. The browser asks to open TRIM Notes; the per-user Windows handler starts the existing on-demand service and Notes window. Unsaved changes and active saves keep the save-before-switch guard and prevent launch. Read-only background Drive verification does not block the separate Notes app. The Notes panel and version-switch dialog also offer the launcher; desktop launch remains available. Visiting the website alone does not start a service.
+Clicking Notes in the hosted app opens its Notes landing page. Clicking **Open TRIM Notes** invokes the fixed trim-notes://open action. The browser asks to open TRIM Notes; the per-user Windows handler starts the existing on-demand service and Notes window. Unsaved changes and active saves keep the save-before-switch guard and prevent launch. Read-only background Drive verification does not block the separate Notes app. The version-switch dialog also offers the launcher; desktop launch remains available. Visiting the website or selecting the Notes tab alone does not start a service.
 
 Install-TRIMLauncher.ps1 compiles launcher/TrimNotesLauncher.cs locally and registers only HKCU/Software/Classes/trim-notes. It refuses another handler's registration; -Disable removes only its exact owned key. The small native helper accepts only the fixed open action (optional trailing slash); it rejects additional arguments, queries, fragments and other destinations. No patient/workspace data or credentials are passed through the URI. It invokes only its adjacent Start-TRIM.ps1 with fixed Notes arguments. The process-specific script invocation works with the laptop's Windows PowerShell defaults without changing Windows policy settings. The optional startup supervisor is unchanged, and no Windows auto-start is installed.
 

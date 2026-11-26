@@ -164,7 +164,7 @@ export function facilityRoster(host, connection, link) {
       const access = [401,403,404].includes(error.status);
       linkButton.hidden = !access;
       linkButton.textContent = 'Connect ' + facilityNames.get(site) + ' roster';
-      notice.textContent = access ? 'Connect this roster to TRIM to load it on your computers.' : error.message;
+      notice.textContent = access ? 'Connect this roster to Work OS to load it on your computers.' : error.message;
       if (preserve) notice.textContent += ' Showing the last loaded list.';
     }
   }
