@@ -97,3 +97,77 @@ export async function saveFacilityAction(adapter, snapshot, site, action) {
 export function saveFacilityPatient(adapter,snapshot,site,patient) {
   return saveFacilityAction(adapter,snapshot,site,{type:'add',patient});
 }
+
+// Page-session memory only: one verified snapshot per private file, shared by its tabs.
+// Raw reads above stay uncached so conditional saves always verify the actual saved file.
+export class FacilityRosterSession {
+  constructor(connection) {
+    this.connection = connection;
+    this.clear();
+  }
+  clear() {
+    this.adapter = undefined;
+    this.account = undefined;
+    this.files = new Map();
+  }
+  context() {
+    const adapter = this.connection(), account = String(adapter?.accountEmail || '').toLowerCase();
+    if (adapter !== this.adapter || account !== this.account) {
+      this.clear();
+      this.adapter = adapter;
+      this.account = account;
+    }
+    if (!adapter) throw new Error('Connect patient records, then reload the roster.');
+    return {adapter,account,files:this.files};
+  }
+  current(context) {
+    const now = this.context();
+    if (now.files !== context.files) throw new Error('Connection changed. Reload the roster.');
+  }
+  async load(site, {refresh = false} = {}) {
+    const context = this.context(), key = fileForSite(site);
+    let entry = context.files.get(key);
+    if (!entry?.pending && (!entry?.snapshot || refresh)) {
+      entry = {};
+      context.files.set(key,entry);
+      entry.pending = (async () => {
+        try {
+          const snapshot = await readFacilityRosters(context.adapter,site);
+          this.current(context);
+          if (context.files.get(key) !== entry) throw new Error('Roster changed while loading. Reload and try again.');
+          sitePatients(snapshot.roster,site);
+          entry.snapshot = snapshot;
+          return snapshot;
+        } catch (error) {
+          if (context.files.get(key) === entry) context.files.delete(key);
+          throw error;
+        } finally { entry.pending = null; }
+      })();
+    }
+    const snapshot = entry.pending ? await entry.pending : entry.snapshot;
+    this.current(context);
+    sitePatients(snapshot.roster,site);
+    return snapshot;
+  }
+  async save(snapshot, site, action) {
+    const context = this.context(), key = fileForSite(site), entry = context.files.get(key);
+    if (!entry?.snapshot || entry.snapshot !== snapshot || entry.pending) {
+      throw Object.assign(new Error('Reload the roster before making more changes.'),{reloadRequired:true});
+    }
+    // Form errors must leave the verified snapshot available for a corrected submission.
+    applyFacilityAction(snapshot.roster,site,action);
+    entry.pending = (async () => {
+      try {
+        const saved = await saveFacilityAction(context.adapter,snapshot,site,action);
+        this.current(context);
+        entry.snapshot = saved;
+        return saved;
+      } catch (error) {
+        if (context.files.get(key) === entry) context.files.delete(key);
+        error.reloadRequired = true;
+        throw error;
+      } finally { entry.pending = null; }
+    })();
+    return entry.pending;
+  }
+}

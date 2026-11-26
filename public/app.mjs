@@ -4,7 +4,7 @@ import {billingUI} from './billing-ui.mjs?v=20261126-il2';
 import {patientsUI} from './patients-ui.mjs?v=20261125-pending-review1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
-import {facilityNames, facilityRoster} from './il-roster.mjs?v=20261126-il5';
+import {facilityNames, facilityRoster} from './il-roster.mjs?v=20261126-il6';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261117-purple1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
 import {OatRepository,oatClinics} from './oat-roster-repository.mjs?v=20261126-il2';
@@ -60,7 +60,7 @@ function createOatView(clinic){
   }
   return {refresh,state:view.state,needsLoad:()=>!repository};
 }
-function refreshClinics(){return Promise.all([facilityNames.has(section) && facilityView.load(section),refreshMaid(),...Array.from(oatViews.values(),view=>view.refresh())]);}
+function refreshClinics(options){return Promise.all([facilityView.refresh(options),refreshMaid(),...Array.from(oatViews.values(),view=>view.refresh())]);}
 async function refreshMaid(){
   if(maidRoster?.state().busy)return;
   const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
@@ -226,7 +226,7 @@ async function start(){
   const openChanges=$('local-changes').onclick;
   $('local-changes').onclick=()=>{openChanges();status();};
   const latest=document.createElement('button');latest.id='load-latest';latest.textContent='Refresh from Drive';$('drive-connection').after(latest);
-  latest.onclick=async()=>{try{$('workspace-menu').hidePopover();session.message='';await billing.loadLatest();await refreshClinics();await intake.refreshQueue();await intake.profiles();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
+  latest.onclick=async()=>{try{$('workspace-menu').hidePopover();session.message='';await billing.loadLatest();await refreshClinics({refresh:true});await intake.refreshQueue();await intake.profiles();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}finally{status();}};
   const patientReview=document.createElement('div');patientReview.className='actions patient-review-tools';patientReview.innerHTML='<button id="review-patient-changes">Review patient changes</button><button id="reload-patient-changes">Reload saved roster</button>';$('changes-list').before(patientReview);
   $('review-patient-changes').onclick=async()=>{$('changes-dialog').close();showSection('patients');session.message='';try{await patients.refresh(true);}catch(e){billing.notify(e.message);}status();};
   $('reload-patient-changes').onclick=async()=>{$('changes-dialog').close();session.message='';try{await patients.reload();if(!session.state().some(s=>s.dirty||s.error)){session.lastError='';session.message='';}}catch(e){billing.notify(e.message);}status();};

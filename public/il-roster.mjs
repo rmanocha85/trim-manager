@@ -1,5 +1,5 @@
 import {bindIdentity, nameHTML, phnHTML} from './patient-identity.mjs?v=20261119-most-connection1';
-import {facilityNames,pleasantviewGroups,fileForSite,sitePatients,readFacilityRosters,saveFacilityAction} from './il-data.mjs?v=20261126-il5';
+import {facilityNames,pleasantviewGroups,fileForSite,sitePatients,FacilityRosterSession} from './il-data.mjs?v=20261126-il6';
 export {facilityNames};
 // Match the person-plus and person-minus symbols in the main roster.
 const icon = paths => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -32,7 +32,9 @@ export function facilityRoster(host, connection, link) {
   const notice = find('.facility-status'), search = find('input'), count = find('.clinic-count');
   const linkButton = find('[data-link]'), groupHost = find('[data-groups]');
   const dialog = find('.clinic-planning-dialog'), removeDialog = find('.clinic-remove-dialog'), form = find('form'), addButton = find('[data-add]');
-  let currentSite, request = 0, patients = [], snapshot, loadedAdapter, saving = false, editable = false, removedPatient;
+  const session = new FacilityRosterSession(connection);
+  let currentSite, request = 0, patients = [], snapshot, loadedAdapter, loadedAccount, saving = false, editable = false, removedPatient;
+  const account = adapter => String(adapter?.accountEmail || '').toLowerCase();
   function ready(enabled) {
     editable = enabled;
     addButton.disabled = !enabled;
@@ -53,17 +55,23 @@ export function facilityRoster(host, connection, link) {
     if (saving) return;
     const alert = modal.querySelector('[role=alert]'), controls = [...modal.querySelectorAll('button,input,select')];
     try {
-      if (connection() !== loadedAdapter) throw new Error('Connection changed. Close this form and reload the roster.');
+      if (connection() !== loadedAdapter || account(connection()) !== loadedAccount) throw new Error('Connection changed. Close this form and reload the roster.');
       saving = true;
       controls.forEach(control => control.disabled = true);
       alert.textContent = 'Saving…';
-      snapshot = await saveFacilityAction(loadedAdapter,snapshot,currentSite,action);
+      snapshot = await session.save(snapshot,currentSite,action);
       patients = sitePatients(snapshot.roster,currentSite);
       search.value = '';
       modal.close();
       render();
       notice.textContent = action.type === 'add' ? 'Patient added.' : 'Patient removed from roster.';
-    } catch (error) { alert.textContent = error.message; }
+    } catch (error) {
+      alert.textContent = error.message;
+      if (error.reloadRequired) {
+        ready(false);
+        notice.textContent = 'Reload the roster before making more changes.';
+      }
+    }
     finally { saving = false; controls.forEach(control => control.disabled = false); }
   }
   form.onsubmit = event => {
@@ -141,9 +149,9 @@ export function facilityRoster(host, connection, link) {
     count.hidden = false;
     notice.textContent = '';
   }
-  async function load(site) {
+  async function load(site, options) {
     if (saving || dialog.open || removeDialog.open) return;
-    const version = ++request, adapter = connection(), preserve = site === currentSite && adapter === loadedAdapter && snapshot;
+    const version = ++request, adapter = connection(), preserve = site === currentSite && adapter === loadedAdapter && account(adapter) === loadedAccount && snapshot;
     ready(false);
     linkButton.hidden = true;
     if (!preserve) {
@@ -158,11 +166,12 @@ export function facilityRoster(host, connection, link) {
     notice.textContent = preserve ? 'Refreshing roster…' : 'Loading roster…';
     try {
       if (!adapter) throw new Error('Connect patient records, then reload the roster.');
-      const result = await readFacilityRosters(adapter,site);
+      const result = await session.load(site,options);
       if (version !== request) return;
       patients = sitePatients(result.roster,site);
       snapshot = result;
       loadedAdapter = adapter;
+      loadedAccount = account(adapter);
       render();
       ready(true);
     } catch (error) {
@@ -174,13 +183,27 @@ export function facilityRoster(host, connection, link) {
       if (preserve) notice.textContent += ' Showing the last loaded list.';
     }
   }
-  search.oninput = () => { if (snapshot) { render(); ready(editable); } };
-  find('[data-reload]').onclick = () => load(currentSite);
+  search.oninput = () => {
+    if (!snapshot) return;
+    const message = notice.textContent;
+    render();
+    ready(editable);
+    if (!editable) notice.textContent = message;
+  };
+  find('[data-reload]').onclick = () => load(currentSite,{refresh:true});
   linkButton.onclick = async () => {
     linkButton.disabled = true;
-    try { await link(fileForSite(currentSite),() => load(currentSite)); }
+    try { await link(fileForSite(currentSite),() => load(currentSite,{refresh:true})); }
     catch (error) { notice.textContent = error.message; }
     finally { linkButton.disabled = false; }
   };
-  return {load,state:()=>({busy:saving,dirty:false})};
+  async function refresh(options) {
+    if (saving || dialog.open || removeDialog.open) return;
+    // Start both private-file reads after connection, without delaying the main roster.
+    // The selected tab joins the same pending read instead of issuing a second download.
+    return Promise.allSettled(['carrington','pleasantview'].map(site =>
+      currentSite && fileForSite(currentSite) === fileForSite(site)
+        ? load(currentSite,options) : session.load(site,options)));
+  }
+  return {load,refresh,state:()=>({busy:saving,dirty:false})};
 }
