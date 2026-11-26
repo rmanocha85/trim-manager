@@ -4,6 +4,7 @@ import {billingUI} from './billing-ui.mjs?v=20261125-pending-review1';
 import {patientsUI} from './patients-ui.mjs?v=20261125-pending-review1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
 import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
+import {facilityNames, facilityRoster} from './il-roster.mjs';
 import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261117-purple1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
 import {OatRepository,oatClinics} from './oat-roster-repository.mjs?v=20261117-purple1';
@@ -13,6 +14,7 @@ if(laptopRuntime()){document.title='TRIM Notes';document.querySelector('link[rel
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
 const oatViews=new Map();
+let facilityView;
 function createOatView(clinic){
   const {title,fileId}=oatClinics[clinic];
   let repository,pending,version=0;
@@ -58,7 +60,7 @@ function createOatView(clinic){
   }
   return {refresh,state:view.state,needsLoad:()=>!repository};
 }
-function refreshClinics(){return Promise.all([refreshMaid(),...Array.from(oatViews.values(),view=>view.refresh())]);}
+function refreshClinics(){return Promise.all([facilityNames.has(section) && facilityView.load(section),refreshMaid(),...Array.from(oatViews.values(),view=>view.refresh())]);}
 async function refreshMaid(){
   if(maidRoster?.state().busy)return;
   const adapter=intake?.recordsConnection?.()||billing?.state().adapter;
@@ -89,7 +91,10 @@ const lastTab={billing:'billing',notes:'rounds',settings:'settings'};
 function showSection(value){
   if(section!==value)$('workspace').scrollTop=0;
   section=value;
-  const clinic=['maid',...oatViews.keys()].includes(value);
+  const facility = facilityNames.has(value);
+  $('il-workspace').hidden = !facility;
+  if (facility) void facilityView.load(value);
+  const clinic=facility || ['maid',...oatViews.keys()].includes(value);
   const enteringPatients=value==='patients'&&$('patients-workspace').hidden;
   $('patients-workspace').hidden=value!=='patients';
   if(enteringPatients)patients?.activate();
@@ -182,6 +187,7 @@ async function linkClinicFile(fileId,refresh){
   await refresh();
 }
 async function start(){
+  facilityView = facilityRoster($('il-workspace'), () => intake?.recordsConnection?.() || billing?.state().adapter, linkClinicFile);
   maidRoster=clinicRosterUI({host:$('maid-workspace'),kind:'maid',onChange:status,onReload:refreshMaid,onLink:()=>linkClinicFile(maidRepository.fileId,refreshMaid),onAction:async action=>{
     if(!maidSnapshot||!maidRepository)throw new Error('Reload MAID before editing.');
     const saved=await maidRepository.mutate(action,maidSnapshot);maidSnapshot=saved;
@@ -191,7 +197,7 @@ async function start(){
   patients=await patientsUI({onBirthDate:(...args)=>intake.updateBirthDate(...args),host:$('patients-workspace'),onChange:status,onFocus:p=>{if(notes?.openFocus)void notes.openFocus('phn:'+String(p.phn).replace(/\D/g,'')).catch(e=>billing.notify(e.message));else billing.notify('Open the laptop app to edit routine focus.');},onBilling:key=>billing.openPatientBilling(key),onHistory:key=>billing.showPatientHistory(key),onUpload:p=>{void intake.open(p).catch(e=>billing.notify(e.message));},onRoster:raw=>billing?.setRoster(raw),onSaved:async raw=>{if(notes?.ensureRoster)await notes.ensureRoster(raw);}});
   const laptop=laptopRuntime();
   notes=laptop?(await import('./notes-ui.mjs?v=20261119-most-connection1')).notesUI({state:()=>billing?.state()||{date:new Date().toISOString().slice(0,10),people:[]},reconcileBilling:(...args)=>billing.recordRoutine(...args),switchTab:tab=>billing.switchTab(tab),onStatus:status}):localNotesPlaceholder();
-  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid',...oatViews.keys()].includes(wanted)?wanted:section);status();},saveSession});
+  billing=billingUI({patients,notes,onStatus:status,onNavigate:navigate,onPatientConflict:()=>showSection('patients'),onConnected:()=>{void refreshClinics();void intake.profiles();void intake.refreshQueue();const wanted=new URLSearchParams(location.search).get('section');if(wanted==='notes')billing.switchTab('rounds');else showSection(['maid',...oatViews.keys(),...facilityNames.keys()].includes(wanted)?wanted:section);status();},saveSession});
   const rosterRoot=$('patients-workspace').shadowRoot;
   const profileBanner=document.createElement('div'),profileMessage=document.createElement('span'),profileAction=document.createElement('button');
   profileBanner.className='profile-status';profileBanner.hidden=true;profileMessage.setAttribute('role','status');profileAction.type='button';profileAction.className='btn btn-ghost btn-sm';
@@ -236,7 +242,7 @@ async function start(){
       if(notesLaunchBlocked()){switcher.click();return;}
       billing.switchTab(lastTab.notes);$('open-laptop-notes').click();status();return;
     }
-    if(['patients','maid',...oatViews.keys()].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
+    if(['patients','maid',...oatViews.keys(),...facilityNames.keys()].includes(b.dataset.section))showSection(b.dataset.section);else billing.switchTab(lastTab[b.dataset.section]);
     if(b.dataset.section==='maid'&&!maidSnapshot)void refreshMaid();
     const oat=oatViews.get(b.dataset.section);if(oat?.needsLoad())void oat.refresh();
     status();

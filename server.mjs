@@ -16,6 +16,7 @@ import {RosterStore} from './roster-storage.mjs';
 import {LocalBackupStore} from './backup-storage.mjs';
 import {snapshot,hash} from './public/backups.mjs';
 import {MaidStore} from './maid-storage.mjs';
+import {readFacilityFile,addToFacilityFile} from './il-storage.mjs';
 import {OatStore} from './oat-storage.mjs';
 import {applyOatAction} from './public/oat-roster-repository.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const maidStore=new MaidStore(maidPath);
   oatPath ||= live?path.join(home,'My Drive','01. Active List','05. OAT','OAT AI','oat-fh-roster.json'):path.join(path.dirname(rosterPath),'oat-fh-roster.json');
   purplePath ||= live?path.join(home,'My Drive','01. Active List','07. Purple Medical OAT','oat-purple-roster.json'):path.join(path.dirname(rosterPath),'oat-purple-roster.json');
+  const ilRosterPath = live ? path.join(home,'My Drive','01. Active List','01 Assisted living','il-rosters.json') : path.join(path.dirname(rosterPath),'il-rosters.json');
   const oatStores=new Map([['/api/oat-fh/roster',new OatStore(oatPath)],['/api/oat-purple/roster',new OatStore(purplePath,'oat-purple')]]);
 
   notesPath ||= live?path.join(home,'My Drive','02. TRIM','TRIM AI','Working records','Routine notes'):path.join(path.dirname(billingPath),'notes');
@@ -48,6 +50,8 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   for(const name of ['billing-corrections.mjs','billing-export.mjs','billing-pdf.mjs','billing-export-ui.mjs','billing-export.css','vendor/pdf/jspdf.umd.min.mjs','vendor/pdf/pdf.mjs','vendor/pdf/pdf.worker.mjs','vendor/pdf/NotoSans-Regular.ttf','vendor/pdf/NotoSans-Bold.ttf'])allowed.add(name);
   allowed.add('billing-icons.mjs');allowed.add('billing-cards.css');
   allowed.add('clinic-roster.mjs');
+  allowed.add('il-roster.mjs');
+  allowed.add('il-data.mjs');
   allowed.add('maid-lifecycle.mjs');
   allowed.add('maid-assessment.mjs');
   allowed.add('maid-provision.mjs');
@@ -93,7 +97,14 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
         }
         if(!req.headers.cookie?.split(';').some(c=>c.trim()===`trim_session=${session}`)||req.headers['x-trim-session']!==session)return json(401,{error:'Connect this laptop first.'});
         if(!['GET','HEAD'].includes(req.method)&&!origins.includes(req.headers.origin))return json(403,{error:'Origin required.'});
+        if(url.pathname==='/api/il/rosters' && req.method==='GET') {
+          return json(200,await readFacilityFile(ilRosterPath));
+        }
         const readJSON=async()=>{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>20000000)throw Object.assign(new Error('Clinical request is too large.'),{status:413});}return JSON.parse(raw||'{}');};
+        if(url.pathname==='/api/il/rosters' && req.method==='POST') {
+          const {site,patient}=await readJSON();
+          return json(200,await addToFacilityFile(ilRosterPath,req.headers['if-match'],site,patient));
+        }
         if(url.pathname==='/api/service/heartbeat'&&req.method==='POST'){const value=await readJSON();lifecycle.heartbeat(value.id,value.release===true);return json(200,lifecycle.status());}
         if(url.pathname==='/api/service/stop'&&req.method==='POST'){
           if(activeRequests>1||intake.running||chatgpt.aborters?.size)return json(409,{error:'TRIM is still processing or saving. Let it finish, then stop it.'});
