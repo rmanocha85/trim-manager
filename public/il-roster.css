@@ -5,6 +5,7 @@
 #il-workspace .facility-table th:nth-child(2){width:clamp(12rem,22vw,19rem)}
 #il-workspace .facility-table th:nth-child(3){width:10rem}
 #il-workspace .facility-table td{vertical-align:middle}
+#il-workspace .facility-table td:last-child{text-align:right}
 #il-workspace .facility-name{display:flex;align-items:center;gap:5px;min-width:0}
 #il-workspace .facility-name .identity-name{overflow-wrap:anywhere;min-width:0}
 #il-workspace .identity-copy{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;margin:0}
@@ -12,8 +13,11 @@
 #il-workspace .facility-group h2{font-size:18px;color:#284b32;margin:0 0 12px}
 #il-workspace .facility-status:empty{display:none}
 #il-workspace .facility-menu-button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:32px;font-size:20px;padding:2px 8px}
-.facility-menu[popover]{position:fixed;inset:auto;margin:0;padding:5px;border:1px solid #c9d5c7;border-radius:8px;box-shadow:0 5px 18px #183c2722;background:white}
-.facility-menu button{border:0;background:white;text-align:left;padding:9px 12px;min-height:40px}
+#il-workspace .facility-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:44px;min-width:44px;height:40px;min-height:40px;padding:8px;color:#345d43;cursor:pointer}
+#il-workspace .facility-icon svg{width:22px;height:22px;pointer-events:none}
+#il-workspace .facility-icon.danger{color:#a12727}
+.facility-menu[popover]{position:fixed;inset:auto;box-sizing:border-box;width:62px;margin:0;padding:7px;border:1px solid #c9d5c7;border-radius:12px;box-shadow:0 5px 18px #183c2722;background:white}
+.facility-menu button{border:0;background:white;border-radius:5px}
 .facility-menu button:hover{background:#f7eeee}
 #il-workspace dialog{max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box}
 #workspace:has(#rounds:not([hidden]) .notes-launch-card) .sidebar{display:none}

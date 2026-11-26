@@ -1,6 +1,6 @@
 export const facilityNames = new Map([
   ['carrington', 'Carrington'],
-  ['cedarbrook', 'SCEDARBROOKE'],
+  ['cedarbrook', 'CEDARBROOKE'],
   ['the-cedars', 'The Cedars'],
   ['pleasantview', 'Pleasantview']
 ]);

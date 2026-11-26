@@ -51,7 +51,7 @@ try {
     assert.ok(Math.abs(a.y+a.height/2-b.y-b.height/2)<3,'Copy aligned with name');
     assert.ok(c.x-a.x<340,'PHN next to name');
   }
-  const open = () => view.getByRole('button',{name:'+ Add patient',exact:true}).click();
+  const open = () => view.getByRole('button',{name:'Add patient',exact:true}).click();
   const dialog = page.getByRole('dialog');
   await open();
   await dialog.getByLabel('Patient name').fill('Synthetic Addition');
@@ -108,10 +108,10 @@ try {
   await view.getByRole('button',{name:'Reload roster'}).click();
   await view.locator('.facility-status').filter({hasText:'Showing the last loaded list'}).waitFor();
   assert.equal(await view.locator('tbody tr').count(),beforeFailure);
-  assert.equal(await view.getByRole('button',{name:'+ Add patient'}).isDisabled(),true);
+  assert.equal(await view.getByRole('button',{name:'Add patient'}).isDisabled(),true);
   await page.unroute('**/api/pleasantview/roster');
   await view.getByRole('button',{name:'Reload roster'}).click();
-  await view.getByRole('button',{name:'+ Add patient'}).waitFor();
+  await view.getByRole('button',{name:'Add patient'}).waitFor();
   await page.screenshot({path:'work/pleasantview-synthetic.png',fullPage:true});
   assert.deepEqual(errors,[]);
   console.log('PASS facility navigation, chart links, clipboard, missing PHN, add, duplicate, persistence and layout.');

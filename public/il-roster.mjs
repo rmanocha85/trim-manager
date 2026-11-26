@@ -1,11 +1,15 @@
 import {bindIdentity, nameHTML, phnHTML} from './patient-identity.mjs?v=20261119-most-connection1';
-import {facilityNames,pleasantviewGroups,fileForSite,sitePatients,readFacilityRosters,saveFacilityAction} from './il-data.mjs?v=20261126-il2';
+import {facilityNames,pleasantviewGroups,fileForSite,sitePatients,readFacilityRosters,saveFacilityAction} from './il-data.mjs?v=20261126-il4';
 export {facilityNames};
+// Match the person-plus and person-minus symbols in the main roster.
+const icon = paths => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const addIcon = icon('<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a7 7 0 0 1 14 0v2M19 8v6M16 11h6"/>');
+const removeIcon = icon('<circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M17 9h6"/>');
 
 export function facilityRoster(host, connection, link) {
   host.innerHTML = `<div class="clinic-heading"><h1></h1><span class="clinic-count" hidden></span></div>
     <div class="clinic-toolbar"><input type="search" placeholder="Search name or PHN" aria-label="Search facility roster" autocomplete="off">
-    <div class="facility-toolbar-actions"><button type="button" data-add disabled>+ Add patient</button><button type="button" data-reload>Reload roster</button></div></div>
+    <div class="facility-toolbar-actions"><button type="button" data-add class="facility-icon" aria-label="Add patient" title="Add patient" disabled>${addIcon}</button><button type="button" data-reload>Reload roster</button></div></div>
     <p class="facility-status" role="status"></p><button type="button" data-link hidden>Connect facility roster</button>
     <div data-groups></div>
     <dialog class="clinic-planning-dialog" aria-labelledby="il-add-title"><form>
@@ -16,12 +20,12 @@ export function facilityRoster(host, connection, link) {
       <label>PHN (optional)<input name="phn" inputmode="numeric" autocomplete="off"></label>
       <label>Date of birth (optional)<input name="dob" type="date" data-native-date></label>
       <p class="planning-error" role="alert"></p>
-      <div class="actions"><button type="button" data-cancel>Cancel</button><button type="submit">Add patient</button></div>
+      <div class="actions"><button type="button" data-cancel>Cancel</button><button type="submit" class="facility-icon" aria-label="Add patient" title="Add patient">${addIcon}</button></div>
     </form></dialog>
     <dialog class="clinic-remove-dialog" aria-labelledby="il-remove-title">
       <h2 id="il-remove-title">Remove from roster?</h2><p data-remove-name></p>
       <p data-remove-site></p><p role="alert"></p>
-      <div class="actions"><button type="button" data-remove-cancel>Cancel</button><button type="button" data-remove-confirm class="danger">Remove from roster</button></div>
+      <div class="actions"><button type="button" data-remove-cancel>Cancel</button><button type="button" data-remove-confirm class="danger facility-icon" aria-label="Remove from roster" title="Remove from roster">${removeIcon}</button></div>
     </dialog>`;
   bindIdentity(host);
   const find = selector => host.querySelector(selector);
@@ -89,11 +93,13 @@ export function facilityRoster(host, connection, link) {
     button.onclick = () => {
       const bounds = button.getBoundingClientRect();
       menu.style.top = Math.min(bounds.bottom + 4, innerHeight - 64) + 'px';
-      menu.style.left = Math.max(8, Math.min(bounds.left, innerWidth - 220)) + 'px';
+      menu.style.left = Math.max(8, Math.min(bounds.right - 62, innerWidth - 70)) + 'px';
     };
     remove.type = 'button';
-    remove.textContent = 'Remove from roster';
-    remove.className = 'danger';
+    remove.innerHTML = removeIcon;
+    remove.className = 'danger facility-icon';
+    remove.setAttribute('aria-label','Remove from roster');
+    remove.title = 'Remove from roster';
     remove.onclick = () => {
       menu.hidePopover();
       removedPatient = patient;
