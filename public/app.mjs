@@ -10,7 +10,7 @@ import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provisio
 import {OatRepository,oatClinics} from './oat-roster-repository.mjs?v=20261126-il2';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261126-il2';
 
-if(laptopRuntime()){document.title='Work OS Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261126-work-os';}
+if(laptopRuntime()){document.title='Work OS Notes';document.querySelector('link[rel=icon]').href='./favicon-notes.svg?v=20261126-work-os-cross';}
 const $=id=>document.getElementById(id);
 let billing,notes,patients,session,intake,maidRoster,maidRepository,maidSnapshot,maidPending,maidLoad=0,section='billing';
 const oatViews=new Map();
