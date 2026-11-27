@@ -122,6 +122,8 @@
 #connection-error:empty{display:none}#connection-dialog #connection-error{font-size:13px;line-height:1.5;margin:14px 0 0;overflow-wrap:anywhere}#connection-error[data-state=connecting]{color:#606d65}
 #connection-dialog button:focus-visible,#connection-dialog summary:focus-visible{outline:2px solid #54765d;outline-offset:4px}
 #gate{padding:24px;background:#f0f2ed;grid-template-columns:minmax(0,1fr)}#gate .gate-card{width:min(438px,100%);min-width:0;padding:30px;border:1px solid #dce5dd;border-radius:18px;background:#fffefa;box-shadow:0 10px 30px #20352b12;text-align:left}
+#gate .work-os-icon{display:block;margin:0 auto 12px}
+#gate .gate-card h1{text-align:center}
 body:has(#connection-dialog[open]) #gate .gate-card{visibility:hidden}
 #gate .connection-brand{justify-content:flex-start}
 @media(max-width:420px){#connection-dialog .focused-connection,#gate .gate-card{padding:23px}#gate{padding:16px}}
