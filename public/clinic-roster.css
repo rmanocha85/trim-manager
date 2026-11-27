@@ -14,7 +14,15 @@
 [data-oat-patients] th:nth-child(2){width:clamp(9rem,19vw,15rem)}
 [data-oat-patients] th:nth-child(3){width:10rem}
 [data-oat-patients] td:nth-child(2){overflow-wrap:anywhere}
-[data-oat-patients] td:last-child>div{display:inline-block}
+[data-oat-patients] td:nth-child(4)>div{display:inline-block}
+.oat-fh-patients .clinic-table{min-width:36rem}
+.oat-fh-patients .clinic-actions-heading{width:6rem}
+.oat-fh-patients .clinic-actions{text-align:right;white-space:nowrap}
+.oat-fh-patients .clinic-actions .clinic-phone-edit{margin-left:2px;font-size:20px;line-height:1;width:29px;height:29px;padding:4px}
+.oat-message-dialog{margin:auto;box-sizing:border-box;width:min(570px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid #d6ddd2;border-radius:14px;color:#263b2d}
+.oat-message-dialog::backdrop{background:#183c2744}
+.oat-message-dialog textarea{box-sizing:border-box;width:100%;display:block;resize:vertical;font:14px/1.55 system-ui,sans-serif;padding:12px;color:#24392c;background:#fff;border:1px solid #bdcbbd;border-radius:8px;margin-top:8px}
+@media(pointer:coarse){.oat-fh-patients .clinic-actions-heading{width:7rem}.oat-fh-patients .clinic-actions .clinic-phone-edit{width:44px;height:44px}}
 .clinic-table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}
 .clinic-table th{background:#edf2eb;color:#465e49;font-size:12px;padding:12px;white-space:nowrap}
 .clinic-table td{padding:14px 12px;border-top:1px solid #e5eae2;vertical-align:top}

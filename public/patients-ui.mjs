@@ -2,7 +2,7 @@ import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from 
 import {nurseMessageDialog,individualNurseDialog} from './nurse-messages-ui.mjs?v=20261125-pending-review1';
 import {billingHistoryIcon} from './billing-icons.mjs?v=20261117-cards4';
 import {bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
-import {familyContactsCell,familyContactDialog} from './roster-contacts.mjs?v=20261116-phone1';
+import {familyContactsCell,familyContactDialog} from './roster-contacts.mjs?v=20261127-oat-actions1';
 import {withProfile} from './profile-display.mjs?v=20261119-most-connection1';
 import {patientKey} from './core.mjs?v=20261119-export1';
 import {pmhxUploadedHTML,refreshPmhxUploads,flagIcon,patientFlagsHTML,nameHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261119-most-connection1';
@@ -52,7 +52,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   const identityCSS=await fetch('./patient-identity.css?v=20261115-roster1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
-  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261125-pending-review1',import.meta.url);root.append(phoneStyles);
+  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261127-oat-actions1',import.meta.url);root.append(phoneStyles);
   const hideRosterTip=bindRosterTips(root);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();

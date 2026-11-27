@@ -1,11 +1,11 @@
 import {refreshIdentities} from './patient-identity.mjs?v=20261119-most-connection1';
 import {documentIntakeUI,PROFILE_FILE_ID} from './intake-ui.mjs?v=20261119-most-connection1';
 import {billingUI} from './billing-ui.mjs?v=20261126-il2';
-import {patientsUI} from './patients-ui.mjs?v=20261125-pending-review1';
+import {patientsUI} from './patients-ui.mjs?v=20261127-oat-actions1';
 import {Session,saveIndicator} from './session.mjs?v=20261115-manual1';
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261117-purple1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-oat-actions1';
 import {facilityNames, facilityRoster} from './il-roster.mjs?v=20261126-il6';
-import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261117-purple1';
+import {oatWorkspaceUI} from './oat-workspace.mjs?v=20261127-oat-actions1';
 import {MaidRepository} from './clinic-roster-repository.mjs?v=20261112-provision1';
 import {OatRepository,oatClinics} from './oat-roster-repository.mjs?v=20261126-il2';
 import {laptopRuntime,localNotesPlaceholder,CLOUD_URL,NOTES_LAUNCH_URL} from './runtime.mjs?v=20261126-il2';

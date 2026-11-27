@@ -6,7 +6,9 @@ import {phoneControls} from './roster-phone.mjs?v=20261119-export1';
 export function familyContactsCell(patient) {
   const rows = (patient.familyContacts || []).map(contact => {
     const label = [contact.name, contact.relationship].filter(Boolean).join(' · ');
-    return '<div class="family-contact">'+phoneControls(contact,label)+'</div>';
+    const publicGuardian=/\b(?:PG\s*[\/&]?\s*T|Public\s+Guardian(?:ship)?(?:\s+(?:and|&)\s+Trustee)?)\b/i.test(label);
+    const role=publicGuardian?'<span class="family-contact-role" title="Public Guardian and Trustee">PG/T</span>':'';
+    return '<div class="family-contact">'+role+phoneControls(contact,label)+'</div>';
   });
   return '<td class="family-contacts">'+(rows.join('') || '—')+'</td>';
 }

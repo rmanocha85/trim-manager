@@ -6,10 +6,11 @@ import {provisionDefaults,provisionPlanningText,provisionMapUrl} from './maid-pr
 import {avaChartUrl} from './patient-links.mjs';
 import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
+import {oatPatientMessages} from './oat-patient-message.mjs?v=20261127-oat-actions1';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.
 export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',onAction,onPhone,onReload,onLink,onChange=()=>{}}) {
-  const maid=kind==='maid';
+  const maid=kind==='maid',fh=kind==='oat-fh';
   let patients=[],view='active',query='',busy=false,ready=false,loaded=false,loadState='idle',loadMessage='';
   host.classList.add('clinic-workspace');
   host.innerHTML=`<div class="clinic-heading"><div><h1>${title}</h1><p>${maid?'Current patients and assessment history.':'Your clinic list, in the order you provide.'}</p></div><span class="clinic-count" role="status" aria-live="polite"></span></div>
@@ -18,6 +19,8 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
     <div class="clinic-table-wrap" role="region" aria-label="${title} patient list" tabindex="0"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient</th><th scope="col">PHN</th><th scope="col">Patient phone</th>${maid?'<th scope="col">Primary / family contact</th>':''}${maid?'<th scope="col">Location</th>':''}${maid?'<th scope="col" class="clinic-planning-heading">Assessment</th><th scope="col">Provision</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
     <div class="clinic-empty"><h2>Waiting for your patient list</h2><p>${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.</p></div><p class="clinic-feedback" role="status" aria-live="polite"></p>`;
   bindIdentity(host);
+  if(fh){const heading=document.createElement('th');heading.scope='col';heading.className='clinic-actions-heading';heading.innerHTML='<span class="sr-only">Actions</span>';host.querySelector('thead tr').append(heading);host.classList.add('oat-fh-patients');}
+  const messages=fh?oatPatientMessages(host,onChange):null;
   const hideTip = bindRosterTips(host);
   if(onReload){const reload=document.createElement('button');reload.textContent='Reload '+title;reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
   const linkButton=document.createElement('button');
@@ -211,10 +214,17 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
           add.onclick=()=>openPhone(p);
           controls.append(add);phone.append(controls);
         }
-        if(onPhone&&p.phone){
+        let actionButtons;
+        if(fh){
+          const actions=cell(row,'');actions.className='clinic-actions';
+          actionButtons=document.createElement('div');actionButtons.className='roster-billing-actions';
+          const message=messages.button(p);message.disabled=!ready||busy;actionButtons.append(message);actions.append(actionButtons);
+        }
+        if(onPhone&&(p.phone||fh)){
           const more=document.createElement('button');
           more.type='button';more.className='clinic-phone-edit';more.textContent='⋯';
-          more.setAttribute('aria-label','Phone actions for '+p.name);
+          more.setAttribute('aria-label',(fh?'Actions for ':'Phone actions for ')+p.name);
+          more.title='Phone actions';
           more.disabled=!ready||busy;
           more.onclick=()=>{
             phoneMenu.showPopover();
@@ -226,7 +236,7 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
             edit.onclick=()=>{phoneMenu.hidePopover();openPhone(p);};
             edit.focus();
           };
-          phone.append(more);
+          (actionButtons||phone).append(more);
         }
       }
       if(maid)cell(row,patientLocation(p));
@@ -270,7 +280,7 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
   host.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{view=button.dataset.view;host.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render();});
   render();
   return {
-    state(){return {busy:busy||phoneDialog.open||planningDialog.open||provisionDialog.open,ready,loading:loadState==='loading',dirty:false};},
+    state(){return {busy:busy||phoneDialog.open||planningDialog.open||provisionDialog.open||Boolean(messages?.open),ready,loading:loadState==='loading',dirty:false};},
     selectPatientView(value){if(!maid&&['active','history'].includes(value)){if(value!==view){query='';host.querySelector('input[type=search]').value='';}view=value;render();}},
     setPatients(records){if(busy)return;linkButton.hidden=true;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
     loading({preserve=true}={}){ready=false;linkButton.hidden=true;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
