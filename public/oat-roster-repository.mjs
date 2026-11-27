@@ -1,6 +1,7 @@
 import {phoneLink} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {validateClinicRoster} from './clinic-roster-repository.mjs';
 import {validateClinicDays,finishAppointment} from './oat-schedule.mjs?v=20261117-purple1';
+import {changeOatPatientStatus} from './oat-patient-status.mjs?v=20261127-oat-history1';
 const V2='https://www.googleapis.com/drive/v2/files';
 const FOLDER='1d90SEhco30YL0AAE20gt11pzFBjOOJUn';
 // The shared roster's existing Drive ID. Google still enforces account and file access.
@@ -17,6 +18,7 @@ export function validateOatRoster(data,clinic='oat-fh'){
   return data;
 }
 export function applyOatAction(roster,action) {
+  if(action?.type==='patient-status')return changeOatPatientStatus(roster,action);
   if(action?.type!=='patient-phone')return finishAppointment(roster,action);
   if(typeof action.phone!=='string'||action.phone.length>80||!phoneLink(action.phone))throw new Error('Enter one valid phone number.');
   const next=structuredClone(roster);

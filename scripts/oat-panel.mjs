@@ -7,6 +7,7 @@ import {OatStore} from '../oat-storage.mjs';
 import {validateOatRoster} from '../public/oat-roster-repository.mjs';
 import {validClinicDate} from '../public/oat-schedule.mjs';
 import {phoneLink} from '../public/clinic-contacts.mjs';
+import {reconcileOatPatientStatus} from '../public/oat-patient-status.mjs';
 
 function readRows(text){
   const lines=[]; let row=[],field='',quoted=false,closed=false;
@@ -43,6 +44,7 @@ const nameKey=s=>s.toLowerCase().normalize('NFKC').replace(/[\s,.'’-]+/g,' ').
 export function reconcilePanel(original,clinic,source,asOf,prior=null){
   validateOatRoster(original,clinic);
   if(!validClinicDate(asOf)||original.panel?.asOf>asOf)throw Error('Invalid or older panel date.');
+  if(original.panel?.sha256===source.sha256&&original.panel?.asOf===asOf)return structuredClone(original);
   const next=structuredClone(original),byPhn=new Map(next.patients.map(p=>[p.phn,p])),active=new Set(),ordered=[];
   function match(row){
     const p=byPhn.get(row.phn);
@@ -51,7 +53,7 @@ export function reconcilePanel(original,clinic,source,asOf,prior=null){
     return p;
   }
   function add(row,status){const p={...row,id:clinic+'-'+randomUUID(),status};byPhn.set(p.phn,p);next.patients.push(p);return p;}
-  function status(p,value){if(p.status!==value){p.statusHistory=[...(p.statusHistory||[]),{from:p.status,to:value,date:asOf,source:source.file}];p.status=value;}}
+  function status(p,value){reconcileOatPatientStatus(p,value,source,asOf);}
   for(const row of source.patients){
     const p=match(row)||add(row,'active');status(p,'active');
     p.name=row.name;p.dob=row.dob;if(row.ava)p.ava=row.ava;if(row.phone)p.phone=row.phone;if(row.ageAtExport)p.ageAtExport=row.ageAtExport;
@@ -75,10 +77,13 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(path.resolve(process.argv[1]
   const source=await load(csv),prior=priorCsv?await load(priorCsv):null;
   const next=reconcilePanel(current.roster,clinic,source,asOf,prior);
   const before=new Map(current.roster.patients.map(p=>[p.id,p.status]));
+  const statusReviews=next.patients.filter(p=>p.statusReview).map(p=>({patientId:p.id,currentStatus:p.status,panelStatus:p.statusReview.panelStatus,asOf:p.statusReview.asOf}));
   const counts={active:next.patients.filter(p=>p.status==='active').length,history:next.patients.filter(p=>p.status==='history').length,addedActive:next.patients.filter(p=>p.status==='active'&&!before.has(p.id)).length,movedToHistory:next.patients.filter(p=>p.status==='history'&&before.get(p.id)==='active').length,reactivated:next.patients.filter(p=>p.status==='active'&&before.get(p.id)==='history').length,activePhones:next.patients.filter(p=>p.status==='active'&&p.phone).length,activeCharts:next.patients.filter(p=>p.status==='active'&&p.ava).length};
+  counts.sourcePatients=source.patients.length;counts.statusReviews=statusReviews.length;
   if(mode==='apply'&&JSON.stringify(next)!==JSON.stringify(current.roster)){
     next.updatedAt=new Date().toISOString();const saved=await store.update(current.etag,()=>next);
     if(JSON.stringify(saved.roster)!==JSON.stringify(next))throw Error('Readback differs.');
   }
   console.log(clinic,mode,counts);
+  if(statusReviews.length)console.log('Manual status changes kept; review these panel differences in Work OS:',statusReviews);
 }

@@ -7,9 +7,11 @@ import {avaChartUrl} from './patient-links.mjs';
 import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
 import {oatPatientMessages} from './oat-patient-message.mjs?v=20261127-oat-actions1';
+import {oatStatusAction,oatStatusVersion,oatStatusDate,oatPatientMatches} from './oat-patient-status.mjs?v=20261127-oat-history1';
+import {formatDate} from './dates.mjs?v=20261119-export1';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.
-export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',onAction,onPhone,onReload,onLink,onChange=()=>{}}) {
+export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',onAction,onPhone,onStatus,onPatientView,dialogHost=host,onReload,onLink,onChange=()=>{}}) {
   const maid=kind==='maid',fh=kind==='oat-fh';
   let patients=[],view='active',query='',busy=false,ready=false,loaded=false,loadState='idle',loadMessage='';
   host.classList.add('clinic-workspace');
@@ -19,7 +21,10 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
     <div class="clinic-table-wrap" role="region" aria-label="${title} patient list" tabindex="0"><table class="clinic-table"><caption class="sr-only">${title} patients</caption><thead><tr><th scope="col">#</th><th scope="col">Patient</th><th scope="col">PHN</th><th scope="col">Patient phone</th>${maid?'<th scope="col">Primary / family contact</th>':''}${maid?'<th scope="col">Location</th>':''}${maid?'<th scope="col" class="clinic-planning-heading">Assessment</th><th scope="col">Provision</th><th scope="col">1645</th><th scope="col">Details / actions</th>':''}</tr></thead><tbody></tbody></table></div>
     <div class="clinic-empty"><h2>Waiting for your patient list</h2><p>${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.</p></div><p class="clinic-feedback" role="status" aria-live="polite"></p>`;
   bindIdentity(host);
-  if(fh){const heading=document.createElement('th');heading.scope='col';heading.className='clinic-actions-heading';heading.innerHTML='<span class="sr-only">Actions</span>';host.querySelector('thead tr').append(heading);host.classList.add('oat-fh-patients');}
+  if(!maid){
+    const dateHeading=document.createElement('th'),heading=document.createElement('th');dateHeading.scope=heading.scope='col';dateHeading.className='oat-status-date-heading';
+    heading.className='clinic-actions-heading';heading.innerHTML='<span class="sr-only">Actions</span>';host.querySelector('thead tr').append(dateHeading,heading);host.classList.add('oat-patient-panel');
+  }
   const messages=fh?oatPatientMessages(host,onChange):null;
   const hideTip = bindRosterTips(host);
   if(onReload){const reload=document.createElement('button');reload.textContent='Reload '+title;reload.className='clinic-reload';reload.onclick=()=>{if(!busy)void onReload();};host.querySelector('.clinic-toolbar').append(reload);}
@@ -121,18 +126,20 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
     return card;
   }
   const phoneDialog=document.createElement('dialog'),phoneMenu=document.createElement('div');
-  if(onPhone){
+  if(onPhone||onStatus){
     phoneMenu.popover='auto';phoneMenu.className='clinic-phone-menu';
-    phoneMenu.innerHTML='<button type="button">Add phone…</button>';host.append(phoneMenu);
+    host.append(phoneMenu);
+  }
+  if(onPhone){
     phoneDialog.className='clinic-remove-dialog';
     phoneDialog.innerHTML='<form><h2>Patient phone</h2><p></p><label>Phone number<input type="tel" name="phone" required maxlength="80"></label><p role="alert"></p><div class="actions"><button type="button">Cancel</button><button type="submit">Save phone</button></div></form>';
-    host.append(phoneDialog);
+    dialogHost.append(phoneDialog);
     phoneDialog.querySelector('[type=button]').onclick=()=>phoneDialog.close();
     phoneDialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
     phoneDialog.addEventListener('close',onChange);
   }
   function openPhone(patient){
-    if(!ready||busy||phoneDialog.open)return;
+    if(!onPhone||!ready||busy||phoneDialog.open)return;
     const form=phoneDialog.querySelector('form'),input=form.elements.phone,error=form.querySelector('[role=alert]');
     form.querySelector('p').textContent=patient.name;
     input.value=patient.phone||'';error.textContent='';
@@ -150,6 +157,52 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
       finally{busy=false;controls.forEach(el=>el.disabled=false);if(!phoneDialog.open){render();feedback.textContent='Phone saved.';}onChange();}
     };
     phoneDialog.showModal();input.focus();onChange();
+  }
+  let lastStatusChange=null;
+  const notice=document.createElement('div');notice.className='oat-status-notice';notice.hidden=true;
+  notice.innerHTML='<span role="status" aria-live="polite"></span><button type="button" data-status-view></button><button type="button" data-status-undo>Undo</button><button type="button" data-status-dismiss aria-label="Dismiss status notification">×</button>';
+  if(!maid)host.append(notice);
+  notice.querySelector('[data-status-dismiss]').onclick=()=>{lastStatusChange=null;notice.hidden=true;};
+  function statusNotice(){
+    const undo=notice.querySelector('[data-status-undo]');
+    if(lastStatusChange){
+      const current=patients.find(p=>p.id===lastStatusChange.patientId);
+      if(!current||oatStatusVersion(current)!==lastStatusChange.version){lastStatusChange=null;notice.hidden=true;}
+    }
+    undo.disabled=busy||!ready||!lastStatusChange;
+  }
+  async function changeStatus(patient,status,options={}){
+    if(busy||!ready||!onStatus)return;
+    const action=oatStatusAction(patient,kind,status,options);
+    busy=true;onChange();render();
+    try{
+      const saved=await onStatus(action),next=saved.roster.patients.find(p=>p.id===patient.id);
+      patients=structuredClone(saved.roster.patients);
+      lastStatusChange=options.undoOf?null:{patientId:patient.id,from:patient.status,id:action.id,version:oatStatusVersion(next)};
+      const text=options.undoOf?'Status change undone.':options.review==='keep'?patient.name+' kept '+(status==='active'?'active.':'in history.'):patient.name+(status==='active'?' reactivated.':' moved to history.');
+      notice.querySelector('[role=status]').textContent=text+(saved.local?' Saved to laptop folder · cloud sync unverified.':'');
+      const viewButton=notice.querySelector('[data-status-view]');viewButton.textContent=status==='active'?'View active':'View history';viewButton.onclick=()=>onPatientView?.(status);
+      const undo=notice.querySelector('[data-status-undo]');undo.hidden=!lastStatusChange;
+      undo.onclick=()=>{const current=patients.find(p=>p.id===lastStatusChange?.patientId);if(current)void changeStatus(current,lastStatusChange.from,{undoOf:lastStatusChange.id});};
+      notice.hidden=false;
+    }catch(error){ready=false;loadState='error';loadMessage=error.message+' Status change was not confirmed. Reload '+title+' before continuing.';notice.hidden=true;}
+    finally{busy=false;render();if(!notice.hidden)(lastStatusChange?notice.querySelector('[data-status-undo]'):notice.querySelector('[data-status-view]')).focus();onChange();}
+  }
+  function openPatientMenu(patient,button){
+    phoneMenu.replaceChildren();
+    const item=(text,action)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=()=>{phoneMenu.hidePopover();action();};phoneMenu.append(b);};
+    if(onPhone)item(patient.phone?'Edit phone…':'Add phone…',()=>openPhone(patient));
+    if(onStatus){
+      item(patient.status==='active'?'Move to history':'Reactivate',()=>void changeStatus(patient,patient.status==='active'?'history':'active'));
+      if(patient.statusReview){
+        item('Keep current status',()=>void changeStatus(patient,patient.status,{review:'keep'}));
+        item('Use imported status: '+patient.statusReview.panelStatus,()=>void changeStatus(patient,patient.statusReview.panelStatus,{review:'panel'}));
+      }
+    }
+    phoneMenu.showPopover();const box=button.getBoundingClientRect();
+    phoneMenu.style.left=Math.max(4,Math.min(box.left,innerWidth-phoneMenu.offsetWidth-4))+'px';
+    phoneMenu.style.top=(box.bottom+phoneMenu.offsetHeight+4<innerHeight?box.bottom+3:Math.max(4,box.top-phoneMenu.offsetHeight-3))+'px';
+    phoneMenu.querySelector('button').focus();
   }
   function compactContact(contact,fallback) {
     const wrapper=document.createElement('div');
@@ -170,16 +223,22 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
   function render(){
     hideTip();
     if(phoneMenu.matches(':popover-open'))phoneMenu.hidePopover();
-    body.replaceChildren();feedback.textContent=busy?'Saving MAID…':'';host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open||provisionDialog.open);
+    body.replaceChildren();feedback.textContent=busy?'Saving '+title+'…':'';statusNotice();host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open||provisionDialog.open||phoneDialog.open);
     const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!['loading','error'].includes(loadState);
     loadStatus.textContent=loadState==='error'?loadMessage+(loaded?(maid?' Showing the last loaded list; changes are disabled until reload succeeds.':' Showing the last loaded list.'): ''):loaded?`Refreshing ${title} patients…`:`Loading ${title} patients…`;
     const showPlanning=maid;
     const appPatients=maid?maidAppPatients(patients):patients.filter(p=>p.status===view);
     const inView=appPatients.map((patient,index)=>({patient,index})).filter(({patient})=>!maid||view==='all'||(isProvisionPending(patient)?'active':patient.status)===view);
-    const visible=inView.filter(({patient:p})=>[p.name,p.phn,p.ava,patientLocation(p),p.plannedProvision?.location,p.plannedProvision?.address,...appContacts(p.contacts).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query));
+    const visible=inView.filter(({patient:p})=>maid?[p.name,p.phn,p.ava,patientLocation(p),p.plannedProvision?.location,p.plannedProvision?.address,...appContacts(p.contacts).map(c=>c.name)].join(' ').toLocaleLowerCase().includes(query):oatPatientMatches(p,query));
     count.textContent=!loaded?(loadState==='loading'?'Loading patients…':loadState==='error'?'Patient list unavailable':'Patient list not loaded'):`${visible.length} of ${inView.length} patients`;
     empty.hidden=visible.length>0;
-    if(!maid)host.querySelector('.clinic-heading p').textContent=view==='history'?'Patients no longer on the active clinic list.':'Patients on the current clinic list.';
+    if(!maid){
+      host.querySelector('.clinic-heading h1').textContent=view==='history'?'Historical patients':'Active patients';
+      host.querySelector('.clinic-heading p').textContent=title+' · '+(view==='history'?'Previous patients, ready to reactivate.':'Your current clinic list.');
+      host.querySelector('.oat-status-date-heading').textContent=view==='history'?'Moved to history':'Active since';
+      host.querySelector('input[type=search]').placeholder=view==='history'?'Search history · name, PHN or Ava number':'Search active · name, PHN or Ava number';
+    }
+    empty.querySelector('[data-search-other]')?.remove();
     if(!visible.length){
       empty.querySelector('h2').textContent=appPatients.length?'No patients match this view':'Waiting for your patient list';
       empty.querySelector('p').textContent=appPatients.length?'Try another search or patient view.':`${maid?'Your current patients will start in Active.':'Your patients will appear here in the supplied clinic order.'} Names will open Ava, with Copy PHN beside them.`;
@@ -188,12 +247,14 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
       else if(!loaded){empty.querySelector('h2').textContent=`${title} patient list not loaded`;empty.querySelector('p').textContent='Connect your workspace, then reload '+title+'.';}
       else if(!maid&&view==='history'&&!appPatients.length){empty.querySelector('h2').textContent='No patients in history';empty.querySelector('p').textContent='Patients who leave the active list will appear here.';}
       else if(!appPatients.length){empty.querySelector('h2').textContent=`No ${title} patients`;empty.querySelector('p').textContent=maid?'There are no patients to show. Completed provisions are removed automatically after closeout.':'The saved '+title+' roster is empty.';}
+      if(!maid&&loaded&&loadState==='ready'&&onPatientView){const searchOther=document.createElement('button');searchOther.type='button';searchOther.dataset.searchOther='';searchOther.textContent=view==='active'?'Search history':'Search active patients';searchOther.onclick=()=>onPatientView(view==='active'?'history':'active');empty.append(searchOther);}
     }
     for(const {patient:p,index} of visible){
       const row=document.createElement('tr');cell(row,String(index+1));
       const name=cell(row,'');const url=avaChartUrl(p);
       if(url){const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=p.name;link.title='Open Ava chart';name.append(link);}
       else {name.textContent=p.name;const hint=document.createElement('small');hint.textContent=maid?'Ava number needed':'Ava number pending';name.append(hint);}
+      if(!maid&&p.statusReview){const review=document.createElement('small');review.className='oat-status-review';review.textContent='Latest list differs';review.title='The '+p.statusReview.asOf+' list indicates '+p.statusReview.panelStatus+'. Review this patient’s status in the actions menu.';name.append(review);}
       const phn=cell(row,'');const digits=String(p.phn||'').replace(/\D/g,'');
       if(/^\d{10}$/.test(digits)){
         const value=document.createElement('span');value.textContent=digits;phn.append(value);
@@ -214,29 +275,23 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
           add.onclick=()=>openPhone(p);
           controls.append(add);phone.append(controls);
         }
-        let actionButtons;
-        if(fh){
-          const actions=cell(row,'');actions.className='clinic-actions';
-          actionButtons=document.createElement('div');actionButtons.className='roster-billing-actions';
-          const message=messages.button(p);message.disabled=!ready||busy;actionButtons.append(message);actions.append(actionButtons);
+        const statusDate=oatStatusDate(p);cell(row,statusDate?formatDate(statusDate):'—').className='oat-status-date';
+        const actions=cell(row,'');actions.className='clinic-actions';
+        const actionButtons=document.createElement('div');actionButtons.className='roster-billing-actions';actions.append(actionButtons);
+        if(p.status==='history'&&onStatus){
+          const restore=document.createElement('button');restore.type='button';restore.className='roster-icon oat-reactivate';restore.title='Reactivate';restore.setAttribute('aria-label','Reactivate '+p.name);restore.disabled=!ready||busy;
+          restore.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3 21v-2a7 7 0 0 1 12-5m1 3 2 2 4-5"/></svg>';
+          restore.onclick=()=>void changeStatus(p,'active');actionButtons.append(restore);
         }
-        if(onPhone&&(p.phone||fh)){
+        if(fh){const message=messages.button(p);message.disabled=!ready||busy;actionButtons.append(message);}
+        if(onPhone||onStatus){
           const more=document.createElement('button');
           more.type='button';more.className='clinic-phone-edit';more.textContent='⋯';
-          more.setAttribute('aria-label',(fh?'Actions for ':'Phone actions for ')+p.name);
-          more.title='Phone actions';
+          more.setAttribute('aria-label','Actions for '+p.name);
+          more.title='Patient actions';
           more.disabled=!ready||busy;
-          more.onclick=()=>{
-            phoneMenu.showPopover();
-            const box=more.getBoundingClientRect();
-            phoneMenu.style.left=Math.max(4,Math.min(box.left,innerWidth-phoneMenu.offsetWidth-4))+'px';
-            phoneMenu.style.top=(box.bottom+phoneMenu.offsetHeight+4<innerHeight?box.bottom+3:box.top-phoneMenu.offsetHeight-3)+'px';
-            const edit=phoneMenu.querySelector('button');
-            edit.textContent=p.phone?'Edit phone…':'Add phone…';
-            edit.onclick=()=>{phoneMenu.hidePopover();openPhone(p);};
-            edit.focus();
-          };
-          (actionButtons||phone).append(more);
+          more.onclick=()=>openPatientMenu(p,more);
+          actionButtons.append(more);
         }
       }
       if(maid)cell(row,patientLocation(p));
@@ -281,7 +336,8 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
   render();
   return {
     state(){return {busy:busy||phoneDialog.open||planningDialog.open||provisionDialog.open||Boolean(messages?.open),ready,loading:loadState==='loading',dirty:false};},
-    selectPatientView(value){if(!maid&&['active','history'].includes(value)){if(value!==view){query='';host.querySelector('input[type=search]').value='';}view=value;render();}},
+    selectPatientView(value){if(!maid&&['active','history'].includes(value)){view=value;render();}},
+    editPhone(patientId){const patient=patients.find(p=>p.id===patientId);if(patient)openPhone(patient);},
     setPatients(records){if(busy)return;linkButton.hidden=true;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
     loading({preserve=true}={}){ready=false;linkButton.hidden=true;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
     error(message,{link=false}={}){ready=false;linkButton.hidden=!link;loadState='error';loadMessage=message;render();}

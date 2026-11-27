@@ -20,7 +20,7 @@ try{
   assert.equal((await fetch(origin+'/api/oat-fh/roster')).status,401);
   gate=new Promise(r=>release=r);await page.goto(origin+'/?section=oat-fh');
   await oat.getByRole('button',{name:'Active patients',exact:true}).click();
-  await oat.getByRole('heading',{name:'Loading OAT FH patients…'}).waitFor();
+  await oat.getByRole('heading',{name:'Loading OAT Fraser Health patients…'}).waitFor();
   await page.locator('[data-section="billing"]').click();await page.locator('[data-section="oat-fh"]').click();assert.equal(reads,1);
   gate=null;release();await oat.locator('.clinic-count').filter({hasText:'60 of 60 patients'}).waitFor();
   assert.deepEqual(await oat.locator('tbody a').allTextContents(),records.patients.map(p=>p.name));
@@ -28,13 +28,13 @@ try{
   assert.equal(await oat.locator('tbody a').first().getAttribute('rel'),'noopener noreferrer');
   assert.equal(await oat.locator('tbody a').first().getAttribute('target'),'_blank');
   await oat.getByRole('searchbox').fill('Synthetic OAT 01');assert.equal(await oat.locator('tbody tr').count(),1);assert.equal(await oat.locator('tbody td').first().innerText(),'60');
-  await oat.getByRole('searchbox').fill('');fail=true;await oat.getByRole('button',{name:'Reload OAT FH',exact:true}).click();
+  await oat.getByRole('searchbox').fill('');fail=true;await oat.getByRole('button',{name:'Reload OAT Fraser Health',exact:true}).click();
   await oat.locator('.clinic-load-status').filter({hasText:'Synthetic OAT read failed'}).waitFor();assert.equal(await oat.locator('tbody tr').count(),60);
-  await oat.getByRole('searchbox').fill('no match');await oat.getByRole('heading',{name:'OAT FH roster could not load'}).waitFor();
-  fail=false;await oat.getByRole('searchbox').fill('');await oat.getByRole('button',{name:'Reload OAT FH',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#oat-fh-workspace .clinic-load-status').hidden);
+  await oat.getByRole('searchbox').fill('no match');await oat.getByRole('heading',{name:'OAT Fraser Health roster could not load'}).waitFor();
+  fail=false;await oat.getByRole('searchbox').fill('');await oat.getByRole('button',{name:'Reload OAT Fraser Health',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#oat-fh-workspace .clinic-load-status').hidden);
   const writeStatus=await page.evaluate(async()=>{const {LocalAdapter}=await import('./adapters.mjs');const adapter=new LocalAdapter();await adapter.connect();const response=await fetch('/api/oat-fh/roster',{method:'POST',headers:{'X-Trim-Session':adapter.csrf,'Content-Type':'application/json'},body:'{}'});return response.status;});assert.equal(writeStatus,400);
   await page.setViewportSize({width:390,height:844});assert.equal(await oat.locator('tbody tr').count(),60);assert.ok(await oat.getByRole('searchbox').isVisible());
-  await writeFile(oatPath,JSON.stringify({...records,patients:[]}));await oat.getByRole('button',{name:'Reload OAT FH',exact:true}).click();await oat.getByRole('heading',{name:'No OAT FH patients',exact:true}).waitFor();
+  await writeFile(oatPath,JSON.stringify({...records,patients:[]}));await oat.getByRole('button',{name:'Reload OAT Fraser Health',exact:true}).click();await oat.getByRole('heading',{name:'No OAT Fraser Health patients',exact:true}).waitFor();
   await writeFile(oatPath,original);await page.reload();await oat.getByRole('button',{name:'Active patients',exact:true}).click();await oat.locator('.clinic-count').filter({hasText:'60 of 60 patients'}).waitFor();
   assert.deepEqual(errors,[]);assert.equal(await readFile(oatPath,'utf8'),original);assert.equal(await readFile(rosterPath,'utf8'),panel);assert.equal(await readFile(billingPath,'utf8'),ledger);
   console.log('PASS OAT canonical local loading, 60 ordered Ava links, search, loading/error/retry/empty states, navigation deduplication, authenticated read-only API, mobile and unchanged source/billing/TRIM data.');

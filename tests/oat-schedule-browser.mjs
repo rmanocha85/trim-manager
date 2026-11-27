@@ -36,7 +36,7 @@ try{
  assert.equal(await host.locator('.oat-schedule-table tbody tr').count(),5);assert.equal(await host.locator('.oat-schedule-table tbody a').count(),3);assert.equal(await host.locator('.oat-schedule-table tbody a').first().getAttribute('href'),'https://www.avaemr.ca/patients/1234567');assert.match(await host.locator('.oat-schedule-table').innerText(),/Patient match needed/);
  await page.screenshot({path:'work/oat-schedule-preview.png',fullPage:true});
  await setDate('2026-11-20');await host.getByRole('heading',{name:'No schedule saved',exact:true}).waitFor();assert.equal(await host.locator('.oat-schedule-table').isVisible(),false);
- await host.getByRole('button',{name:'Active patients',exact:true}).click();assert.deepEqual(await host.locator('[data-oat-patients] thead th').allTextContents(),['#','Patient','PHN','Patient phone','Actions']);assert.equal(await host.locator('[data-oat-patients] tbody tr').count(),3);assert.doesNotMatch(await host.locator('[data-oat-patients]').getByRole('searchbox').getAttribute('placeholder'),/location/i);
+ await host.getByRole('button',{name:'Active patients',exact:true}).click();assert.deepEqual(await host.locator('[data-oat-patients] thead th').allTextContents(),['#','Patient','PHN','Patient phone','Active since','Actions']);assert.equal(await host.locator('[data-oat-patients] tbody tr').count(),3);assert.doesNotMatch(await host.locator('[data-oat-patients]').getByRole('searchbox').getAttribute('placeholder'),/location/i);
  await host.getByRole('button',{name:'Schedule',exact:true}).click();await setDate('2026-11-13');await page.setViewportSize({width:390,height:844});assert.equal(await host.locator('.oat-schedule-table tbody a').count(),3);assert.ok(await host.getByRole('button',{name:'Choose clinic date',exact:true}).isVisible());
  assert.equal(await readFile(oatPath,'utf8'),original);
  await host.getByRole('searchbox',{name:'Search clinic day'}).fill('Patel');assert.equal(await host.locator('.oat-schedule-table tbody tr').count(),1);
@@ -70,7 +70,7 @@ try{
  const addPhone=first.getByRole('button',{name:/Add phone number/});
  assert.equal(await addPhone.locator('svg').count(),1);
  await addPhone.click();
- const phoneForm=panel.getByRole('dialog');
+ const phoneForm=host.locator('.clinic-remove-dialog');
  await phoneForm.getByRole('textbox').fill('604-555-0142');await phoneForm.getByRole('button',{name:'Save phone'}).click();
  await first.getByRole('link',{name:/Call Jordan/}).waitFor();
  assert.equal(await first.getByRole('link',{name:/Call Jordan/}).getAttribute('href'),'tel:6045550142');

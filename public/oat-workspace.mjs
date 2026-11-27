@@ -1,4 +1,6 @@
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-oat-actions1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-oat-history1';
+import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
+import {bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
 import {avaChartUrl} from './patient-links.mjs';
 import {appointmentsForDate,upcomingFriday,pacificDate} from './oat-schedule.mjs?v=20261117-purple1';
 import {dateCalendar} from './maid-date-calendar.mjs?v=20261113-combined1';
@@ -10,16 +12,24 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
     ['schedule','Schedule','<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h3m3 0h3"/>'],
     ['patients','Active patients','<circle cx="10" cy="8" r="3.5"/><path d="M3 21v-2a7 7 0 0 1 12-5m1 3 2 2 4-5"/>'],
     ['history','Patient history','<path d="M3 11a9 9 0 1 1 2 7M3 5v6h6m3-5v6l4 2"/>']
-  ].map(([key,label,icon])=>'<button type="button" data-oat-view="'+key+'" title="'+label+'" aria-label="'+label+'" aria-pressed="'+(key==='schedule')+'"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></button>').join('');
-  const tableMarkup=caption=>'<table class="clinic-table"><caption class="sr-only">'+caption+'</caption><thead><tr><th scope="col">Time</th><th scope="col">Finished</th><th scope="col">Patient</th><th scope="col">PHN</th><th scope="col">Notes</th></tr></thead><tbody></tbody></table>';
+  ].map(([key,label,icon])=>'<button type="button" data-oat-view="'+key+'" title="'+label+'" aria-label="'+label+'" aria-pressed="'+(key==='schedule')+'"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg>'+(key==='schedule'?'':'<span class="oat-view-count" aria-hidden="true"></span>')+'</button>').join('');
+  const tableMarkup=caption=>'<table class="clinic-table"><caption class="sr-only">'+caption+'</caption><thead><tr><th scope="col">Time</th><th scope="col">Finished</th><th scope="col">Patient</th><th scope="col">PHN</th><th scope="col">Phone</th><th scope="col">Notes</th></tr></thead><tbody></tbody></table>';
   host.innerHTML='<nav class="clinic-filters oat-views" aria-label="'+title+' views">'+tabs+'</nav><section data-oat-schedule><div class="clinic-heading"><div><h1>'+title+'</h1>'+(clinic==='oat-fh'?'<p>RAAC clinic</p>':'')+'</div></div><div class="oat-day-controls"><input type="hidden" data-clinic-date><button data-calendar popovertarget="'+calendarId+'" aria-label="Choose clinic date"></button><button data-upcoming>Upcoming Friday</button><button data-reload>Reload '+title+'</button></div><div id="'+calendarId+'" class="oat-calendar" popover><section class="planning-calendar" aria-label="Clinic date calendar"><div class="planning-calendar-nav"><button type="button" data-month="-1" aria-label="Previous month">‹</button><h3 aria-live="polite"></h3><button type="button" data-month="1" aria-label="Next month">›</button></div><div class="planning-weekdays" aria-hidden="true"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="planning-days"></div><button type="button" data-today>Current month</button><p class="planning-selected" aria-live="polite"></p></section></div><div class="oat-day-heading"><h2></h2><span class="oat-appointment-count"></span></div><div class="oat-search"><label>Find a patient<input type="search" placeholder="Search this day · name, PHN or notes" aria-label="Search clinic day"></label></div><p class="oat-schedule-status" role="status" aria-live="polite"></p><p class="oat-save-status" role="status" aria-live="polite"></p><div class="clinic-table-wrap oat-schedule-table">'+tableMarkup('Remaining appointments')+'</div><div class="clinic-empty oat-schedule-empty"><h2></h2><p></p></div><details class="oat-completed"><summary>Show Completed</summary><div class="clinic-table-wrap">'+tableMarkup('Completed appointments')+'</div><p data-completed-empty>No completed appointments.</p></details></section><section data-oat-patients hidden></section>';
   const schedule=host.querySelector('[data-oat-schedule]'),panel=host.querySelector('[data-oat-patients]');
-  const rosterUI=clinicRosterUI({host:panel,kind:clinic,title,onReload,onChange,onPhone:onSave && (async action=>{
+  const savePatient=onSave && (async action=>{
     const saved=await onSave(action);
     roster=structuredClone(saved.roster);
+    if(action.type==='patient-phone')feedback.textContent=saved.local?'Phone saved to laptop folder · cloud sync unverified.':'Phone saved.';
     render();
     return saved;
-  })});
+  });
+  const saveStatus=savePatient && (async action=>{
+    try{return await savePatient(action);}
+    catch(error){loadState='error';message=error.message+' Reload '+title+' to check the saved status.';render();throw error;}
+  });
+  const rosterUI=clinicRosterUI({host:panel,kind:clinic,title,onReload,onChange,dialogHost:host,onPhone:savePatient,onStatus:saveStatus,onPatientView:value=>selectView(value==='history'?'history':'patients')});
+  const hideScheduleTip=bindRosterTips(schedule);
+  bindIdentity(schedule);
   let roster=null,loadState='idle',message='',busy=false,query='';
   const date=host.querySelector('[data-clinic-date]'),rows=host.querySelector('.oat-schedule-table tbody'),table=host.querySelector('.oat-schedule-table'),empty=host.querySelector('.oat-schedule-empty'),status=host.querySelector('.oat-schedule-status'),feedback=host.querySelector('.oat-save-status'),completed=host.querySelector('.oat-completed'),doneRows=completed.querySelector('tbody'),popover=host.querySelector('.oat-calendar');
   const defaultDate=clinic==='oat-fh'?upcomingFriday:pacificDate;
@@ -38,7 +48,7 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
   function rowFor(slot){
     const row=document.createElement('tr');row.dataset.appointment=slot.id;
     const cell=()=>{const td=document.createElement('td');row.append(td);return td;};
-    const time=cell(),finish=cell(),name=cell(),phn=cell(),note=cell();finish.className="oat-finished";phn.className="oat-phn";
+    const time=cell(),finish=cell(),name=cell(),phn=cell(),phone=cell(),note=cell();finish.className="oat-finished";phn.className="oat-phn";phone.className='oat-schedule-phone';
     const [hour,minute]=slot.time.split(':').map(Number);time.textContent=(hour%12||12)+':'+String(minute).padStart(2,'0')+' '+(hour<12?'a.m.':'p.m.');time.className='oat-time';
     const url=slot.patient&&avaChartUrl(slot.patient),label=slot.patient?.name||slot.sourceName||slot.label;
     if(url){const link=document.createElement('a');link.textContent=label;link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.title='Open Ava chart';name.append(link);}else name.textContent=label;
@@ -50,6 +60,13 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
       const copy=document.createElement('button');copy.type='button';copy.className='clinic-phn-copy';copy.title='Copy PHN';copy.setAttribute('aria-label','Copy PHN for '+label);copy.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg>';
       copy.onclick=async()=>{try{await navigator.clipboard.writeText(digits);feedback.textContent='PHN copied.';}catch{feedback.textContent='Could not copy. Select the displayed PHN to copy it.';}};phn.append(copy);
     }else phn.textContent=slot.patientId||slot.sourceName?'Not recorded':'';
+    if(slot.patient){
+      if(slot.patient.phone)phone.innerHTML=phoneControls({phone:slot.patient.phone,role:'Patient'},slot.patient.name);
+      const edit=document.createElement('button');edit.type='button';edit.className=slot.patient.phone?'clinic-phone-edit':'roster-icon';
+      edit.innerHTML=slot.patient.phone?'⋯':handset;edit.title=(slot.patient.phone?'Edit':'Add')+' phone number';
+      edit.setAttribute('aria-label',(slot.patient.phone?'Edit':'Add')+' phone number for '+slot.patient.name);edit.disabled=!onSave||loadState!=='ready'||busy;
+      edit.onclick=()=>rosterUI.editPhone(slot.patient.id);const controls=document.createElement('span');controls.className='roster-phone';controls.append(edit);phone.append(controls);
+    }
     note.textContent=slot.note||'';
     if(slot.patientId||slot.sourceName){
       const check=document.createElement('input');check.type='checkbox';check.checked=slot.finished===true;check.disabled=busy||loadState!=='ready'||!onSave;check.setAttribute('aria-label','Finished appointment for '+label);finish.append(check);
@@ -67,6 +84,11 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
     return row;
   }
   function render(){
+    hideScheduleTip();
+    for(const key of ['patients','history']){
+      const button=host.querySelector('[data-oat-view="'+key+'"]'),total=roster?.patients.filter(p=>p.status===(key==='patients'?'active':'history')).length;
+      button.querySelector('.oat-view-count').textContent=total??'—';button.title=(key==='patients'?'Active patients':'Patient history')+(total===undefined?'':' · '+total);
+    }
     host.querySelector('[data-calendar]').textContent='📅 '+formatDate(date.value);
     host.querySelector('.oat-day-heading h2').textContent=formatDate(date.value);
     const slots=roster?appointmentsForDate(roster,date.value):null;
@@ -81,7 +103,11 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
     empty.querySelector('h2').textContent=loadState==='loading'&&!roster?'Loading clinic schedule…':loadState==='error'?'Schedule needs attention':!roster?'Connect your workspace':query?'No matches':slots?.length?'No appointments remaining':slots?'No appointments':'No schedule saved';
     empty.querySelector('p').textContent=loadState==='error'?message:!roster?'Connect TRIM to load your clinic schedule.':query?'Try another name, PHN or note.':slots?.length?'Open Show Completed to review finished appointments.':'Your appointments will appear here once this clinic schedule is added.';
   }
-  host.querySelectorAll('[data-oat-view]').forEach(button=>button.onclick=()=>{const showSchedule=button.dataset.oatView==='schedule';schedule.hidden=!showSchedule;panel.hidden=showSchedule;if(!showSchedule)rosterUI.selectPatientView(button.dataset.oatView==='history'?'history':'active');host.querySelectorAll('[data-oat-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));});
+  function selectView(value){
+    if(busy||rosterUI.state().busy)return;
+    const showSchedule=value==='schedule';schedule.hidden=!showSchedule;panel.hidden=showSchedule;if(!showSchedule)rosterUI.selectPatientView(value==='history'?'history':'active');host.querySelectorAll('[data-oat-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.oatView===value)));
+  }
+  host.querySelectorAll('[data-oat-view]').forEach(button=>button.onclick=()=>selectView(button.dataset.oatView));
   host.querySelector('[type=search]').oninput=e=>{query=e.target.value.trim().toLocaleLowerCase();render();};
   host.querySelector('[data-upcoming]').onclick=()=>{date.value=defaultDate();feedback.textContent='';render();};host.querySelector('[data-reload]').onclick=()=>void onReload();render();
   return {

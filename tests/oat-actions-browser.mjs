@@ -91,7 +91,7 @@ try{
   await page.locator('[data-section="oat-purple"]').click();const purpleHost=page.locator('#oat-purple-workspace');
   await purpleHost.getByRole('button',{name:'Active patients',exact:true}).click();await purpleHost.locator('tbody tr').first().waitFor();
   assert.equal(await purpleHost.locator('.oat-patient-message').count(),0);
-  assert.equal(await purpleHost.locator('[data-oat-patients] thead th').count(),4);
+  assert.equal(await purpleHost.locator('[data-oat-patients] thead th').count(),6);
 
   await page.locator('[data-section="patients"]').click();
   const contact=page.locator('#patients-workspace .family-contact');await contact.first().waitFor();
