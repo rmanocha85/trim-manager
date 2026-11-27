@@ -27,7 +27,7 @@ try{
  await purple.getByRole('button',{name:/Add phone number/}).click();
  await purple.getByRole('textbox',{name:'Phone number'}).fill('604-555-0111');
  await purple.getByRole('button',{name:'Save phone'}).click();
- await purple.getByRole('link',{name:/Call Purple Patient/}).waitFor();
+ await purple.getByRole('button',{name:/Edit phone number for Purple Patient/}).waitFor();
  assert.equal(JSON.parse(await readFile(purplePath)).patients[0].phone,'604-555-0111');
  assert.equal(await readFile(oatPath,'utf8'),original);
  await page.goto(`http://127.0.0.1:${server.address().port}/?section=oat-fh`);const host=page.locator('#oat-fh-workspace');
@@ -72,8 +72,9 @@ try{
  await addPhone.click();
  const phoneForm=host.locator('.clinic-remove-dialog');
  await phoneForm.getByRole('textbox').fill('604-555-0142');await phoneForm.getByRole('button',{name:'Save phone'}).click();
- await first.getByRole('link',{name:/Call Jordan/}).waitFor();
- assert.equal(await first.getByRole('link',{name:/Call Jordan/}).getAttribute('href'),'tel:6045550142');
+ await first.getByRole('button',{name:/Edit phone number for Jordan/}).click();
+ assert.equal(await phoneForm.getByRole('link',{name:/Call Jordan/}).getAttribute('href'),'tel:6045550142');
+ await phoneForm.getByRole('button',{name:'Cancel',exact:true}).click();
  await first.getByRole('button',{name:/Copy number/}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'604-555-0142');
  await panel.getByRole('button',{name:/^Reload OAT (FH|Fraser Health)$/}).click();await first.getByRole('button',{name:/Actions for/}).click();await panel.getByRole('button',{name:'Edit phone…'}).click();
  await phoneForm.getByRole('textbox').fill('604-555-0121');

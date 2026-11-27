@@ -56,3 +56,16 @@
 .oat-day-controls{align-items:center}.oat-day-controls button{height:42px;margin:0;white-space:nowrap}.oat-search{margin-bottom:16px}.oat-search label{display:grid;gap:6px;font-size:13px;color:#465e49}.oat-search input{width:min(440px,100%);min-height:42px;background:white}.oat-completed{margin-top:20px}.oat-completed>summary{cursor:pointer;padding:12px 0;font-weight:600;color:#465e49}.oat-workspace [data-oat-schedule] td:nth-child(3),.oat-workspace [data-oat-schedule] td:last-child{white-space:normal}.oat-workspace [data-oat-schedule] th:nth-child(2),.oat-workspace .oat-finished{width:58px;text-align:center}.oat-workspace .oat-phn{white-space:nowrap}.oat-phn span{user-select:all}.oat-workspace [type=checkbox]{width:18px;height:18px;min-height:0;accent-color:#386848;cursor:pointer}.oat-save-status{font-size:13px;color:#465e49}.oat-save-status:empty{display:none}.oat-calendar{width:min(340px,calc(100vw - 32px));padding:16px;border:1px solid #b4c5b3;border-radius:12px;box-shadow:0 8px 32px #183c2733;background:white}.oat-calendar::backdrop{background:#183c2722}
 
 .oat-views button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:44px;height:44px;padding:0 12px}.oat-views svg{width:22px;height:22px}.oat-views [aria-pressed="true"]{box-shadow:inset 0 -3px currentColor}.oat-view-count{font-size:13px;font-variant-numeric:tabular-nums}
+
+/* All OAT row controls share a centered box, including completed appointments. */
+.oat-workspace .clinic-table td{vertical-align:middle}
+.oat-workspace .roster-phone{display:inline-flex;align-items:center;vertical-align:middle;gap:2px}
+.oat-workspace .roster-phone .roster-icon,.oat-workspace .clinic-actions .roster-icon,.oat-workspace .clinic-table .clinic-phone-edit{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;box-sizing:border-box;width:36px;height:36px;min-height:36px;padding:8px;line-height:1;margin:0}
+.oat-workspace .clinic-table .clinic-phone-edit svg,.oat-workspace .oat-phone-edit svg{width:20px;height:20px;display:block;flex:none}
+.oat-workspace .clinic-actions .roster-billing-actions{display:flex;align-items:center;justify-content:flex-end;gap:2px}
+.oat-workspace .oat-day-actions{width:60px;min-width:60px;box-sizing:border-box}
+.oat-workspace .clinic-phone-menu button{display:flex;align-items:center;gap:10px}
+.clinic-menu-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 24px;width:24px;height:24px}
+.clinic-menu-icon svg{width:20px;height:20px}.clinic-ava-logo{width:24px;height:24px;object-fit:contain;background:white;border-radius:4px}
+.oat-phone-call{display:block;margin-top:12px;color:#235b46}.oat-phone-call[hidden]{display:none}
+@media(pointer:coarse){.oat-workspace .roster-phone .roster-icon,.oat-workspace .clinic-actions .roster-icon,.oat-workspace .clinic-table .clinic-phone-edit{width:44px;height:44px;min-height:44px}}

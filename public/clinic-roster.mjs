@@ -1,4 +1,5 @@
 import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
+import {oatPhoneControls,moreIcon,phoneAddIcon} from './oat-row-controls.mjs?v=20261127-oat-controls1';
 import {bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
 import {assessmentPlanningText} from './maid-assessment.mjs?v=20261112-provision1';
 import {dateCalendar} from './maid-date-calendar.mjs';
@@ -132,7 +133,7 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
   }
   if(onPhone){
     phoneDialog.className='clinic-remove-dialog';
-    phoneDialog.innerHTML='<form><h2>Patient phone</h2><p></p><label>Phone number<input type="tel" name="phone" required maxlength="80"></label><p role="alert"></p><div class="actions"><button type="button">Cancel</button><button type="submit">Save phone</button></div></form>';
+    phoneDialog.innerHTML='<form><h2>Patient phone</h2><p></p><label>Phone number<input type="tel" name="phone" required maxlength="80"></label><a class="oat-phone-call" hidden></a><p role="alert"></p><div class="actions"><button type="button">Cancel</button><button type="submit">Save phone</button></div></form>';
     dialogHost.append(phoneDialog);
     phoneDialog.querySelector('[type=button]').onclick=()=>phoneDialog.close();
     phoneDialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});
@@ -143,6 +144,8 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
     const form=phoneDialog.querySelector('form'),input=form.elements.phone,error=form.querySelector('[role=alert]');
     form.querySelector('p').textContent=patient.name;
     input.value=patient.phone||'';error.textContent='';
+    const call=form.querySelector('.oat-phone-call'),number=phoneLink(patient.phone||'');call.hidden=!number;
+    if(number){call.href=number.href;call.textContent='Call '+patient.phone;call.setAttribute('aria-label','Call '+patient.name+' at '+patient.phone);}else call.removeAttribute('href');
     form.onsubmit=async e=>{
       e.preventDefault();
       if(busy||!ready)return;
@@ -223,9 +226,9 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
     if(busy||!ready)return;
     (status?host:dialogHost).append(phoneMenu);
     phoneMenu.replaceChildren();
-    const item=(text,action)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=()=>{phoneMenu.hidePopover();action();};phoneMenu.append(b);};
-    if(onPhone)item(patient.phone?'Edit phone…':'Add phone…',()=>openPhone(patient));
-    if(onAva)item((patient.ava?'Edit':'Add')+' Ava EMR number',()=>openAva(patient));
+    const item=(text,action,icon)=>{const b=document.createElement('button');b.type='button';if(icon){const symbol=document.createElement('span');symbol.className='clinic-menu-icon';symbol.innerHTML=icon;b.append(symbol);}b.append(document.createTextNode(text));b.onclick=()=>{phoneMenu.hidePopover();action();};phoneMenu.append(b);};
+    if(onPhone)item(patient.phone?'Edit phone…':'Add phone…',()=>openPhone(patient),patient.phone?handset:phoneAddIcon);
+    if(onAva)item((patient.ava?'Edit':'Add')+' Ava EMR number',()=>openAva(patient),'<img src="'+new URL('./ava-logo.ico',import.meta.url).href+'" alt="" class="clinic-ava-logo">');
     if(onStatus&&status){
       item(patient.status==='active'?'Move to history':'Reactivate',()=>void changeStatus(patient,patient.status==='active'?'history':'active'));
       if(patient.statusReview){
@@ -298,17 +301,7 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
       if(maid)renderContacts(row,p);
       else {
         const phone=cell(row,'');
-        if(p.phone)phone.append(compactContact({phone:p.phone,role:'Patient'},p.name));
-        else {
-          const controls=document.createElement('span'),add=document.createElement('button');
-          controls.className='roster-phone';
-          add.type='button';add.className='roster-icon';add.innerHTML=handset;
-          add.title=onPhone?'Add phone number':'Phone number not recorded';
-          add.setAttribute('aria-label',add.title+' for '+p.name);
-          add.disabled=!onPhone||!ready||busy;
-          add.onclick=()=>openPhone(p);
-          controls.append(add);phone.append(controls);
-        }
+        phone.append(oatPhoneControls(p,{onEdit:onPhone?()=>openPhone(p):null,disabled:!ready||busy}));
         const statusDate=oatStatusDate(p);cell(row,statusDate?formatDate(statusDate):'—').className='oat-status-date';
         const actions=cell(row,'');actions.className='clinic-actions';
         const actionButtons=document.createElement('div');actionButtons.className='roster-billing-actions';actions.append(actionButtons);
@@ -320,7 +313,7 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
         if(fh){const message=messages.button(p);message.disabled=!ready||busy;actionButtons.append(message);}
         if(onPhone||onAva||onStatus){
           const more=document.createElement('button');
-          more.type='button';more.className='clinic-phone-edit';more.textContent='⋯';
+          more.type='button';more.className='clinic-phone-edit';more.innerHTML=moreIcon;
           more.setAttribute('aria-label','Actions for '+p.name);
           more.title='Patient actions';
           more.disabled=!ready||busy;

@@ -64,15 +64,17 @@ try{
     await schedule.getByRole('button',{name:'Copy PHN for Example, Alex',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'0000000009','Schedule keeps the supplied provincial identifier');
     await host.getByRole('searchbox',{name:'Search clinic day',exact:true}).fill('0000-000-009');assert.equal(await schedule.locator('tbody tr').count(),1);assert.equal(await schedule.getByRole('link',{name:'Example, Alex',exact:true}).getAttribute('href'),'https://www.avaemr.ca/patients/1234567');await host.getByRole('searchbox',{name:'Search clinic day',exact:true}).fill('');
     const addIcon=await schedule.getByRole('button',{name:'Add phone number for Sample, Robin',exact:true}).locator('svg').boundingBox();assert.ok(addIcon.width>=16&&addIcon.height>=16,'Missing-phone icon is visible on the schedule');
-    assert.equal(await schedule.getByRole('link',{name:/Call Example, Alex/}).getAttribute('href'),'tel:6045550101');
+    await schedule.getByRole('button',{name:'Edit phone number for Example, Alex',exact:true}).click();
+    assert.equal(await phoneForm.getByRole('link',{name:/Call Example, Alex/}).getAttribute('href'),'tel:6045550101');
+    await phoneForm.getByRole('button',{name:'Cancel',exact:true}).click();
     await schedule.getByRole('button',{name:'Copy number for Example, Alex',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'604-555-0101');
     await schedule.getByRole('button',{name:'Add phone number for Sample, Robin',exact:true}).click();await phoneForm.getByRole('textbox',{name:'Phone number'}).fill('604-555-0112');await phoneForm.getByRole('button',{name:'Save phone'}).click();
-    await schedule.getByRole('link',{name:/Call Sample, Robin.*604-555-0112/}).waitFor();
+    await schedule.locator('.roster-phone[data-roster-tip*="604-555-0112"]').waitFor();
     await schedule.getByRole('button',{name:'Actions for Sample, Robin',exact:true}).click();await host.getByRole('button',{name:'Edit phone…',exact:true}).click();await phoneForm.getByRole('textbox',{name:'Phone number'}).fill('604-555-0113');await phoneForm.getByRole('button',{name:'Save phone'}).click();
-    await schedule.getByRole('link',{name:/Call Sample, Robin.*604-555-0113/}).waitFor();
+    await schedule.locator('.roster-phone[data-roster-tip*="604-555-0113"]').waitFor();
     await schedule.getByRole('checkbox',{name:'Finished appointment for Sample, Robin'}).check();await host.getByText('Saved to laptop folder · cloud sync unverified.',{exact:true}).waitFor();
-    await host.locator('.oat-completed summary').click();assert.equal(await host.locator('.oat-completed').getByRole('link',{name:/Call Sample, Robin/}).getAttribute('href'),'tel:6045550113');
-    await page.reload();await host.getByRole('button',{name:'Choose clinic date'}).click();await host.locator('.oat-calendar [data-date="'+pacificDate()+'"]').click();await host.locator('.oat-completed summary').click();await host.locator('.oat-completed').getByRole('link',{name:/Call Sample, Robin.*604-555-0113/}).waitFor();
+    await host.locator('.oat-completed summary').click();await host.locator('.oat-completed').getByRole('button',{name:'Edit phone number for Sample, Robin',exact:true}).click();assert.equal(await phoneForm.getByRole('link',{name:/Call Sample, Robin/}).getAttribute('href'),'tel:6045550113');await phoneForm.getByRole('button',{name:'Cancel',exact:true}).click();
+    await page.reload();await host.getByRole('button',{name:'Choose clinic date'}).click();await host.locator('.oat-calendar [data-date="'+pacificDate()+'"]').click();await host.locator('.oat-completed summary').click();await host.locator('.oat-completed .roster-phone[data-roster-tip*="604-555-0113"]').waitFor();
     await active.click();
     await panel.getByRole('button',{name:'Actions for Example, Alex',exact:true}).click();await panel.getByRole('button',{name:'Move to history',exact:true}).click();await notice.getByText(/moved to history/).waitFor();
     // Undo must keep a phone edit made in the meantime, even by another browser.

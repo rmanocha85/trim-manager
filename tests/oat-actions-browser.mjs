@@ -66,12 +66,12 @@ try{
   await host.getByRole('button',{name:'Edit phone…',exact:true}).click();
   await host.getByRole('textbox',{name:'Phone number'}).fill('604-555-0199');
   await host.getByRole('button',{name:'Save phone',exact:true}).click();
-  await first.getByRole('link',{name:/Call Example, Alex.*604-555-0199/}).waitFor();
+  await first.locator('.roster-phone[data-roster-tip*="604-555-0199"]').waitFor();
   await second.getByRole('button',{name:'Actions for Sample, Robin',exact:true}).click();
   await host.getByRole('button',{name:'Add phone…',exact:true}).click();
   await host.getByRole('textbox',{name:'Phone number'}).fill('604-555-0198');
   await host.getByRole('button',{name:'Save phone',exact:true}).click();
-  await second.getByRole('link',{name:/Call Sample, Robin.*604-555-0198/}).waitFor();
+  await second.locator('.roster-phone[data-roster-tip*="604-555-0198"]').waitFor();
   assert.deepEqual(JSON.parse(await readFile(oatPath,'utf8')).patients.map(p=>p.phone),['604-555-0199','604-555-0198',undefined]);
 
   for(const width of [1440,1920,390]){
@@ -85,7 +85,7 @@ try{
     assert.ok(metrics.gap>=10&&metrics.gap<20,'Menu is at the far right');assert.ok(metrics.overlap<=1,'Action icons do not overlap');
   }
   await page.setViewportSize({width:1440,height:940});await page.screenshot({path:'work/oat-fh-actions-synthetic.png'});
-  await page.reload();await host.getByRole('button',{name:'Active patients',exact:true}).click();await first.getByRole('link',{name:/604-555-0199/}).waitFor();
+  await page.reload();await host.getByRole('button',{name:'Active patients',exact:true}).click();await first.locator('.roster-phone[data-roster-tip*="604-555-0199"]').waitFor();
   await message.click();assert.equal(await page.evaluate(async()=>(await navigator.clipboard.readText()).replaceAll('\r\n','\n')),expected(patients[0]));
   await host.getByRole('button',{name:'Patient history',exact:true}).click();await host.getByRole('button',{name:'Copy OAT care confirmation for History, Taylor'}).click();assert.equal(await page.evaluate(async()=>(await navigator.clipboard.readText()).replaceAll('\r\n','\n')),expected(patients[2]));
   await page.locator('[data-section="oat-purple"]').click();const purpleHost=page.locator('#oat-purple-workspace');

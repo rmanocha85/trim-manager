@@ -8,13 +8,28 @@ const trim=JSON.stringify({patients:[],otherPatients:[],removedPatients:[],units
 await Promise.all([writeFile(rosterPath,trim),writeFile(billingPath,ledger),writeFile(oatPath,JSON.stringify(oat)),writeFile(purplePath,JSON.stringify(purple)),mkdir('work',{recursive:true})]);
 const server=createServer({rosterPath,billingPath,oatPath,purplePath,lockPath:path.join(dir,'lock')});await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true}),page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(12000);const errors=[];let posts=0;page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&/\/api\/oat-(fh|purple)\/roster$/.test(r.url()))posts++;});await page.route('https://**/*',r=>r.abort());
-if(process.env.TRIM_ASSET_BASE)await page.route('**/*',async route=>{const u=new URL(route.request().url());if(u.hostname==='127.0.0.1'&&!u.pathname.startsWith('/api/')&&(u.pathname==='/'||/\.(mjs|css|html|svg)$/.test(u.pathname))){const res=await fetch(process.env.TRIM_ASSET_BASE+(u.pathname==='/'?'index.html':u.pathname.slice(1))+u.search);assert.ok(res.ok);await route.fulfill({status:200,contentType:res.headers.get('content-type'),body:await res.text()});}else await route.fallback();});
+if(process.env.TRIM_ASSET_BASE)await page.route('**/*',async route=>{const u=new URL(route.request().url());if(u.hostname==='127.0.0.1'&&!u.pathname.startsWith('/api/')&&(u.pathname==='/'||/\.(mjs|css|html|svg|ico)$/.test(u.pathname))){const res=await fetch(process.env.TRIM_ASSET_BASE+(u.pathname==='/'?'index.html':u.pathname.slice(1))+u.search);assert.ok(res.ok);await route.fulfill({status:200,contentType:res.headers.get('content-type'),body:Buffer.from(await res.arrayBuffer())});}else await route.fallback();});
 const origin=`http://127.0.0.1:${server.address().port}`,read=async file=>JSON.parse(await readFile(file,'utf8'));
 try{
   for(const [clinic,file,other] of [['oat-fh',oatPath,purplePath],['oat-purple',purplePath,oatPath]]){
     const beforeOther=await readFile(other,'utf8'),before=await readFile(file,'utf8');
     await page.goto(origin+'/?section='+clinic);const host=page.locator('#'+clinic+'-workspace'),panel=host.locator('[data-oat-patients]'),schedule=host.locator('.oat-schedule-table'),dialog=host.getByRole('dialog',{name:'Ava EMR number',exact:true}),input=dialog.getByRole('textbox',{name:'Ava EMR number',exact:true});
     await host.getByRole('button',{name:'Choose clinic date'}).click();await host.locator('.oat-calendar [data-date="'+pacificDate()+'"]').click();
+    assert.deepEqual(await schedule.locator('th').allTextContents(),['Time','Finished','Patient','PHN','Phone','Actions']);
+    assert.equal(await schedule.getByRole('button',{name:/Ava EMR number/}).count(),0,'Ava editing is only in the menu');
+    for(const width of [1440,390]){
+      await page.setViewportSize({width,height:1000});
+      const boxes=await schedule.locator('tbody tr').evaluateAll(rows=>rows.map(row=>{const phone=row.querySelector('.oat-phone-edit').getBoundingClientRect(),more=row.querySelector('.clinic-phone-edit').getBoundingClientRect();return {right:more.right,phoneY:phone.y+phone.height/2,moreY:more.y+more.height/2,width:more.width};}));
+      assert.ok(boxes.every(b=>Math.abs(b.phoneY-b.moreY)<1&&Math.abs(b.right-boxes[0].right)<1&&b.width>=36),'Phone and dots align on each row and down the table');
+    }
+    await page.setViewportSize({width:1440,height:1000});
+    await page.screenshot({path:'work/oat-controls-'+clinic+'-synthetic.png'});
+    await schedule.getByRole('button',{name:'Edit phone number for Example, Alex',exact:true}).click();
+    const phoneDialog=host.locator('.clinic-remove-dialog');assert.equal(await phoneDialog.getByRole('textbox',{name:'Phone number',exact:true}).inputValue(),'604-555-0101');
+    assert.equal(await phoneDialog.getByRole('link',{name:/Call Example, Alex/}).getAttribute('href'),'tel:6045550101');await phoneDialog.getByRole('button',{name:'Cancel',exact:true}).click();
+    await schedule.getByRole('button',{name:'Actions for Example, Alex',exact:true}).click();
+    await host.locator('.clinic-ava-logo').evaluate(img=>img.decode());assert.equal(await host.locator('.clinic-ava-logo').evaluate(img=>img.naturalWidth>0),true);
+    await host.getByRole('button',{name:'Edit phone…',exact:true}).click();assert.equal(await phoneDialog.getByRole('textbox',{name:'Phone number',exact:true}).inputValue(),'604-555-0101');await phoneDialog.getByRole('button',{name:'Cancel',exact:true}).click();
     await schedule.getByRole('button',{name:'Actions for Example, Alex',exact:true}).click();await host.getByRole('button',{name:'Add Ava EMR number',exact:true}).click();
     await dialog.waitFor();assert.equal(await input.inputValue(),'');assert.match(await dialog.locator('.ava-patient-identity').innerText(),/PHN: 0000000001/);assert.equal(await dialog.locator('.ava-patient-name').innerText(),'Example, Alex');
     await input.fill('1234570');await dialog.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await readFile(file,'utf8'),before);
