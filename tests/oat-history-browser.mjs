@@ -11,10 +11,10 @@ import {oatStatusAction} from '../public/oat-patient-status.mjs';
 const dir=await mkdtemp(path.join(os.tmpdir(),'oat-history-'));
 const rosterPath=path.join(dir,'roster.json'),billingPath=path.join(dir,'billing.json'),oatPath=path.join(dir,'oat-fh-roster.json'),purplePath=path.join(dir,'oat-purple-roster.json');
 const patients=[
-  {id:'one',name:'Example, Alex',phn:'0000000001',ava:'1234567',status:'active',phone:'604-555-0101'},
+  {id:'one',name:'Example, Alex',phn:'0000000001',alternatePhns:[{phn:'0000000009',jurisdiction:'BC'}],ava:'1234567',status:'active',phone:'604-555-0101'},
   {id:'old',name:'Sample, Robin',phn:'0000000002',ava:'1234568',status:'history',statusHistory:[{from:'active',to:'history',date:'2026-11-17',source:'synthetic.csv'}]}
 ];
-const clinicDays=[{date:pacificDate(),appointments:[{id:'a',time:'09:00',patientId:'one'},{id:'b',time:'09:20',patientId:'old'},{id:'break',time:'09:40',label:'Break'}]}];
+const clinicDays=[{date:pacificDate(),appointments:[{id:'a',time:'09:00',patientId:'one',sourcePhn:'0000000009'},{id:'b',time:'09:20',patientId:'old'},{id:'break',time:'09:40',label:'Break'}]}];
 const oat={schemaVersion:1,clinic:'oat-fh',patients,clinicDays},purple={...oat,clinic:'oat-purple'};
 const trim=JSON.stringify({patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]}),ledger=JSON.stringify(blankLedger('oat-history-test'));
 await Promise.all([writeFile(rosterPath,trim),writeFile(billingPath,ledger),writeFile(oatPath,JSON.stringify(oat)),writeFile(purplePath,JSON.stringify(purple)),mkdir('work',{recursive:true})]);
@@ -61,6 +61,8 @@ try{
     await host.getByRole('button',{name:'Schedule',exact:true}).click();
     await host.getByRole('button',{name:'Choose clinic date',exact:true}).click();await host.locator('.oat-calendar [data-date="'+pacificDate()+'"]').click();
     const schedule=host.locator('.oat-schedule-table'),phoneForm=host.locator('.clinic-remove-dialog');
+    await schedule.getByRole('button',{name:'Copy PHN for Example, Alex',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'0000000009','Schedule keeps the supplied provincial identifier');
+    await host.getByRole('searchbox',{name:'Search clinic day',exact:true}).fill('0000-000-009');assert.equal(await schedule.locator('tbody tr').count(),1);assert.equal(await schedule.getByRole('link',{name:'Example, Alex',exact:true}).getAttribute('href'),'https://www.avaemr.ca/patients/1234567');await host.getByRole('searchbox',{name:'Search clinic day',exact:true}).fill('');
     const addIcon=await schedule.getByRole('button',{name:'Add phone number for Sample, Robin',exact:true}).locator('svg').boundingBox();assert.ok(addIcon.width>=16&&addIcon.height>=16,'Missing-phone icon is visible on the schedule');
     assert.equal(await schedule.getByRole('link',{name:/Call Example, Alex/}).getAttribute('href'),'tel:6045550101');
     await schedule.getByRole('button',{name:'Copy number for Example, Alex',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'604-555-0101');

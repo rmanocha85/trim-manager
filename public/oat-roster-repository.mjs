@@ -1,7 +1,8 @@
 import {phoneLink} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {validateClinicRoster} from './clinic-roster-repository.mjs';
 import {validateClinicDays,finishAppointment} from './oat-schedule.mjs?v=20261117-purple1';
-import {changeOatPatientStatus} from './oat-patient-status.mjs?v=20261127-oat-history1';
+import {changeOatPatientStatus} from './oat-patient-status.mjs?v=20261127-oat-identity1';
+import {oatPhnIndex,hasOatPhn} from './oat-identifiers.mjs?v=20261127-oat-identity1';
 const V2='https://www.googleapis.com/drive/v2/files';
 const FOLDER='1d90SEhco30YL0AAE20gt11pzFBjOOJUn';
 // The shared roster's existing Drive ID. Google still enforces account and file access.
@@ -15,6 +16,9 @@ export function validateOatRoster(data,clinic='oat-fh'){
   if(!Object.hasOwn(oatClinics,clinic))throw new Error('Unknown OAT clinic.');
   if(data.clinic!==clinic)throw new Error('The selected file is not the '+oatClinics[clinic].title+' roster.');
   validateClinicDays(data.clinicDays??[],data.patients);
+  oatPhnIndex(data.patients);
+  const patients=new Map(data.patients.map(p=>[p.id,p]));
+  for(const day of data.clinicDays||[])for(const slot of day.appointments)if(slot.sourcePhn&&(!patients.has(slot.patientId)||!hasOatPhn(patients.get(slot.patientId),slot.sourcePhn)))throw new Error('An appointment source PHN conflicts with the patient.');
   return data;
 }
 export function applyOatAction(roster,action) {

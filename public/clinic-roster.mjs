@@ -7,7 +7,7 @@ import {avaChartUrl} from './patient-links.mjs';
 import {contactGroups,contactRole,phoneLink,appContacts} from './clinic-contacts.mjs?v=20261108-closeout1';
 import {maidAppPatients,isProvisionPending,patientLocation,closeoutOutstanding} from './maid-lifecycle.mjs';
 import {oatPatientMessages} from './oat-patient-message.mjs?v=20261127-oat-actions1';
-import {oatStatusAction,oatStatusVersion,oatStatusDate,oatPatientMatches} from './oat-patient-status.mjs?v=20261127-oat-history1';
+import {oatStatusAction,oatStatusVersion,oatStatusDate,oatPatientMatches} from './oat-patient-status.mjs?v=20261127-oat-identity1';
 import {formatDate} from './dates.mjs?v=20261119-export1';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.

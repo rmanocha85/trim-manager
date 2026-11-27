@@ -1,3 +1,4 @@
+import {oatPhns,oatNames} from './oat-identifiers.mjs?v=20261127-oat-identity1';
 const statuses=new Set(['active','history']);
 const manualSource='Physician edit in Work OS';
 const conflict=()=>Object.assign(new Error('This patient’s status changed elsewhere. Reload the clinic roster before trying again.'),{status:409});
@@ -56,7 +57,7 @@ export function oatStatusDate(patient){
 }
 export function oatPatientMatches(patient,query){
   const words=query.toLocaleLowerCase().trim().split(/[\s,]+/).filter(Boolean);
-  const name=patient.name.toLocaleLowerCase();
+  const names=oatNames(patient).map(name=>name.toLocaleLowerCase());
   const digits=query.replace(/\D/g,'');
-  return words.every(word=>name.includes(word))||(/^[-\d\s]+$/.test(query)&&digits.length>0&&[patient.phn,patient.ava].some(value=>String(value||'').replace(/\D/g,'').includes(digits)));
+  return names.some(name=>words.every(word=>name.includes(word)))||(/^[-\d\s]+$/.test(query)&&digits.length>0&&[...oatPhns(patient),patient.ava].some(value=>String(value||'').replace(/\D/g,'').includes(digits)));
 }

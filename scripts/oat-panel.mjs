@@ -8,6 +8,7 @@ import {validateOatRoster} from '../public/oat-roster-repository.mjs';
 import {validClinicDate} from '../public/oat-schedule.mjs';
 import {phoneLink} from '../public/clinic-contacts.mjs';
 import {reconcileOatPatientStatus} from '../public/oat-patient-status.mjs';
+import {oatPhnIndex,oatNames} from '../public/oat-identifiers.mjs';
 
 function readRows(text){
   const lines=[]; let row=[],field='',quoted=false,closed=false;
@@ -45,10 +46,10 @@ export function reconcilePanel(original,clinic,source,asOf,prior=null){
   validateOatRoster(original,clinic);
   if(!validClinicDate(asOf)||original.panel?.asOf>asOf)throw Error('Invalid or older panel date.');
   if(original.panel?.sha256===source.sha256&&original.panel?.asOf===asOf)return structuredClone(original);
-  const next=structuredClone(original),byPhn=new Map(next.patients.map(p=>[p.phn,p])),active=new Set(),ordered=[];
+  const next=structuredClone(original),byPhn=oatPhnIndex(next.patients),active=new Set(),ordered=[];
   function match(row){
     const p=byPhn.get(row.phn);
-    if(p&&(p.dob&&p.dob!==row.dob||p.ava&&row.ava&&p.ava!==row.ava||nameKey(p.name)!==nameKey(row.name)))throw Error('A matched PHN has conflicting demographics. Review the source before applying.');
+    if(p&&(p.dob&&p.dob!==row.dob||p.ava&&row.ava&&p.ava!==row.ava||!oatNames(p).some(name=>nameKey(name)===nameKey(row.name))))throw Error('A matched PHN has conflicting demographics. Review the source before applying.');
     if(!p&&next.patients.some(q=>(row.ava&&row.ava===q.ava)||(q.dob===row.dob&&nameKey(q.name)===nameKey(row.name))))throw Error('A possible identity match has a different or missing PHN. Review before applying.');
     return p;
   }
@@ -56,6 +57,8 @@ export function reconcilePanel(original,clinic,source,asOf,prior=null){
   function status(p,value){reconcileOatPatientStatus(p,value,source,asOf);}
   for(const row of source.patients){
     const p=match(row)||add(row,'active');status(p,'active');
+    if(active.has(p.id))throw Error('The export contains two identifiers for the same confirmed patient. Review before applying.');
+    if(p.name!==row.name&&p.nameAliases)p.nameAliases=[...new Set([...p.nameAliases,p.name])].filter(name=>name!==row.name);
     p.name=row.name;p.dob=row.dob;if(row.ava)p.ava=row.ava;if(row.phone)p.phone=row.phone;if(row.ageAtExport)p.ageAtExport=row.ageAtExport;
     active.add(p.id);ordered.push(p);
   }

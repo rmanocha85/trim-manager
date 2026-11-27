@@ -1,4 +1,4 @@
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-oat-history1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-oat-identity1';
 import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
 import {bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
 import {avaChartUrl} from './patient-links.mjs';
@@ -54,7 +54,7 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
     if(url){const link=document.createElement('a');link.textContent=label;link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.title='Open Ava chart';name.append(link);}else name.textContent=label;
     if(slot.sourceName&&!slot.patient){const hint=document.createElement('small');hint.textContent='Patient match needed';name.append(hint);}
     if(slot.patient&&!url){const hint=document.createElement('small');hint.textContent='Ava number pending';name.append(hint);}
-    const digits=String(slot.patient?.phn||'').replace(/\D/g,'');
+    const digits=String(slot.sourcePhn||slot.patient?.phn||'').replace(/\D/g,'');
     if(/^\d{10}$/.test(digits)){
       const value=document.createElement('span');value.textContent=digits;phn.append(value);
       const copy=document.createElement('button');copy.type='button';copy.className='clinic-phn-copy';copy.title='Copy PHN';copy.setAttribute('aria-label','Copy PHN for '+label);copy.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg>';
@@ -92,7 +92,7 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
     host.querySelector('[data-calendar]').textContent='📅 '+formatDate(date.value);
     host.querySelector('.oat-day-heading h2').textContent=formatDate(date.value);
     const slots=roster?appointmentsForDate(roster,date.value):null;
-    const matches=slot=>[slot.patient?.name,slot.patient?.phn,slot.sourceName,slot.note,slot.time].join(' ').toLocaleLowerCase().includes(query)||(/^[-\d\s]+$/.test(query)&&String(slot.patient?.phn||'').replace(/\D/g,'').includes(query.replace(/\D/g,'')));
+    const matches=slot=>[slot.patient?.name,slot.patient?.phn,slot.sourcePhn,slot.sourceName,slot.note,slot.time].join(' ').toLocaleLowerCase().includes(query)||(/^[-\d\s]+$/.test(query)&&[slot.sourcePhn,slot.patient?.phn].some(phn=>String(phn||'').replace(/\D/g,'').includes(query.replace(/\D/g,''))));
     const remaining=(slots||[]).filter(s=>!s.finished&&matches(s)),done=(slots||[]).filter(s=>s.finished&&matches(s));
     rows.replaceChildren(...remaining.map(rowFor));doneRows.replaceChildren(...done.map(rowFor));table.hidden=!remaining.length;empty.hidden=!!remaining.length;
     completed.hidden=!slots;completed.querySelector('.clinic-table-wrap').hidden=!done.length;completed.querySelector('[data-completed-empty]').hidden=!!done.length;
