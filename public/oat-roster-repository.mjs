@@ -23,6 +23,17 @@ export function validateOatRoster(data,clinic='oat-fh'){
 }
 export function applyOatAction(roster,action) {
   if(action?.type==='patient-status')return changeOatPatientStatus(roster,action);
+  if(action?.type==='patient-ava'){
+    if(action.clinic!==roster.clinic||typeof action.ava!=='string'||!/^\d{6,10}$/.test(action.ava.trim()))throw new Error('Enter an Ava EMR number containing 6–10 digits.');
+    const next=structuredClone(roster),patient=next.patients.find(p=>p.id===action.patientId),value=action.ava.trim();
+    if(!patient||(patient.phn||'')!==action.expectedPhn||String(patient.ava||'')!==action.expectedAva||JSON.stringify(patient.avaHistory||[])!==action.expectedAvaHistory)throw Object.assign(new Error('This patient’s Ava record changed elsewhere. Cancel, reload the clinic, then reopen this patient.'),{status:409});
+    if(next.patients.some(p=>p.id!==patient.id&&String(p.ava||'')===value))throw new Error('This Ava EMR number is already assigned to another patient in this clinic. Review the patient records before saving.');
+    if(String(patient.ava||'')===value)return next;
+    const now=new Date().toISOString();
+    patient.avaHistory=[...(patient.avaHistory||[]),{from:patient.ava||null,to:value,at:now,source:'Physician edit in Work OS'}];
+    patient.ava=value;patient.avaUpdatedAt=now;patient.updatedAt=now;next.updatedAt=now;
+    return next;
+  }
   if(action?.type!=='patient-phone')return finishAppointment(roster,action);
   if(typeof action.phone!=='string'||action.phone.length>80||!phoneLink(action.phone))throw new Error('Enter one valid phone number.');
   const next=structuredClone(roster);

@@ -11,7 +11,7 @@ import {oatStatusAction,oatStatusVersion,oatStatusDate,oatPatientMatches} from '
 import {formatDate} from './dates.mjs?v=20261119-export1';
 
 // No patient data is persisted in browser storage; each action verifies its saved revision.
-export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',onAction,onPhone,onStatus,onPatientView,dialogHost=host,onReload,onLink,onChange=()=>{}}) {
+export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',onAction,onPhone,onAva,onStatus,onPatientView,dialogHost=host,onReload,onLink,onChange=()=>{}}) {
   const maid=kind==='maid',fh=kind==='oat-fh';
   let patients=[],view='active',query='',busy=false,ready=false,loaded=false,loadState='idle',loadMessage='';
   host.classList.add('clinic-workspace');
@@ -126,9 +126,9 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
     return card;
   }
   const phoneDialog=document.createElement('dialog'),phoneMenu=document.createElement('div');
-  if(onPhone||onStatus){
+  if(onPhone||onAva||onStatus){
     phoneMenu.popover='auto';phoneMenu.className='clinic-phone-menu';
-    host.append(phoneMenu);
+    dialogHost.append(phoneMenu);
   }
   if(onPhone){
     phoneDialog.className='clinic-remove-dialog';
@@ -157,6 +157,37 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
       finally{busy=false;controls.forEach(el=>el.disabled=false);if(!phoneDialog.open){render();feedback.textContent='Phone saved.';}onChange();}
     };
     phoneDialog.showModal();input.focus();onChange();
+  }
+  const avaDialog=document.createElement('dialog');avaDialog.className='clinic-planning-dialog clinic-ava-dialog';avaDialog.setAttribute('aria-label','Ava EMR number');
+  if(onAva){
+    avaDialog.innerHTML='<form><h2></h2><p class="ava-patient-name"></p><p class="ava-patient-identity"></p><label>Ava EMR number<input type="text" inputmode="numeric" name="ava" required pattern="[0-9]{6,10}" maxlength="10" autocomplete="off"></label><p class="planning-help">Enter the number from this patient’s Ava chart address.</p><p role="alert" class="planning-error"></p><div class="actions"><button type="button">Cancel</button><button type="submit">Save Ava number</button></div></form>';
+    dialogHost.append(avaDialog);avaDialog.querySelector('[type=button]').onclick=()=>avaDialog.close();
+    avaDialog.addEventListener('cancel',e=>{if(busy)e.preventDefault();});avaDialog.addEventListener('close',onChange);
+  }
+  function openAva(patient){
+    if(!onAva||!ready||busy||avaDialog.open)return;
+    feedback.textContent='';
+    const form=avaDialog.querySelector('form'),input=form.elements.ava,error=form.querySelector('[role=alert]');
+    form.querySelector('h2').textContent=(patient.ava?'Edit':'Add')+' Ava EMR number';
+    form.querySelector('.ava-patient-name').textContent=patient.name;
+    form.querySelector('.ava-patient-identity').textContent=['PHN: '+(patient.phn||'Not recorded'),patient.dob&&'DOB: '+formatDate(patient.dob)].filter(Boolean).join(' · ');
+    input.value=patient.ava||'';error.textContent='';
+    form.onsubmit=async event=>{
+      event.preventDefault();if(busy||!ready)return;
+      const value=input.value.trim();
+      if(!/^\d{6,10}$/.test(value)){error.textContent='Enter an Ava EMR number containing 6–10 digits.';return;}
+      if(patients.some(p=>p.id!==patient.id&&String(p.ava||'')===value)){error.textContent='This Ava EMR number is already assigned to another patient in this clinic. Review the patient records before saving.';return;}
+      const action={type:'patient-ava',clinic:kind,patientId:patient.id,expectedPhn:patient.phn||'',expectedAva:String(patient.ava||''),expectedAvaHistory:JSON.stringify(patient.avaHistory||[]),ava:value};
+      busy=true;onChange();const controls=form.querySelectorAll('input,button');controls.forEach(el=>el.disabled=true);
+      let message='';
+      try{
+        // Start in the submit gesture so Google access can renew if needed.
+        const saved=await onAva(action);patients=structuredClone(saved.roster.patients);avaDialog.close();
+        message=saved.local?'Ava EMR number saved to laptop folder · cloud sync unverified.':'Ava EMR number saved.';
+      }catch(errorSaving){error.textContent=errorSaving.message;}
+      finally{busy=false;controls.forEach(el=>el.disabled=false);if(!avaDialog.open){render();feedback.textContent=message;}onChange();}
+    };
+    avaDialog.showModal();input.focus();input.select();onChange();
   }
   let lastStatusChange=null;
   const notice=document.createElement('div');notice.className='oat-status-notice';notice.hidden=true;
@@ -188,11 +219,14 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
     }catch(error){ready=false;loadState='error';loadMessage=error.message+' Status change was not confirmed. Reload '+title+' before continuing.';notice.hidden=true;}
     finally{busy=false;render();if(!notice.hidden)(lastStatusChange?notice.querySelector('[data-status-undo]'):notice.querySelector('[data-status-view]')).focus();onChange();}
   }
-  function openPatientMenu(patient,button){
+  function openPatientMenu(patient,button,{status=true}={}){
+    if(busy||!ready)return;
+    (status?host:dialogHost).append(phoneMenu);
     phoneMenu.replaceChildren();
     const item=(text,action)=>{const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=()=>{phoneMenu.hidePopover();action();};phoneMenu.append(b);};
     if(onPhone)item(patient.phone?'Edit phone…':'Add phone…',()=>openPhone(patient));
-    if(onStatus){
+    if(onAva)item((patient.ava?'Edit':'Add')+' Ava EMR number',()=>openAva(patient));
+    if(onStatus&&status){
       item(patient.status==='active'?'Move to history':'Reactivate',()=>void changeStatus(patient,patient.status==='active'?'history':'active'));
       if(patient.statusReview){
         item('Keep current status',()=>void changeStatus(patient,patient.status,{review:'keep'}));
@@ -223,7 +257,7 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
   function render(){
     hideTip();
     if(phoneMenu.matches(':popover-open'))phoneMenu.hidePopover();
-    body.replaceChildren();feedback.textContent=busy?'Saving '+title+'…':'';statusNotice();host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open||provisionDialog.open||phoneDialog.open);
+    body.replaceChildren();feedback.textContent=busy?'Saving '+title+'…':'';statusNotice();host.querySelector('.clinic-reload')?.toggleAttribute('disabled',busy||loadState==='loading'||planningDialog.open||provisionDialog.open||phoneDialog.open||avaDialog.open);
     const loadStatus=host.querySelector('.clinic-load-status');loadStatus.hidden=!['loading','error'].includes(loadState);
     loadStatus.textContent=loadState==='error'?loadMessage+(loaded?(maid?' Showing the last loaded list; changes are disabled until reload succeeds.':' Showing the last loaded list.'): ''):loaded?`Refreshing ${title} patients…`:`Loading ${title} patients…`;
     const showPlanning=maid;
@@ -284,7 +318,7 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
           restore.onclick=()=>void changeStatus(p,'active');actionButtons.append(restore);
         }
         if(fh){const message=messages.button(p);message.disabled=!ready||busy;actionButtons.append(message);}
-        if(onPhone||onStatus){
+        if(onPhone||onAva||onStatus){
           const more=document.createElement('button');
           more.type='button';more.className='clinic-phone-edit';more.textContent='⋯';
           more.setAttribute('aria-label','Actions for '+p.name);
@@ -335,9 +369,10 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
   host.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>{view=button.dataset.view;host.querySelectorAll('[data-view]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));render();});
   render();
   return {
-    state(){return {busy:busy||phoneDialog.open||planningDialog.open||provisionDialog.open||Boolean(messages?.open),ready,loading:loadState==='loading',dirty:false};},
+    state(){return {busy:busy||phoneDialog.open||avaDialog.open||planningDialog.open||provisionDialog.open||Boolean(messages?.open),ready,loading:loadState==='loading',dirty:false};},
     selectPatientView(value){if(!maid&&['active','history'].includes(value)){view=value;render();}},
     editPhone(patientId){const patient=patients.find(p=>p.id===patientId);if(patient)openPhone(patient);},
+    patientMenu(patientId,button,options){const patient=patients.find(p=>p.id===patientId);if(patient)openPatientMenu(patient,button,options);},
     setPatients(records){if(busy)return;linkButton.hidden=true;patients=structuredClone(records);ready=true;loaded=true;loadState='ready';loadMessage='';render();},
     loading({preserve=true}={}){ready=false;linkButton.hidden=true;if(!preserve){patients=[];loaded=false;}loadState='loading';loadMessage='';render();},
     error(message,{link=false}={}){ready=false;linkButton.hidden=!link;loadState='error';loadMessage=message;render();}

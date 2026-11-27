@@ -68,7 +68,7 @@ try{
     await schedule.getByRole('button',{name:'Copy number for Example, Alex',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'604-555-0101');
     await schedule.getByRole('button',{name:'Add phone number for Sample, Robin',exact:true}).click();await phoneForm.getByRole('textbox',{name:'Phone number'}).fill('604-555-0112');await phoneForm.getByRole('button',{name:'Save phone'}).click();
     await schedule.getByRole('link',{name:/Call Sample, Robin.*604-555-0112/}).waitFor();
-    await schedule.getByRole('button',{name:'Edit phone number for Sample, Robin',exact:true}).click();await phoneForm.getByRole('textbox',{name:'Phone number'}).fill('604-555-0113');await phoneForm.getByRole('button',{name:'Save phone'}).click();
+    await schedule.getByRole('button',{name:'Actions for Sample, Robin',exact:true}).click();await host.getByRole('button',{name:'Edit phone…',exact:true}).click();await phoneForm.getByRole('textbox',{name:'Phone number'}).fill('604-555-0113');await phoneForm.getByRole('button',{name:'Save phone'}).click();
     await schedule.getByRole('link',{name:/Call Sample, Robin.*604-555-0113/}).waitFor();
     await schedule.getByRole('checkbox',{name:'Finished appointment for Sample, Robin'}).check();await host.getByText('Saved to laptop folder · cloud sync unverified.',{exact:true}).waitFor();
     await host.locator('.oat-completed summary').click();assert.equal(await host.locator('.oat-completed').getByRole('link',{name:/Call Sample, Robin/}).getAttribute('href'),'tel:6045550113');
