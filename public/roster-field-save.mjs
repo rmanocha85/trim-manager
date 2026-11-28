@@ -1,5 +1,5 @@
-import {normalize,validate} from './patients-core.mjs';
-import {mergeRoster} from './roster-merge.mjs';
+import {normalize,validate} from './patients-core.mjs?v=20261127-names1';
+import {mergeRoster} from './roster-merge.mjs?v=20261127-names1';
 const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const value=(p,field)=>p[field]??(field==='familyContacts'?[]:'');
 function find(roster,id){for(const collection of ['patients','otherPatients']){const patient=roster[collection]?.find(p=>String(p.id)===String(id));if(patient)return {patient,collection};}throw new Error('Patient is no longer in this roster. Reload before editing.');}

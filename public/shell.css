@@ -2,7 +2,8 @@
 :root{--billing-header-height:72px;--app-utility-height:52px}
 #workspace{padding-bottom:var(--app-utility-height)}
 @media screen {
-  #workspace:has(> :is(#il-workspace,#patients-workspace,#maid-workspace,#oat-fh-workspace,#oat-purple-workspace):not([hidden])) {
+  #workspace:has(> :is(#il-workspace,#patients-workspace,#maid-workspace,#oat-fh-workspace,#oat-purple-workspace):not([hidden])),
+  #workspace:has(#history:not([hidden])) {
     box-sizing:border-box;
     height:100dvh;
     overflow:auto;

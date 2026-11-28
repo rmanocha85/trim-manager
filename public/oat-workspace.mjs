@@ -1,7 +1,8 @@
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-menus2';
+import {patientName} from './patient-names.mjs?v=20261127-names1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-names1';
 import {bindRosterTips} from './roster-phone.mjs?v=20261127-menus2';
-import {oatPhoneControls,moreIcon} from './oat-row-controls.mjs?v=20261127-menus2';
-import {bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
+import {oatPhoneControls,moreIcon} from './oat-row-controls.mjs?v=20261127-names1';
+import {bindIdentity} from './patient-identity.mjs?v=20261127-names1';
 import {avaChartUrl} from './patient-links.mjs';
 import {appointmentsForDate,upcomingFriday,pacificDate} from './oat-schedule.mjs?v=20261117-purple1';
 import {dateCalendar} from './maid-date-calendar.mjs?v=20261113-combined1';
@@ -53,7 +54,7 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
     const cell=()=>{const td=document.createElement('td');row.append(td);return td;};
     const time=cell(),finish=cell(),name=cell(),phn=cell(),phone=cell(),actions=cell();finish.className="oat-finished";phn.className="oat-phn";phone.className='oat-schedule-phone';actions.className='oat-day-actions';
     const [hour,minute]=slot.time.split(':').map(Number);time.textContent=(hour%12||12)+':'+String(minute).padStart(2,'0')+' '+(hour<12?'a.m.':'p.m.');time.className='oat-time';
-    const url=slot.patient&&avaChartUrl(slot.patient),label=slot.patient?.name||slot.sourceName||slot.label;
+    const url=slot.patient&&avaChartUrl(slot.patient),label=slot.patient?patientName(slot.patient):slot.sourceName?patientName(slot.sourceName):slot.label;
     if(url){const link=document.createElement('a');link.textContent=label;link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.title='Open Ava chart';name.append(link);}else name.textContent=label;
     if(slot.sourceName&&!slot.patient){const hint=document.createElement('small');hint.textContent='Patient match needed';name.append(hint);}
     if(slot.patient&&!url){const hint=document.createElement('small');hint.textContent='Ava number pending';name.append(hint);}
@@ -65,7 +66,7 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
     }else phn.textContent=slot.patientId||slot.sourceName?'Not recorded':'';
     if(slot.patient){
       phone.append(oatPhoneControls(slot.patient,{onEdit:()=>rosterUI.editPhone(slot.patient.id),disabled:!onSave||loadState!=='ready'||busy}));
-      const more=document.createElement('button');more.type='button';more.className='clinic-phone-edit';more.innerHTML=moreIcon;more.title='Patient actions';more.setAttribute('aria-label','Actions for '+slot.patient.name);more.disabled=!onSave||loadState!=='ready'||busy;
+      const more=document.createElement('button');more.type='button';more.className='clinic-phone-edit';more.innerHTML=moreIcon;more.title='Patient actions';more.setAttribute('aria-label','Actions for '+patientName(slot.patient));more.disabled=!onSave||loadState!=='ready'||busy;
       more.onclick=()=>rosterUI.patientMenu(slot.patient.id,more,{status:false});actions.append(more);
     }
     if(slot.patientId||slot.sourceName){

@@ -8,6 +8,7 @@ Work OS contains separate apps: TRIM Roster, TRIM Billing, Notes, OAT Fraser Hea
 - TRIM Billing references the TRIM roster for current contact/identity changes. Preserve billing history and unrelated pending work when saving a patient field.
 - Symbol-only actions need hover labels, accessible names, keyboard access, and appropriate touch targets. Primary navigation retains text labels.
 - Add/Edit Ava EMR number belongs only in the patient three-dot actions menu, including missing numbers. Keep patient-name chart links separate and preserve the shared guarded editor.
+- Patient names use the shared `public/patient-names.mjs` formatter: Last, First with consistent capitalization, preserving accents, punctuation and established mixed case. Never guess surname boundaries or change identity keys when formatting display text.
 - Review a new shared behaviour with synthetic records across applicable apps, including empty values, cancellation, save failure, concurrent edits, and desktop/mobile layout. Never use production patient records for tests or screenshots.
 - `docs/planned-improvements.md` is pending work only. Remove completed, cancelled, and superseded items; keep durable decisions in the shared plans and release evidence in commit/PR records.
 - A design plan or mockup is not evidence that a feature is implemented or deployed. State these statuses separately.

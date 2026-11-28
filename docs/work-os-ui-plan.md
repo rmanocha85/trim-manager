@@ -23,6 +23,12 @@ MAID and facility editing must not be exposed as nonfunctional buttons. Until th
 
 ## Shared interaction rules
 
+Patient names share `public/patient-names.mjs` across TRIM Roster/Billing, Notes, MAID, OAT FH/Purple, and facilities. Display and copy use Last, First with consistent capitalization; source identities and clinical narrative text remain intact. Preserve mixed-case spelling, accents and punctuation; do not infer surname boundaries.
+
+TRIM new-patient reminders remain in **New patient tasks outstanding** until both medication reconciliation and history upload are complete. History completion includes a manual PMHx check or a verified imported history document. An active issue can keep the patient in the higher Active issues section. Pending tasks remain editable beyond the 14-day New patient badge; completing one task alone never removes the outstanding-task priority. This applies to My Patients and Other Patients. Profile refresh updates grouping while preserving open forms. Other apps do not acquire TRIM onboarding tasks implicitly.
+
+Billing History uses the same viewport-sized Work OS scroll container as roster views, so long history remains reachable when the surrounding host page does not scroll. Keep bottom content clear of the fixed utility bar.
+
 | Area | Rule | Work remaining |
 | --- | --- | --- |
 | Navigation | App names remain labelled. Show the active app consistently. Keep app-level navigation separate from local views such as Active, History and Schedule. | App bar selected in mockup review. Retain this direction when improving responsive spacing. |

@@ -1,4 +1,4 @@
-import {normalize,validate} from './patients-core.mjs?v=20261111-active-issue1';
+import {normalize,validate} from './patients-core.mjs?v=20261127-names1';
 const stable=value=>JSON.stringify(value,(_k,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);
 const equal=(a,b)=>stable(a)===stable(b);
 const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);

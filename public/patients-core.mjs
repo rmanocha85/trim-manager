@@ -180,7 +180,7 @@ export function resolveActiveIssue(raw,id,now=new Date().toISOString()){
  });
 }
 
-// Completion is retained after the temporary new-patient controls expire.
+// Outstanding onboarding tasks remain editable after the New patient badge expires.
 export function setMedReconciliation(raw,id,completed,asOf=today()){
  return setNewPatientCompletion(raw,id,'medReconciliationDate',completed,asOf);
 }
@@ -194,6 +194,6 @@ function setNewPatientCompletion(raw,id,field,completed,asOf){
  if(!p||typeof completed!=='boolean')throw new Error('Choose an active new patient.');
  dateParts(p.panelAddedDate);
  const days=(Date.parse(asOf)-Date.parse(p.panelAddedDate))/86400000;
- if(!p.newPanelPatient||days<0||days>=14)throw new Error('New-patient completion controls are available during the first 14 days.');
+ if(!p.newPanelPatient||days<0)throw new Error('Completion controls require a patient whose panel start date has arrived.');
  return {...roster,[collection]:roster[collection].map(x=>x===p?{...x,[field]:completed?(p[field]||asOf):''}:x)};
 }

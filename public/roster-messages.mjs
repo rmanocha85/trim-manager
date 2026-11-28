@@ -1,4 +1,4 @@
-import {individualNurseText,messageName} from './nurse-messages.mjs';
+import {individualNurseText,messageName} from './nurse-messages.mjs?v=20261127-names1';
 import {contactGroup} from './clinic-contacts.mjs';
 
 export function familyMessageContact(patient){

@@ -9,7 +9,7 @@ test('new Other Patients receive completion controls without creating routine bi
  assert.equal(roster.otherPatients[0].newPanelPatient,true);assert.equal(setPmhxUploaded(roster,'new',true,'2026-11-11').otherPatients[0].pmhxUploadedDate,'2026-11-11');
  const ledger=blankLedger('synthetic');assert.deepEqual(planNewPatients(ledger,normalizeRoster(roster),'2026-11-11').entries,[]);assert.equal(planNewPatients(ledger,normalizeRoster(roster),'2026-11-11').newPatientStarts,undefined);
 });
-test('PMHx completion saves independently on both rosters, merges, and expires without erasing dates',()=>{
+test('PMHx completion saves independently on both rosters, merges, and remains editable after badge expiry',()=>{
  const p={id:'one',name:'Example, Alex',phn:'0000000001',panelAddedDate:'2026-11-01',newPanelPatient:true,room:'1'};
  for(const collection of ['patients','otherPatients']){
   const base={patients:[],otherPatients:[],units:[],[collection]:[p]};
@@ -17,7 +17,7 @@ test('PMHx completion saves independently on both rosters, merges, and expires w
   const merged=mergeRoster(base,local,remote);assert.equal(merged.conflicts.length,0);assert.equal(merged.roster[collection][0].pmhxUploadedDate,'2026-11-02');assert.equal(merged.roster[collection][0].medReconciliationDate,'2026-11-03');assert.equal(merged.roster[collection][0].room,'2');
   assert.equal(setPmhxUploaded(local,p.id,true,'2026-11-04')[collection][0].pmhxUploadedDate,'2026-11-02');
   assert.equal(setPmhxUploaded(local,p.id,false,'2026-11-04')[collection][0].pmhxUploadedDate,'');
-  assert.throws(()=>setPmhxUploaded(local,p.id,false,'2026-11-15'),/14 days/);assert.equal(local[collection][0].pmhxUploadedDate,'2026-11-02');
+  assert.equal(setPmhxUploaded(local,p.id,false,'2026-11-15')[collection][0].pmhxUploadedDate,'');assert.equal(local[collection][0].pmhxUploadedDate,'2026-11-02');
  }
 });
 test('typed sources preserve Unicode and selected identity and reject invalid or oversize inputs',()=>{

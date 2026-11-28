@@ -36,7 +36,7 @@ export function exportUI({state,save,chosen,issues,guard,notice,refresh}){
   check();let record=pending();if(!record&&!state().ledger.settings.billingRecipient)throw Error('Save Suzy’s verified email in Settings first.');
   if(!record){const entries=chosen();if(issues(entries).length)throw Error('Complete the flagged billing information before sending.');record=await freezeExport(state().ledger,state().roster,entries,{layout:$('report-layout').value,recipient:state().ledger.settings.billingRecipient});await persist(record);}
   const current=await matchingEntries(state().ledger,record);if(current.matches.length!==record.snapshots.length)throw Error('Billing changed after this export was prepared. Cancel this unsent export and create a new one.');
-  progress('Generating and verifying every PDF page…');const {generateVerifiedPDF,downloadPDF}=await import('./billing-pdf.mjs?v=20261119-export1');const result=await generateVerifiedPDF(record,state().ledger,state().roster);
+  progress('Generating and verifying every PDF page…');const {generateVerifiedPDF,downloadPDF}=await import('./billing-pdf.mjs?v=20261127-names1');const result=await generateVerifiedPDF(record,state().ledger,state().roster);
   if(record.pdfHash&&record.pdfHash!==result.hash)throw Error('The regenerated PDF differs from the saved export. Cancel this unsent export and prepare a new one.');
   record={...record,state:'verified',pdfHash:result.hash,verification:result.verification};await persist(record);
   downloadPDF(result.bytes,record.filename);record={...record,state:'downloaded',downloadRequestedAt:new Date().toISOString()};await persist(record);

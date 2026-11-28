@@ -24,7 +24,7 @@ const save=async()=>{await ready();await page.locator('#sync').click();await sav
 const readBilling=async()=>JSON.parse(await readFile(billingPath,'utf8'));
 try{
   await page.goto(`http://127.0.0.1:${server.address().port}/`);await page.locator('.patient').first().waitFor();await saved();
-  assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes','MAID','OAT FH','OAT Purple']);
+  assert.deepEqual(await page.locator('.app-sections button').allTextContents(),['Roster','Billing','Notes','MAID','OAT Fraser Health','OAT Purple','Carrington','Cedarbrooke','The Cedars','Pleasantview']);
   assert.deepEqual(await page.locator('#calendar .calendar-weekdays span').allTextContents(),['Sun','Mon','Tue','Wed','Thu','Fri','Sat']);
   for(const mode of ['billing','routine']){
     await page.locator(`[data-tab="${mode}"]`).click();

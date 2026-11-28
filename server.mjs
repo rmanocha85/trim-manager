@@ -51,6 +51,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   for(const name of ['billing-corrections.mjs','billing-export.mjs','billing-pdf.mjs','billing-export-ui.mjs','billing-export.css','vendor/pdf/jspdf.umd.min.mjs','vendor/pdf/pdf.mjs','vendor/pdf/pdf.worker.mjs','vendor/pdf/NotoSans-Regular.ttf','vendor/pdf/NotoSans-Bold.ttf'])allowed.add(name);
   allowed.add('billing-icons.mjs');allowed.add('billing-cards.css');
   allowed.add('clinic-roster.mjs');
+  allowed.add('patient-names.mjs');
   allowed.add('il-roster.mjs');
   allowed.add('il-data.mjs');
   allowed.add('il-roster.css');

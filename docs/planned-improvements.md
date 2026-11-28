@@ -7,3 +7,4 @@ Keep this file limited to pending changes. Remove completed, published, cancelle
 - [ ] Complete the private patient sex review, then save only explicitly confirmed values using verified patient identifiers. Keep family messages using patient names until reviewed demographic and relationship data are available.
 - [ ] Implement guarded MAID and facility contact/Ava owner actions and wire supported Notes identity edits to the TRIM owner, preserving roles, provenance and unfinished clinical work.
 - [ ] Standardize search, menus, hover/focus labels, feedback, visual tokens and remaining small editors using [the cross-app UI plan](work-os-ui-plan.md).
+- [ ] Correct the Notes layout overflow at 820px tablet width; retain note editing, review and handoff behavior while making the existing layout fit.

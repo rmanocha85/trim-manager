@@ -1,3 +1,4 @@
+import {patientName} from './patient-names.mjs?v=20261127-names1';
 export const facilityNames = new Map([
   ['carrington', 'Carrington'],
   ['cedarbrook', 'Cedarbrooke'],
@@ -39,7 +40,7 @@ function groupContainer(data, site, group) {
 }
 export function addFacilityPatient(data, site, input) {
   const rows = sitePatients(data,site);
-  const name = String(input?.name ?? '').trim(), ava = String(input?.ava ?? '').trim();
+  const name = patientName(input), ava = String(input?.ava ?? '').trim();
   const phn = String(input?.phn ?? '').replace(/[\s-]/g,'') || null;
   const dob = String(input?.dob ?? '').trim() || null;
   if (!name || !/^\d{6,10}$/.test(ava)) throw new Error('Enter a name and a valid Ava chart number.');

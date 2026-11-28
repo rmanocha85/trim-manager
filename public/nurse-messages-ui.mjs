@@ -1,4 +1,5 @@
-import {nurseMessages} from './nurse-messages.mjs?v=20261122-symbol-menu1';
+import {patientName} from './patient-names.mjs?v=20261127-names1';
+import {nurseMessages} from './nurse-messages.mjs?v=20261127-names1';
 
 export function nurseMessageDialog(root){
   const dialog=document.createElement('dialog');dialog.id='nurse-message-dialog';dialog.setAttribute('aria-labelledby','nurse-message-title');
@@ -14,7 +15,7 @@ export function nurseMessageDialog(root){
     scope=nextScope;select.value=scope;lastSignature=signature;originals=result.groups.map(g=>g.text);status.textContent='';
     dialog.querySelector('.nurse-context').textContent=`${result.total} patients with active issues · Search filters do not limit this list.${dirty?' Includes unsaved roster changes.':''}`;
     const pending=dialog.querySelector('.nurse-unassigned');pending.replaceChildren();pending.hidden=!result.unassigned.length;
-    if(result.unassigned.length){const title=document.createElement('strong');title.textContent=`${result.unassigned.length} ${result.unassigned.length===1?'patient needs':'patients need'} a location review — excluded from both drafts`;pending.append(title);const list=document.createElement('ul');for(const p of result.unassigned){const item=document.createElement('li');item.textContent=`${p.name} — ${p.location}: ${p.reason}`;list.append(item);}pending.append(list);}
+    if(result.unassigned.length){const title=document.createElement('strong');title.textContent=`${result.unassigned.length} ${result.unassigned.length===1?'patient needs':'patients need'} a location review — excluded from both drafts`;pending.append(title);const list=document.createElement('ul');for(const p of result.unassigned){const item=document.createElement('li');item.textContent=`${patientName(p)} — ${p.location}: ${p.reason}`;list.append(item);}pending.append(list);}
     const groups=dialog.querySelector('.nurse-groups');groups.replaceChildren();
     for(const group of result.groups){
       const section=document.createElement('section'),title=document.createElement('h3'),field=document.createElement('textarea'),actions=document.createElement('div'),copy=document.createElement('button'),open=document.createElement('a');

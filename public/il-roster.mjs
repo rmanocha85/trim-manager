@@ -1,5 +1,6 @@
-import {bindIdentity, nameHTML, phnHTML} from './patient-identity.mjs?v=20261119-most-connection1';
-import {facilityNames,pleasantviewGroups,fileForSite,sitePatients,FacilityRosterSession} from './il-data.mjs?v=20261126-il6';
+import {patientName} from './patient-names.mjs?v=20261127-names1';
+import {bindIdentity, nameHTML, phnHTML} from './patient-identity.mjs?v=20261127-names1';
+import {facilityNames,pleasantviewGroups,fileForSite,sitePatients,FacilityRosterSession} from './il-data.mjs?v=20261127-names1';
 export {facilityNames};
 // Match the person-plus and person-minus symbols in the main roster.
 const icon = paths => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -93,7 +94,7 @@ export function facilityRoster(host, connection, link) {
     button.textContent = '⋯';
     button.className = 'facility-menu-button';
     button.dataset.patientMenu = '';
-    button.setAttribute('aria-label','Actions for ' + patient.name);
+    button.setAttribute('aria-label','Actions for ' + patientName(patient));
     button.setAttribute('popovertarget',menuId);
     menu.id = menuId;
     menu.setAttribute('popover','auto');
@@ -111,7 +112,7 @@ export function facilityRoster(host, connection, link) {
     remove.onclick = () => {
       menu.hidePopover();
       removedPatient = patient;
-      find('[data-remove-name]').textContent = patient.name;
+      find('[data-remove-name]').textContent = patientName(patient);
       find('[data-remove-site]').textContent = facilityNames.get(currentSite) + (currentSite === 'pleasantview' ? ' · ' + pleasantviewGroups.get(patient.group) : '');
       removeDialog.querySelector('[role=alert]').textContent = '';
       removeDialog.showModal();
@@ -125,7 +126,7 @@ export function facilityRoster(host, connection, link) {
     const groups = currentSite === 'pleasantview' ? [...pleasantviewGroups] : [[currentSite,'']];
     for (const [key,title] of groups) {
       const section = document.createElement('section'), members = patients.filter(p => p.group === key);
-      const visible = members.filter(p => [p.name,p.phn,p.ava].some(value => value?.toLowerCase().includes(query)));
+      const visible = members.filter(p => [patientName(p),p.phn,p.ava].some(value => value?.toLowerCase().includes(query)));
       section.className = 'facility-group';
       if (title) {
         const heading = document.createElement('h2');

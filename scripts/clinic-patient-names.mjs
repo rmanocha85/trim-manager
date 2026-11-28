@@ -1,15 +1,5 @@
-// Apply the roster convention to each word without changing its spelling or punctuation.
-export function formatNamePart(value) {
-  return value.trim().replace(/\p{L}[\p{L}\p{M}]*/gu, word => {
-    const [first] = word;
-    return first.toUpperCase() + word.slice(first.length).toLowerCase();
-  });
-}
-
-export function rosterName(lastName, firstName) {
-  if (!lastName?.trim() || !firstName?.trim()) throw new Error('Verified last and given names are required.');
-  return formatNamePart(lastName) + ', ' + formatNamePart(firstName);
-}
+import {formatNamePart,rosterName} from '../public/patient-names.mjs';
+export {formatNamePart,rosterName};
 
 export function oatIntakeName(row) {
   if (row.firstName && row.lastName) return rosterName(row.lastName, row.firstName);

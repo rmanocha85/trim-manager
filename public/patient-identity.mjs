@@ -1,7 +1,8 @@
+import {patientName} from './patient-names.mjs?v=20261127-names1';
 import {withProfile} from './profile-display.mjs?v=20261119-most-connection1';
 import {avaChartUrl} from './patient-links.mjs';
 import {formatTimestamp} from './dates.mjs?v=20261119-export1';
-import {today,dateParts} from './patients-core.mjs?v=20261105-flags1';
+import {today,dateParts} from './patients-core.mjs?v=20261127-names1';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const MOST_OPTIONS=['','CPR C2','DNACPR C2','DNACPR C1','DNACPR M3','DNACPR M2','DNACPR M1'];
 export function ageOn(dob,asOf=today()){
@@ -11,15 +12,22 @@ export function newPatient(p,asOf=today()){
   if(!p.newPanelPatient)return false;
   try{dateParts(p.panelAddedDate);dateParts(asOf);const days=(Date.parse(asOf)-Date.parse(p.panelAddedDate))/86400000;return days>=0&&days<14;}catch{return false;}
 }
+export function newPatientTasksPending(p,asOf=today()){
+  if(!p.newPanelPatient)return false;
+  try{dateParts(p.panelAddedDate);dateParts(asOf);}catch{return false;}
+  if(p.panelAddedDate>asOf)return false;
+  const historyDone=Boolean(p.pmhxUploadedDate||withProfile(p).historyImport);
+  return !p.medReconciliationDate||!historyDone;
+}
 export function validateDemographics(fields){
   if(fields.dateOfBirth&&ageOn(fields.dateOfBirth)===null)throw new Error('Enter a valid date of birth.');
   if(fields.mostStatus&&!MOST_OPTIONS.includes(fields.mostStatus))throw new Error('Choose the exact documented MOST status.');
   return fields;
 }
-export function nameCopy(name){return `<button type="button" class="identity-copy name-copy" data-copy-value="${esc(name)}" aria-label="Copy name: ${esc(name)}" title="Copy Last name, First name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button>`;}
-export function nameHTML(p,afterName=""){const url=avaChartUrl(p);return (url?`<a class="identity-name ava-chart-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Open Ava chart" aria-label="Open Ava chart for ${esc(p.name)}">${esc(p.name)}</a>`:`<span class="identity-name">${esc(p.name)}</span>`)+afterName+nameCopy(p.name)+patientFlagsHTML(p);}
-export function avaHTML(p){const url=avaChartUrl(p);return url?`<a class="identity-ava ava-chart-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="Open Ava chart for ${esc(p.name)}">Ava ↗</a>`:'';}
-export function phnHTML(p){const phn=String(p.phn||'').replace(/\D/g,'');return `<span class="identity-phn">${esc(phn||'—')}${/^\d{10}$/.test(phn)?`<button type="button" class="identity-copy billing-phn-copy" data-copy-value="${phn}" aria-label="Copy PHN for ${esc(p.name)}" title="Copy PHN"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button>`:''}</span>`;}
+export function nameCopy(name){name=patientName(name);return `<button type="button" class="identity-copy name-copy" data-copy-value="${esc(name)}" aria-label="Copy name: ${esc(name)}" title="Copy Last name, First name"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button>`;}
+export function nameHTML(p,afterName=""){const displayName=patientName(p);const url=avaChartUrl(p);return (url?`<a class="identity-name ava-chart-link" href="${url}" target="_blank" rel="noopener noreferrer" title="Open Ava chart" aria-label="Open Ava chart for ${esc(patientName(p))}">${esc(patientName(p))}</a>`:`<span class="identity-name">${esc(patientName(p))}</span>`)+afterName+nameCopy(displayName)+patientFlagsHTML(p);}
+export function avaHTML(p){const url=avaChartUrl(p);return url?`<a class="identity-ava ava-chart-link" href="${url}" target="_blank" rel="noopener noreferrer" aria-label="Open Ava chart for ${esc(patientName(p))}">Ava ↗</a>`:'';}
+export function phnHTML(p){const phn=String(p.phn||'').replace(/\D/g,'');return `<span class="identity-phn">${esc(phn||'—')}${/^\d{10}$/.test(phn)?`<button type="button" class="identity-copy billing-phn-copy" data-copy-value="${phn}" aria-label="Copy PHN for ${esc(patientName(p))}" title="Copy PHN"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="1.5"/><path d="M16 8V3H3v13h5"/></svg></button>`:''}</span>`;}
 export function demographicsHTML(p,asOf=today()){
   const raw=p;p=withProfile(p);const age=ageOn(p.dateOfBirth,asOf),most=p.mostStatus||'';
   const unavailable=p.profileAvailability!=='ready';
@@ -41,7 +49,7 @@ export function refreshIdentities(root){for(const el of root.querySelectorAll('[
 export function pmhxUploadedHTML(p,editable){
  const imported=withProfile(p).historyImport;
  const title=imported?'Automatically recorded from '+imported.sourceName+' · '+formatTimestamp(imported.importedAt):p.pmhxUploadedDate?'Completed '+p.pmhxUploadedDate:'Not yet marked complete';
- return `<label class="med-reconciliation" title="${esc(title)}"><input type="checkbox" data-pmhx-uploaded="${esc(p.id)}" data-pmhx-phn="${esc(p.phn)}" data-pmhx-manual="${esc(p.pmhxUploadedDate||'')}" data-pmhx-editable="${editable?'yes':'no'}" data-change="togglePmhxUploaded('${esc(p.id)}')" aria-label="PMHx uploaded for ${esc(p.name)}" ${imported||p.pmhxUploadedDate?'checked':''} ${!editable||imported?'disabled':''}><span>PMHx uploaded</span></label>`;
+ return `<label class="med-reconciliation" title="${esc(title)}"><input type="checkbox" data-pmhx-uploaded="${esc(p.id)}" data-pmhx-phn="${esc(p.phn)}" data-pmhx-manual="${esc(p.pmhxUploadedDate||'')}" data-pmhx-editable="${editable?'yes':'no'}" data-change="togglePmhxUploaded('${esc(p.id)}')" aria-label="PMHx uploaded for ${esc(patientName(p))}" ${imported||p.pmhxUploadedDate?'checked':''} ${!editable||imported?'disabled':''}><span>PMHx uploaded</span></label>`;
 }
 export function refreshPmhxUploads(root){
  for(const input of root.querySelectorAll('[data-pmhx-uploaded]')){

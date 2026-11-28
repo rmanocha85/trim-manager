@@ -1,7 +1,7 @@
 import './vendor/pdf/jspdf.umd.min.mjs';
 import {getDocument,GlobalWorkerOptions} from './vendor/pdf/pdf.mjs';
 import {formatRequestTime} from './dates.mjs?v=20261119-export1';
-import {renderReport,diagnosisForItem} from './reports.mjs?v=20261119-export1';
+import {renderReport,diagnosisForItem} from './reports.mjs?v=20261127-names1';
 import {sha256} from './billing-export.mjs?v=20261119-export1';
 GlobalWorkerOptions.workerSrc=new URL('./vendor/pdf/pdf.worker.mjs',import.meta.url).href;
 const clean=s=>String(s).normalize('NFKC').replace(/\s/g,'');

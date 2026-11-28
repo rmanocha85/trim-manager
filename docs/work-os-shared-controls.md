@@ -8,6 +8,10 @@ Treat TRIM Roster, TRIM Billing, Notes, OAT Fraser Health, OAT Purple and MAID a
 
 The goal is consistent placement, symbols, hover labels, keyboard behaviour, validation, save meaning and feedback. Similar controls must not perform different actions without a clear distinction.
 
+## Patient names
+
+Patient-name presentation across the apps uses `public/patient-names.mjs`: Last, First, converting uniformly uppercase/lowercase words to normal capitalization while preserving established mixed case, accents and punctuation. Use structured last/first fields when available; never guess name order from an ambiguous unstructured string. Name copy actions use the same display value. Formatting does not mutate existing source records, patient keys or billing history. New-input helpers reuse this formatter. Conversational family-message text retains the approved given-name-first wording.
+
 ## Phone controls
 
 - Adopt the current OAT phone interaction as the starting point. A missing number has a phone-plus button in the phone/contact cell. An existing number has the same phone-edit button and adjacent Copy button. Clicking phone-edit opens the editor; Call is an explicit action inside it. Use this interaction consistently instead of making the same handset dial in one app and edit in another.

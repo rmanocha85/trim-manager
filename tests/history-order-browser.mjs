@@ -23,11 +23,11 @@ try{
  });
  await page.goto(`http://127.0.0.1:${server.address().port}/?connection=manual`);await page.locator('#connect').click();await page.locator('#cloud-connect').click();await page.locator('.patient').first().waitFor();
  await page.locator('[data-section="billing"]').click();await page.locator('[data-tab=history]').click();const rows=page.locator('.history-table').first().locator('tbody tr');
- assert.deepEqual(await rows.locator('td:nth-child(2)').allTextContents(),['SYNTHETIC, 2','SYNTHETIC, 1','SYNTHETIC, 3']);
+ assert.deepEqual(await rows.locator('td:nth-child(2)').allTextContents(),['Synthetic, 2','Synthetic, 1','Synthetic, 3']);
  assert.equal(await rows.first().locator('td').first().textContent(),'Thu, Oct 8, 2026');
  assert.equal(await rows.last().locator('td').first().textContent(),'Tue, Sep 22, 2026');
  assert.match(await page.locator('#history-content').innerText(),/Newest billing date first/);
- await page.locator('.history-table [data-history-patient]').filter({hasText:'SYNTHETIC, 3'}).first().click();
+ await page.locator('.history-table [data-history-patient]').filter({hasText:'Synthetic, 3'}).first().click();
  assert.equal(await page.locator('.history-table tbody tr').first().locator('td').first().textContent(),'Tue, Sep 22, 2026');
  assert.equal(writes,0);assert.deepEqual(ledger,original);assert.deepEqual(errors,[]);
  console.log('PASS History newest-billing-date ordering, same-day and backdated entries, actual date preserved, no billing writes.');

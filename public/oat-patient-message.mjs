@@ -1,5 +1,6 @@
+import {patientName} from './patient-names.mjs?v=20261127-names1';
 export function oatPatientMessage(patient) {
-  const name=String(patient.name||'').trim().replace(/\s*,\s*/g,', ');
+  const name=patientName(patient);
   const phn=String(patient.phn||'').replace(/\D/g,'');
   return `${name}\nPHN: ${/^\d{10}$/.test(phn)?phn:'Not recorded'}\n\nJust wanted to confirm if this patient is still under my care for OAT in our system?\nThanks!`;
 }
@@ -34,7 +35,7 @@ export function oatPatientMessages(host,onChange=()=>{}) {
   };
   return {get open(){return dialog.open;},button(patient){
     const button=document.createElement('button');button.type='button';button.className='roster-icon oat-patient-message';
-    button.setAttribute('aria-label','Copy OAT care confirmation for '+patient.name);
+    button.setAttribute('aria-label','Copy OAT care confirmation for '+patientName(patient));
     button.setAttribute('aria-description','Right-click or press Shift+F10 to edit the message');
     button.dataset.rosterTip='Copy OAT care confirmation · Right-click to edit';
     button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a3 3 0 0 1-3 3H8l-5 4V6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3zM7 8h10M7 12h7"/></svg>';

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {patientName} from '../public/patient-names.mjs';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -38,12 +39,12 @@ try {
   await page.goto(origin+'/?section=the-cedars');
   await preloadedPV;
   const view = page.locator('#il-workspace');
-  await view.getByRole('link',{name:/Open Ava chart for Test the-cedars/}).waitFor();
+  await view.getByRole('link',{name:/Open Ava chart for Test The-Cedars/}).waitFor();
   assert.equal(reads('/api/il/rosters'),1,'Startup preload and the selected tab share one read');
   assert.equal(reads('/api/pleasantview/roster'),1,'Pleasantview preloads without opening its tab');
   for (const [id,title] of [...facilityNames].filter(([id])=>id!=='pleasantview')) {
     await page.getByRole('button',{name:title,exact:true}).click();
-    const row = view.locator('tbody tr').filter({hasText:'Test '+id});
+    const row = view.locator('tbody tr').filter({hasText:patientName('Test '+id)});
     const patient = sites[id].patients[0];
     assert.equal(await row.getByRole('link').getAttribute('href'),'https://www.avaemr.ca/patients/'+patient.ava);
     const copies = row.getByRole('button',{name:/Copy PHN/});
@@ -53,7 +54,7 @@ try {
       assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patient.phn);
     }
     await row.getByRole('button',{name:/Copy name/}).click();
-    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patient.name);
+    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),patientName(patient));
     const a=await row.getByRole('link').boundingBox(),b=await row.getByRole('button',{name:/Copy name/}).boundingBox(),c=await row.locator('td').nth(2).boundingBox();
     assert.ok(Math.abs(a.y+a.height/2-b.y-b.height/2)<3,'Copy aligned with name');
     assert.ok(c.x-a.x<340,'PHN next to name');
@@ -70,7 +71,7 @@ try {
   await view.getByRole('link',{name:/Synthetic Addition/}).waitFor();
   const afterAdd=reads('/api/il/rosters');
   await page.getByRole('button',{name:'Carrington',exact:true}).click();
-  await view.getByRole('link',{name:/Test carrington/}).waitFor();
+  await view.getByRole('link',{name:/Test Carrington/}).waitFor();
   await page.getByRole('button',{name:'The Cedars',exact:true}).click();
   await view.getByRole('link',{name:/Synthetic Addition/}).waitFor();
   assert.equal(reads('/api/il/rosters'),afterAdd,'A saved addition is immediately reused across tab switches');
@@ -98,26 +99,26 @@ try {
   await page.getByRole('dialog').getByRole('button',{name:'Remove from roster'}).click();
   await view.locator('.facility-status').filter({hasText:'Patient removed'}).waitFor();
   await page.reload();
-  await view.getByRole('link',{name:/Test the-cedars/}).waitFor();
+  await view.getByRole('link',{name:/Test The-Cedars/}).waitFor();
   assert.equal(await view.getByRole('link',{name:/Synthetic Addition/}).count(),0);
   await page.getByRole('button',{name:'Pleasantview',exact:true}).click();
-  await view.getByRole('link',{name:/Test RC/}).waitFor();
-  assert.deepEqual(await view.locator('tbody a').allTextContents(),['Test RC','Test AL']);
+  await view.getByRole('link',{name:/Test Rc/}).waitFor();
+  assert.deepEqual(await view.locator('tbody a').allTextContents(),['Test Rc','Test Al']);
   assert.deepEqual(await view.locator('.facility-group h2').allTextContents(),['Residential Care (RC) · 1','Assisted Living (AL) · 1']);
   await open();
   await dialog.getByLabel('Care group').selectOption('pleasantview_al');
   await dialog.getByLabel('Patient name').fill('Added AL');
   await dialog.getByLabel('Ava chart number').fill('334455');
   await dialog.getByRole('button',{name:'Add patient',exact:true}).click();
-  await view.getByRole('link',{name:/Added AL/}).waitFor();
+  await view.getByRole('link',{name:/Added Al/}).waitFor();
   const savedPV=JSON.parse(await readFile(file('pleasantview-patients-data.json'),'utf8'));
   assert.deepEqual(savedPV.groups.pleasantview_rc,pv.groups.pleasantview_rc);
   assert.equal(savedPV.groups.pleasantview_al.patients.at(-1).emrNumber,'334455');
-  await view.getByRole('button',{name:'Actions for Added AL'}).click();
+  await view.getByRole('button',{name:'Actions for Added Al'}).click();
   await page.getByRole('button',{name:'Remove from roster',exact:true}).click();
   await page.getByRole('dialog').getByRole('button',{name:'Remove from roster'}).click();
   await view.locator('.facility-status').filter({hasText:'Patient removed'}).waitFor();
-  assert.equal(await view.getByRole('link',{name:/Added AL/}).count(),0);
+  assert.equal(await view.getByRole('link',{name:/Added Al/}).count(),0);
   const beforeFailure=await view.locator('tbody tr').count();
   await page.route('**/api/pleasantview/roster',r=>r.fulfill({status:503,contentType:'application/json',body:'{"error":"Temporary failure"}'}));
   await view.getByRole('button',{name:'Reload roster'}).click();
@@ -138,7 +139,7 @@ try {
   await writeFile(file('il-rosters.json'),JSON.stringify(remote));
   const beforeSwitch=reads('/api/il/rosters');
   await page.getByRole('button',{name:'Cedarbrooke',exact:true}).click();
-  await view.getByRole('link',{name:/Test cedarbrook/}).waitFor();
+  await view.getByRole('link',{name:/Test Cedarbrook/}).waitFor();
   assert.equal(await view.getByRole('link',{name:/Synthetic Remote/}).count(),0);
   assert.equal(reads('/api/il/rosters'),beforeSwitch);
   await open();
@@ -154,7 +155,7 @@ try {
   assert.equal(reads('/api/il/rosters'),beforeSwitch+1);
   assert.equal(await view.getByRole('button',{name:'Add patient'}).isDisabled(),false);
   await page.getByRole('button',{name:'The Cedars',exact:true}).click();
-  await view.getByRole('link',{name:/Test the-cedars/}).waitFor();
+  await view.getByRole('link',{name:/Test The-Cedars/}).waitFor();
   await page.getByRole('button',{name:'Cedarbrooke',exact:true}).click();
   await view.getByRole('link',{name:/Synthetic Remote/}).waitFor();
   assert.equal(reads('/api/il/rosters'),beforeSwitch+1,'Reload updates every tab sharing the file');

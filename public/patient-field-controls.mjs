@@ -1,3 +1,4 @@
+import {patientName} from './patient-names.mjs?v=20261127-names1';
 import {escapeHTML as esc} from './core.mjs';
 import {handset,phoneControls} from './roster-phone.mjs?v=20261127-menus2';
 import {phoneLink} from './clinic-contacts.mjs';
@@ -7,10 +8,10 @@ export const phoneEditIcon=handset.replace('</svg>','<path d="m14 7 5-5 3 3-5 5-
 const chartIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="14" height="18" rx="2"/><path d="M6 7h7M6 11h5m3 7 6-6 2 2-6 6-3 1z"/></svg>';
 export function avaEditHTML(patient,{disabled=false,showLabel=false}={}){
   const label=(patient.ava?'Edit':'Add')+' Ava EMR number';
-  return `<button type="button" class="workos-field-icon ava-edit${showLabel?' workos-menu-item':' menu-symbol'}" title="${label}" data-roster-tip="${label}" aria-label="${label} for ${esc(patient.name)}" ${disabled?'disabled':''}>${chartIcon}${showLabel?'<span>'+label+'</span>':''}</button>`;
+  return `<button type="button" class="workos-field-icon ava-edit${showLabel?' workos-menu-item':' menu-symbol'}" title="${label}" data-roster-tip="${label}" aria-label="${label} for ${esc(patientName(patient))}" ${disabled?'disabled':''}>${chartIcon}${showLabel?'<span>'+label+'</span>':''}</button>`;
 }
 export function avaActionsHTML(patient,{menuId,disabled=false}={}){
-  return `<button type="button" class="workos-field-icon workos-actions-toggle" popovertarget="${esc(menuId)}" title="Patient actions" aria-label="Actions for ${esc(patient.name)}" ${disabled?'disabled':''}>⋯</button><span id="${esc(menuId)}" popover class="workos-actions-menu" role="group" aria-label="Patient actions">${avaEditHTML(patient,{disabled,showLabel:true})}</span>`;
+  return `<button type="button" class="workos-field-icon workos-actions-toggle" popovertarget="${esc(menuId)}" title="Patient actions" aria-label="Actions for ${esc(patientName(patient))}" ${disabled?'disabled':''}>⋯</button><span id="${esc(menuId)}" popover class="workos-actions-menu" role="group" aria-label="Patient actions">${avaEditHTML(patient,{disabled,showLabel:true})}</span>`;
 }
 export function bindAvaActions(root,onEdit){
   for(const toggle of root.querySelectorAll('.workos-actions-toggle'))toggle.addEventListener('click',()=>{
@@ -26,7 +27,7 @@ export function editablePhoneHTML(contact,label,{disabled=false,action='Edit pho
   return wrapper.replace(/<a\b[^>]*>[\s\S]*?<\/a>/,'').replace(/<span tabindex="0"[^>]*>—<\/span>/,'').replace(/(<span class="roster-phone"[^>]*>)/,'$1'+edit);
 }
 export function editablePhoneControls(patient,{onEdit,disabled=false}={}){
-  const wrapper=document.createElement('span');wrapper.innerHTML=editablePhoneHTML(patient,patient.name,{disabled:disabled||!onEdit,action:(patient.phone?'Edit':'Add')+' phone number'});
+  const wrapper=document.createElement('span');wrapper.innerHTML=editablePhoneHTML(patient,patientName(patient),{disabled:disabled||!onEdit,action:(patient.phone?'Edit':'Add')+' phone number'});
   const button=wrapper.querySelector('button');button.onclick=onEdit;
   // Retained for existing OAT layout and consumers while sharing the implementation.
   button.classList.add('oat-phone-edit');return wrapper.firstElementChild;
@@ -60,7 +61,7 @@ export function patientFieldEditor(root,{kind,onSave,onChange=()=>{},duplicateAv
     if(dialog.open||busy)return;opener=document.activeElement;while(opener?.shadowRoot?.activeElement)opener=opener.shadowRoot.activeElement;openerRoot=opener?.getRootNode();openerLabel=opener?.getAttribute('aria-label');target={patient:structuredClone(patient),context};
     const source=contact?context.contact||{}:patient;
     form.querySelector('h2').textContent=ava?(patient.ava?'Edit':'Add')+' Ava EMR number':contact?(context.contact?'Edit':'Add')+' family contact':(patient.phone?'Edit':'Add')+' patient phone';
-    form.querySelector('.ava-patient-name').textContent=patient.name;
+    form.querySelector('.ava-patient-name').textContent=patientName(patient);
     form.querySelector('.ava-patient-identity').textContent=['PHN: '+(patient.phn||'Not recorded'),(patient.dob||patient.dateOfBirth)&&'DOB: '+(patient.dob||patient.dateOfBirth),contact&&'Family contact'].filter(Boolean).join(' · ');
     for(const input of form.querySelectorAll('input'))input.value=source[input.name]||'';
     if(!ava){const call=form.querySelector('a'),number=phoneLink(source.phone,source.extension);call.hidden=!number;if(number){call.href=number.href;call.textContent='Call '+source.phone+(number.extension?' · extension '+number.extension:'');call.setAttribute('aria-label','Call '+(source.name||patient.name)+' at '+source.phone);}else call.removeAttribute('href');}

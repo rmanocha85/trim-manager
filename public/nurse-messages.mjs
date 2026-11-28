@@ -1,10 +1,11 @@
-import {hasActiveIssue} from './patients-core.mjs';
+import {patientName} from './patient-names.mjs?v=20261127-names1';
+import {hasActiveIssue} from './patients-core.mjs?v=20261127-names1';
 
 // Physician-confirmed nursing assignments, November 20, 2026.
 export const NURSING_FLOORS=Object.freeze({CEDAR:1,CHERRY:1,FERN:2,HATZIC:2,DEWDNEY:2,DEROCHE:2,SILVER:3,STAVE:3});
 const unitName=value=>String(value||'').trim().toUpperCase();
 export function messageName(value){
-  const name=String(value||'').trim();
+  const name=patientName(value);
   const comma=name.indexOf(',');
   return comma<0?name:[name.slice(comma+1).trim(),name.slice(0,comma).trim()].filter(Boolean).join(' ');
 }
@@ -14,7 +15,7 @@ export function nurseText(rows){
 }
 export function individualNurseText(patient,units=[]){
   const issue=hasActiveIssue(patient)?patient.activeIssue.description.trim():'';
-  const name=String(patient.name||'').trim().replace(/\s*,\s*/,', ');
+  const name=patientName(patient);
   const unit=unitName(units.find(u=>u.id===patient.unit)?.name||patient.unit);
   return `Re: ${name}${unit?' on '+unit+' unit':''}\n\n${issue?issue+' - ':''}Could you please let me know how the patient is doing?\n\nThanks!\nDr Rahul Manocha`;
 }

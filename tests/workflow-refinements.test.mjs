@@ -6,14 +6,14 @@ import {inheritConferenceDiagnoses} from '../public/core.mjs';
 import {mergeRoster} from '../public/roster-merge.mjs';
 import {saveIndicator} from '../public/session.mjs';
 const fixture=()=>({patients:[{id:'new',name:'Example, Alex',panelAddedDate:'2026-11-01',newPanelPatient:true,unit:'cedar',room:'1',extra:'keep'}],otherPatients:[{id:'other',name:'Coverage, Casey',panelAddedDate:'2026-11-01',newPanelPatient:true,doctor:'Example doctor'}],units:[],billingDates:[]});
-test('med reconciliation shares the 14-day window; completion remains in the record after expiry',()=>{
+test('onboarding remains editable after the 14-day badge expires',()=>{
  const original=fixture();for(const id of ['new','other']){
  const next=setMedReconciliation(original,id,true,'2026-11-14'),p=[...next.patients,...next.otherPatients].find(p=>p.id===id);
  assert.equal(p.medReconciliationDate,'2026-11-14');assert.equal(newPatient(p,'2026-11-14'),true);assert.equal(newPatient(p,'2026-11-15'),false);assert.equal(p.medReconciliationDate,'2026-11-14');
- assert.throws(()=>setMedReconciliation(next,id,false,'2026-11-15'),/14 days/);
+ assert.equal([...setMedReconciliation(next,id,false,'2026-11-15').patients,...setMedReconciliation(next,id,false,'2026-11-15').otherPatients].find(p=>p.id===id).medReconciliationDate,'');
  const undone=setMedReconciliation(next,id,false,'2026-11-14');assert.equal([...undone.patients,...undone.otherPatients].find(p=>p.id===id).medReconciliationDate,'');
  }assert.equal(original.patients[0].medReconciliationDate,undefined);
- assert.throws(()=>setMedReconciliation(original,'new',true,'2026-10-31'),/14 days/);
+ assert.throws(()=>setMedReconciliation(original,'new',true,'2026-10-31'),/start date/);
 });
 test('reconciliation merges independent room edits without losing clinician or patient details',()=>{
  const base=fixture(),local=setMedReconciliation(base,'other',true,'2026-11-02'),remote=structuredClone(base);remote.otherPatients[0].room='205';
