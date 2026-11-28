@@ -5,7 +5,7 @@ import {createServer} from './server-fixture.mjs';import {blankLedger} from '../
 const dir=await mkdtemp(path.join(os.tmpdir(),'trim-nurses-')),rosterPath=path.join(dir,'roster.json'),billingPath=path.join(dir,'billing.json');
 const activeIssue={status:'active',resolvedAt:null,description:'Private symptom details',openedAt:'2026-11-19T12:00:00Z',updatedAt:'2026-11-19T12:00:00Z',history:[]};
 const p=(id,n,unit,extra={})=>({id,name:'Example, '+id,phn:String(n).padStart(10,'0'),unit,room:'101',codes:'401',activeIssue,...extra});
-const roster={patients:[p('Alex',1,'cedar',{palliativeFlag:true}),p('Morgan',2,'hatzic'),p('Taylor',3,'stave'),p('Unknown',4,'unknown'),p('Ordinary',5,'cedar',{activeIssue:undefined})],otherPatients:[p('Jordan',6,'fern')],units:[{id:'cedar',name:'CEDAR',floor:1},{id:'hatzic',name:'HATZIC',floor:1},{id:'stave',name:'STAVE',floor:3},{id:'fern',name:'FERN',floor:2}],removedPatients:[],billingDates:[]};
+const roster={patients:[p('Alex',1,'cedar',{palliativeFlag:true,familyContacts:[{name:'Alex Contact',relationship:'Son'}]}),p('Morgan',2,'hatzic'),p('Taylor',3,'stave'),p('Unknown',4,'unknown'),p('Ordinary',5,'cedar',{activeIssue:undefined})],otherPatients:[p('Jordan',6,'fern')],units:[{id:'cedar',name:'CEDAR',floor:1},{id:'hatzic',name:'HATZIC',floor:1},{id:'stave',name:'STAVE',floor:3},{id:'fern',name:'FERN',floor:2}],removedPatients:[],billingDates:[]};
 const original=JSON.stringify(roster),billing=JSON.stringify(blankLedger('nurses-synthetic'));await writeFile(rosterPath,original);await writeFile(billingPath,billing);await mkdir('work',{recursive:true});
 const server=createServer({rosterPath,billingPath,lockPath:path.join(dir,'lock')});await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true}),context=await browser.newContext({viewport:{width:1600,height:1000},permissions:['clipboard-read','clipboard-write']}),page=await context.newPage(),errors=[];
@@ -18,28 +18,32 @@ try{
  for(const button of await root.locator('.toolbar-icon').all()){assert.equal((await button.textContent()).trim(),'');assert.ok(await button.getAttribute('aria-label'));assert.equal(await button.locator('svg').count(),1);}
  assert.equal((await root.locator('.roster-search').innerText()).trim(),'');
  assert.equal(await root.locator('.roster-search-symbol').count(),1);
- const messageButton=row.getByRole('button',{name:'Copy patient update',exact:true});
+ const messageButton=row.getByRole('button',{name:'Copy nurse message',exact:true});
  const m=await messageButton.boundingBox(),b=await row.getByRole('button',{name:'Open billing',exact:true}).boundingBox();assert.ok(m.x+m.width<=b.x);
  await messageButton.click();const individual=root.locator('#individual-nurse-dialog');
  assert.equal(await individual.isVisible(),false);
  const expectedIndividual='Re: Example, Alex on CEDAR unit\n\nPrivate symptom details - Could you please let me know how the patient is doing?\n\nThanks!\nDr Rahul Manocha';
  assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n'),expectedIndividual);
- await messageButton.click({button:'right'});assert.equal(await individual.isVisible(),true);
- assert.equal(await individual.locator('textarea').inputValue(),expectedIndividual);
- await individual.getByRole('button',{name:'Copy message'}).click();assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n'),expectedIndividual);
- await individual.locator('textarea').fill('Edited individual clinical update request');await individual.getByRole('button',{name:'Copy message'}).click();
- assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'Edited individual clinical update request');
- await individual.getByRole('button',{name:'Close',exact:true}).click();await messageButton.click();assert.equal(await individual.isVisible(),false);assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'Edited individual clinical update request');await messageButton.click({button:'right'});assert.equal(await individual.locator('textarea').inputValue(),'Edited individual clinical update request');await individual.getByRole('button',{name:'Close',exact:true}).click();
- await messageButton.focus();await messageButton.press('Shift+F10');assert.equal(await individual.isVisible(),true);await individual.getByRole('button',{name:'Close',exact:true}).click();
+ for(const record of [...roster.patients,...roster.otherPatients]){
+   const current=root.locator('[data-roster-patient="'+record.id+'"]').first();
+   assert.equal(await current.getByRole('button',{name:'Copy nurse message',exact:true}).count(),1);
+   await current.getByRole('button',{name:'Copy family message',exact:true}).click();
+   const expected=record.id==='Alex'?'Hi Alex,\n\nThis is Dr Manocha from TRIM calling about your parent.\nCould I please speak to you urgently?\n\n-Dr Rahul Manocha':'Hi,\n\nThis is Dr Manocha from TRIM calling about '+record.id+' Example.\nCould I please speak to you urgently?\n\n-Dr Rahul Manocha';
+   assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n'),expected);
+   assert.equal(await page.locator('dialog[open]').count(),0);
+   assert.equal(await root.locator('dialog[open]').count(),0);
+ }
+ const familyBox=await row.getByRole('button',{name:'Copy family message',exact:true}).boundingBox();assert.ok(m.x+m.width<=familyBox.x&&familyBox.x+familyBox.width<=b.x);
+ await messageButton.dispatchEvent('contextmenu');assert.equal(await root.locator('dialog[open]').count(),0);
  await page.evaluate(()=>{window.originalClipboardWrite=navigator.clipboard.writeText;navigator.clipboard.writeText=()=>Promise.reject(new Error('denied'));});
- await messageButton.click();assert.equal(await individual.isVisible(),false);await root.locator('.patient-message-feedback').filter({hasText:'Could not copy'}).waitFor();
+ await messageButton.click();assert.equal(await individual.isVisible(),false);await page.locator('.patient-message-feedback').filter({hasText:'Could not copy'}).waitFor();
  await page.evaluate(()=>{navigator.clipboard.writeText=window.originalClipboardWrite;});
  await row.locator('.patient-actions-toggle').click();const menu=row.locator('.patient-actions-menu');
  const labels=['Active issue','Palliative protocol','Psychiatric consult','Hospital dates','Documents','Edit patient','Remove from roster'];
  assert.deepEqual(await menu.locator('button').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('aria-label'))),labels);
  for(const button of await menu.locator('button').all()){assert.match((await button.textContent()).trim(),/^[✓Ψ]*$/u);await button.hover();assert.equal(await root.locator('.roster-tip:popover-open').innerText(),await button.getAttribute('aria-label'));}
  assert.ok((await menu.boundingBox()).width<=66);await page.screenshot({path:'work/symbol-menu-desktop.png',fullPage:true});
- await menu.getByRole('button',{name:'Edit patient',exact:true}).click();assert.equal(await root.locator('#en-Alex').count(),1);await root.locator('[data-click="cancelEdit()"]:visible').click();
+ await menu.getByRole('button',{name:'Edit patient',exact:true}).click();assert.equal(await root.locator('#en-Alex').count(),1);const fields=await root.locator('.roster-location-fields input,.roster-location-fields select').evaluateAll(els=>els.map(e=>e.getBoundingClientRect().height));assert.equal(fields[0],fields[1]);await root.locator('[data-click="cancelEdit()"]:visible').click();
  await root.locator('#ss').filter({hasText:/Saved locally|Saved in Drive/}).waitFor({state:'attached'});
  const copy=await row.locator('.identity-copy').boundingBox(),name=await row.locator('.identity-name').boundingBox();assert.ok(copy.x+copy.width<=name.x);
  const cells=row.locator('td');assert.equal(await cells.nth(4).locator('.active-issue-badge').count(),1);assert.equal(await cells.nth(4).locator('.resolve-issue').count(),1);assert.equal(await cells.nth(3).locator('.pphn').count(),1);assert.equal(await cells.nth(5).getAttribute('class'),'roster-hospital');assert.equal(await row.locator('.roster-billing-actions .resolve-issue').count(),0);

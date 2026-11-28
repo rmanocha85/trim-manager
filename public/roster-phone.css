@@ -96,3 +96,47 @@
 .active-issue-priority:has(.active-issue-description:not([hidden])) .roster-table td{vertical-align:top;padding-top:12px;padding-bottom:12px}
 @media(pointer:coarse){.issue-descriptions-toggle{width:44px;height:44px}}
 @media(pointer:coarse){.patient-actions-menu .menu-symbol{height:44px;min-height:44px}}
+
+/* Work OS field controls: shared by rosters, schedules and Billing. */
+.workos-field-icon{display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;width:30px;height:30px;min-height:30px;padding:5px;margin-left:4px;color:#345d43;background:transparent;border:1px solid transparent;border-radius:6px;cursor:pointer;flex:none}
+.workos-field-icon svg{width:18px;height:18px;pointer-events:none}
+.workos-field-icon:hover,.workos-field-icon:focus-visible{background:#e9f0e7;border-color:#b8cbb8}
+.workos-field-icon:focus-visible,.workos-phone-edit:focus-visible{outline:2px solid #345d43;outline-offset:2px}
+.workos-field-icon:disabled{opacity:.45;cursor:default}
+.workos-identity-actions{display:inline-flex;align-items:center;gap:3px}
+.workos-field-dialog{box-sizing:border-box;width:min(480px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;margin:auto;padding:24px;border:1px solid #cbd4ca;border-radius:14px;background:#fff;color:#263b2d;font:15px/1.5 system-ui,sans-serif;box-shadow:0 16px 48px #183c2733}
+.workos-field-dialog::backdrop{background:#183c2744}
+.workos-field-dialog h2{font-size:21px;margin:0 0 8px}
+.workos-field-dialog p{margin:8px 0;color:#526354}
+.workos-field-dialog .ava-patient-name{font-weight:650;color:#263b2d}
+.workos-field-dialog .ava-patient-identity,.workos-field-dialog .planning-help{font-size:13px}
+.workos-field-dialog label{display:block;margin-top:14px;font-weight:550}
+.workos-field-dialog input{display:block;box-sizing:border-box;width:100%;margin:4px 0 0;padding:10px;border:1px solid #bac7b9;border-radius:7px;background:white;color:#263b2d;font:inherit}
+.workos-field-dialog .actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:22px}
+.workos-field-dialog button{border:1px solid #bac7b9;border-radius:7px;padding:9px 14px;background:#fff;color:#345d43;font:inherit;cursor:pointer;min-height:40px}
+.workos-field-dialog [type=submit]{background:#305a40;color:white;border-color:#305a40}
+.workos-field-dialog button:disabled{opacity:.5;cursor:wait}
+.workos-field-dialog [role=alert]:not(:empty){color:#9b2727;background:#fff1ef;padding:10px;border-radius:6px}
+.workos-field-dialog .oat-phone-call{display:inline-block;color:#305a40;margin-top:12px}
+.workos-field-dialog [hidden]{display:none}
+.workos-field-dialog .contact-choice{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px}
+@media(pointer:coarse){.workos-field-icon,.roster-phone .roster-icon{width:44px;height:44px;min-height:44px}.workos-field-dialog button{min-height:44px}}
+
+.family-contact-list{display:flex;align-items:center;flex-wrap:wrap;gap:2px 8px}.family-contact-list .family-contact{display:inline-flex;align-items:center}
+
+/* Shared location fields: select/input/buttons have one geometry. */
+.roster-edit .roster-location-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;grid-column:span 2;min-width:0}
+.roster-edit .roster-location-fields label{display:flex;flex-direction:column;gap:6px;min-width:0;margin:0;font:12px/1.4 var(--sans);color:var(--muted)}
+.roster-edit .roster-location-fields :is(input,select){box-sizing:border-box;width:100%;min-width:0;height:42px;min-height:42px;margin:0;padding:9px 11px;border:1px solid #7e9981;border-radius:7px;background:var(--surface,#fff);color:var(--text);font:14px/1.4 var(--sans)}
+.roster-edit .roster-location-fields :is(input,select):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.roster-edit.location-edit{display:grid;grid-template-columns:minmax(140px,1fr) minmax(280px,2fr) auto;gap:18px;align-items:end;padding:16px 12px;background:var(--paper,#f7f8f5)}
+.roster-edit.location-edit>strong{align-self:center}
+.roster-edit.location-edit .roster-location-fields{grid-column:auto}
+.roster-edit.location-edit .pact{align-items:center;gap:8px;align-self:end}
+.roster-edit.location-edit .pact .btn{box-sizing:border-box;height:42px;min-height:42px;padding:9px 13px;margin:0;border-radius:7px;font:14px/1.4 var(--sans)}
+.roster-table .col-actions{width:178px}
+@media(max-width:650px){.roster-edit.location-edit{grid-template-columns:1fr;gap:14px}.roster-edit.location-edit .pact{justify-content:flex-end}.roster-edit .roster-location-fields{grid-column:1/-1}}
+@media(pointer:coarse){.roster-edit .roster-location-fields :is(input,select),.roster-edit.location-edit .pact .btn{height:44px;min-height:44px;font-size:16px}.roster-table .col-actions{width:236px}}
+
+.roster-edit.location-edit{width:min(100%,1100px)}
+@media(max-width:650px){.roster-edit.location-edit{width:calc(100vw - 72px);max-width:100%}}

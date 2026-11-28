@@ -1,27 +1,4 @@
-import {nurseMessages,individualNurseText,messageName} from './nurse-messages.mjs?v=20261122-symbol-menu1';
-
-export function individualNurseDialog(root){
-  const dialog=document.createElement('dialog');dialog.id='individual-nurse-dialog';dialog.setAttribute('aria-labelledby','individual-nurse-title');
-  dialog.innerHTML='<div class="nurse-dialog-heading"><h2 id="individual-nurse-title">Patient update</h2><button type="button" class="btn btn-ghost" data-close>Close</button></div><p class="nurse-context"></p><label for="individual-nurse-text">Message</label><textarea id="individual-nurse-text" rows="6"></textarea><div class="nurse-actions"><button type="button" class="btn btn-green" data-copy>Copy message</button><a href="https://messages.google.com/web/" target="_blank" rel="noopener noreferrer">Open Google Messages</a></div><p role="status" aria-live="polite"></p>';
-  root.append(dialog);
-  const field=dialog.querySelector('textarea'),status=dialog.querySelector('[role=status]'),copy=dialog.querySelector('[data-copy]'),drafts=new Map();let key;
-  field.oninput=()=>{drafts.get(key).text=field.value;copy.disabled=!field.value.trim();status.textContent='';};
-  dialog.querySelector('[data-close]').onclick=()=>dialog.close();
-  copy.onclick=async()=>{try{await navigator.clipboard.writeText(field.value);status.textContent='Copied. Paste into your nurse conversation.';}catch{field.focus();field.select();status.textContent='Select and copy the highlighted text.';}};
-  return {copy(patient,units=[]){
-    const original=individualNurseText(patient,units),prior=drafts.get(String(patient.id));
-    // Reuse an edited draft only while its patient context still matches.
-    // A plain copy never prompts or opens a dialog; stale edits remain for review.
-    return navigator.clipboard.writeText(prior?.original===original?prior.text:original);
-  },show(patient,units=[]){
-    key=String(patient.id);const original=individualNurseText(patient,units),prior=drafts.get(key);
-    if(!prior||prior.original!==original){
-      if(prior&&prior.text!==prior.original&&!window.confirm('The active issue changed. Replace your edited draft with the current issue?')){status.textContent='Kept your edited draft. Review it against the current active issue.';}
-      else{drafts.set(key,{original,text:original});status.textContent='';}
-    }else status.textContent='';
-    dialog.querySelector('.nurse-context').textContent=messageName(patient.name);field.value=drafts.get(key).text;copy.disabled=!field.value.trim();dialog.showModal();field.focus();
-  }};
-}
+import {nurseMessages} from './nurse-messages.mjs?v=20261122-symbol-menu1';
 
 export function nurseMessageDialog(root){
   const dialog=document.createElement('dialog');dialog.id='nurse-message-dialog';dialog.setAttribute('aria-labelledby','nurse-message-title');

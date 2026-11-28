@@ -33,7 +33,7 @@ try {
   const row=id=>root.locator('[data-roster-patient="'+id+'"]');
   await tab.click();
   const record=row('sample'), number=record.locator('.family-contact');
-  await number.getByRole('link').hover();
+  await number.getByRole('button',{name:/Edit contact/}).hover();
   assert.match(await root.locator('.roster-tip:popover-open').innerText(),/Sam Example · Son/);
   const search=root.locator('#roster-search');
   await page.setViewportSize({width:1440,height:600});
@@ -48,17 +48,17 @@ try {
   await workspace.evaluate(el=>el.scrollTop=0);await page.setViewportSize({width:1440,height:1000});
   await number.getByRole('button',{name:'Copy number'}).click();
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),contacts[0].phone);
-  assert.equal(await number.getByRole('link').getAttribute('href'),'tel:6045550142');
+  await number.getByRole('button',{name:/Edit contact/}).click();
+  assert.equal(await page.locator('.family-contact-dialog').getByRole('link').getAttribute('href'),'tel:6045550142');
+  await page.locator('.family-contact-dialog').getByRole('button',{name:'Cancel'}).click();
   const fits=await record.locator('.pinned-unit').evaluate(el=>{
     const range=document.createRange();range.selectNodeContents(el);
     return range.getClientRects().length===1&&range.getBoundingClientRect().right<=el.closest('td').getBoundingClientRect().right;
   });
   assert.ok(fits,'DEWDNEY must fit on one line inside its own column');
-  const form=root.locator('.family-contact-dialog');
+  const form=page.locator('.family-contact-dialog');
   async function enter(row,action,name,relationship,phone){
-    await row.locator('.patient-actions-toggle').click();
-    await row.getByRole('button',{name:'Family contacts…'}).click();
-    await form.getByRole('button',{name:action,exact:true}).click();
+    await row.getByRole('button',{name:action==='Edit'?/^Edit contact for/:/^Add family contact for/}).click();
     await form.getByLabel('Contact name').fill(name);await form.getByLabel('Relationship').fill(relationship);
     await form.getByLabel('Phone number').fill(phone);await form.getByRole('button',{name:'Save contact'}).click();
     await form.waitFor({state:'hidden'});
@@ -67,13 +67,14 @@ try {
   assert.equal(await record.locator('.family-contact').count(),2);
   await enter(row('second'),'Add contact','Robin Example','Spouse','604-555-0168');
   await enter(row('second'),'Edit','Robin Example','Partner','604-555-0188');
-  assert.deepEqual(JSON.parse(await readFile(rosterPath,'utf8')),roster);
-  await page.locator('#sync:not([disabled])').click();
-  await page.waitForFunction(()=>!document.querySelector('#sync').textContent.includes('Saving') && document.querySelector('#local-changes').dataset.state!=='busy');
+  assert.equal(JSON.parse(await readFile(rosterPath,'utf8')).otherPatients[0].familyContacts[0].phone,'604-555-0188');
+  await page.waitForFunction(()=>document.querySelector('#local-changes').dataset.state!=='busy');
   assert.match(await page.locator('#local-changes').innerText(),/Saved to folder/,await page.locator('#session-status').textContent());
   await page.reload();await page.locator('.patient').first().waitFor();await tab.click();
   assert.match(await row('second').locator('.family-contact [data-roster-tip]').getAttribute('data-roster-tip'),/Partner/);
-  assert.equal(await row('second').locator('.family-contact a').getAttribute('href'),'tel:6045550188');
+  await row('second').getByRole('button',{name:/^Edit contact for/}).click();
+  assert.equal(await form.getByRole('link').getAttribute('href'),'tel:6045550188');
+  await form.getByRole('button',{name:'Cancel'}).click();
   assert.equal(await record.locator('.family-contact').count(),2);
   for (const label of ['Open billing','Billing history']) {
     const action = record.getByRole('button',{name:label,exact:true});
@@ -102,7 +103,7 @@ try {
   await root.getByRole('button',{name:'Add',exact:true}).click();
   const added=root.locator('[data-roster-patient]').filter({hasText:'O’Neil, Élise-Marie'});
   await added.locator('.patient-actions-toggle').click();
-  await added.getByRole('button',{name:'Edit',exact:true}).click();
+  await added.getByRole('button',{name:'Edit patient',exact:true}).click();
   const editName=root.locator('.roster-edit').getByLabel('Name',{exact:true});
   await editName.fill('dE vERA, aNNE-mARIE');
   await editName.press('Tab');assert.equal(await editName.inputValue(),'De Vera, Anne-Marie');

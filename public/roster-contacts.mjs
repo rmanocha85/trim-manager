@@ -1,68 +1,32 @@
-import {escapeHTML as esc} from './core.mjs?v=20261119-export1';
-import {phoneLink} from './clinic-contacts.mjs?v=20261108-closeout1';
+import {escapeHTML as esc} from './core.mjs';
+import {phoneControls} from './roster-phone.mjs?v=20261127-shared1';
+import {editablePhoneHTML,phoneAddIcon,patientFieldEditor} from './patient-field-controls.mjs?v=20261127-shared1';
 
-import {phoneControls} from './roster-phone.mjs?v=20261119-export1';
-
-export function familyContactsCell(patient) {
-  const rows = (patient.familyContacts || []).map(contact => {
-    const label = [contact.name, contact.relationship].filter(Boolean).join(' · ');
+export function familyContactsCell(patient,{editable=false}={}) {
+  const rows=(patient.familyContacts||[]).map((contact,index)=>{
+    const label=[contact.name,contact.relationship].filter(Boolean).join(' · ');
     const publicGuardian=/\b(?:PG\s*[\/&]?\s*T|Public\s+Guardian(?:ship)?(?:\s+(?:and|&)\s+Trustee)?)\b/i.test(label);
     const role=publicGuardian?'<span class="family-contact-role" title="Public Guardian and Trustee">PG/T</span>':'';
-    return '<div class="family-contact">'+role+phoneControls(contact,label)+'</div>';
+    const controls=editable?editablePhoneHTML(contact,label,{action:'Edit contact'}).replace('class="roster-icon workos-phone-edit"','class="roster-icon workos-phone-edit" data-contact-index="'+index+'"'):phoneControls(contact,label);
+    return '<div class="family-contact">'+role+controls+'</div>';
   });
-  return '<td class="family-contacts">'+(rows.join('') || '—')+'</td>';
+  const add=editable?'<span class="roster-phone"><button type="button" class="roster-icon workos-phone-edit" data-contact-index="-1" title="Add family contact" aria-label="Add family contact for '+esc(patient.name)+'">'+phoneAddIcon+'</button></span>':'';
+  return '<td class="family-contacts"><span class="family-contact-list">'+rows.join('')+add+(!rows.length&&!editable?'—':'')+'</span></td>';
 }
 
-export function familyContactDialog(root, save) {
-  const dialog = document.createElement('dialog');
-  dialog.className = 'family-contact-dialog';
-  dialog.setAttribute('aria-labelledby','contact-dialog-title');
-  dialog.innerHTML = `<h2 id="contact-dialog-title"></h2><p class="contact-patient"></p><div class="contact-choices"></div><form>
-    <label>Contact name<input name="name" required></label><label>Relationship<input name="relationship"></label>
-    <label>Phone number<input name="phone" type="tel" required></label><p role="alert"></p>
-    <div class="actions"><button type="button" class="btn btn-ghost">Cancel</button><button type="submit" class="btn btn-green">Save contact</button></div></form>`;
-  root.append(dialog);
-  const form = dialog.querySelector('form'), error = form.querySelector('[role=alert]');
-  let target;
-  form.querySelector('[type=button]').onclick = () => dialog.close();
-  dialog.onclose = () => {form.reset(); target = null;};
-  form.onsubmit = async event => {
-    event.preventDefault();
-    const fields = Object.fromEntries([...new FormData(form)].map(([key,value]) => [key,value.trim()]));
-    if (!fields.name || !phoneLink(fields.phone,target.contact?.extension)) {
-      error.textContent = 'Enter a contact name and one valid phone number.';
-      return;
-    }
-    try {
-      await save(target,fields);
-      dialog.close();
-    } catch (e) { error.textContent = e.message; }
-  };
-  function selectContact(patient,index){
-    const contacts = patient.familyContacts || [];
-    target = {id:patient.id, index, contact:contacts[index], expected:JSON.stringify(contacts)};
-    dialog.querySelector('h2').textContent = index < 0 ? 'Add family contact' : 'Edit family contact';
-    dialog.querySelector('.contact-patient').textContent = [patient.name,patient.room && 'Room '+patient.room].filter(Boolean).join(' · ');
-    for (const key of ['name','relationship','phone']) form.elements[key].value = target.contact?.[key] || '';
-    error.textContent = '';
-    choices.hidden = true;
-    form.hidden = false;
-    form.elements.name.focus();
+export function familyContactDialog(root,save,{onChange=()=>{}}={}) {
+  const editor=patientFieldEditor(root,{kind:'contact',className:'family-contact-dialog',onChange,onSave:(_patient,fields,target)=>save(target,fields)});
+  const choices=document.createElement('dialog');choices.className='workos-field-dialog family-contact-choices';choices.setAttribute('aria-label','Family contacts');root.append(choices);
+  choices.addEventListener('close',onChange);
+  function edit(patient,index){
+    const contacts=patient.familyContacts||[];
+    editor.show(patient,{id:patient.id,index,contact:contacts[index],expected:JSON.stringify(contacts)});
   }
-  const choices = dialog.querySelector('.contact-choices');
-  return {get open(){return dialog.open;}, show(patient){
-    form.hidden = true;
-    choices.hidden = false;
-    dialog.querySelector('h2').textContent = 'Family contacts';
-    dialog.querySelector('.contact-patient').textContent = [patient.name,patient.room && 'Room '+patient.room].filter(Boolean).join(' · ');
-    choices.innerHTML = (patient.familyContacts || []).map((c,i) =>
-      '<div class="contact-choice"><span><strong>'+esc(c.name)+'</strong> '+esc(c.relationship || '')+'<br>'+esc(c.phone || '')+(c.extension?' ext. '+esc(c.extension):'')+'</span><button class="btn btn-ghost" data-index="'+i+'">Edit</button></div>'
-    ).join('')+'<div class="actions"><button class="btn btn-green" data-index="-1">Add contact</button><button class="btn btn-ghost" data-done>Done</button></div>';
-    choices.onclick = e=>{
-      const button = e.target.closest('button');
-      if (button?.hasAttribute('data-index')) selectContact(patient,Number(button.dataset.index));
-      else if (button?.hasAttribute('data-done')) dialog.close();
-    };
-    dialog.showModal();
+  return {get open(){return editor.open||choices.open;},show(patient,index){
+    if(Number.isInteger(index)){edit(patient,index);return;}
+    if(!patient.familyContacts?.length){edit(patient,-1);return;}
+    choices.innerHTML='<h2>Family contacts</h2><p>'+esc(patient.name)+'</p>'+(patient.familyContacts||[]).map((c,i)=>'<div class="contact-choice"><span><strong>'+esc(c.name)+'</strong> '+esc(c.relationship||'')+'<br>'+esc(c.phone||'')+(c.extension?' ext. '+esc(c.extension):'')+'</span><button type="button" data-index="'+i+'">Edit</button></div>').join('')+'<div class="actions"><button type="button" data-index="-1">Add contact</button><button type="button" data-done>Done</button></div>';
+    choices.onclick=event=>{const button=event.target.closest('button');if(!button)return;if(button.hasAttribute('data-index')){choices.close();edit(patient,Number(button.dataset.index));}else choices.close();};
+    choices.showModal();onChange();
   }};
 }

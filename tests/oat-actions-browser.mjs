@@ -99,7 +99,10 @@ try{
   assert.equal(await contact.nth(1).locator('.family-contact-role').innerText(),'PG/T');
   assert.equal(await contact.nth(2).locator('.family-contact-role').count(),0);
   assert.ok(await contact.nth(0).locator('.family-contact-role').isVisible());
-  assert.equal(await contact.nth(0).getByRole('link').getAttribute('href'),'tel:6045550102');
+  await contact.nth(0).getByRole('button',{name:/Edit contact/}).click();
+  const familyEditor=page.getByRole('dialog',{name:'Family contact',exact:true});
+  assert.equal(await familyEditor.getByRole('link').getAttribute('href'),'tel:6045550102');
+  await familyEditor.getByRole('button',{name:'Cancel'}).click();
   await contact.nth(0).getByRole('button',{name:/Copy number/}).click();assert.equal(await page.evaluate(async()=>(await navigator.clipboard.readText()).replaceAll('\r\n','\n')),'604-555-0102');
   await page.screenshot({path:'work/trim-pgt-synthetic.png'});
   assert.equal(await readFile(rosterPath,'utf8'),JSON.stringify(roster));assert.equal(await readFile(billingPath,'utf8'),ledger);assert.equal(await readFile(purplePath,'utf8'),JSON.stringify(purple));

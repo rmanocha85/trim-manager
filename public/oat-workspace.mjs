@@ -1,6 +1,7 @@
-import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-oat-controls1';
-import {bindRosterTips} from './roster-phone.mjs?v=20261119-export1';
-import {oatPhoneControls,moreIcon} from './oat-row-controls.mjs?v=20261127-oat-controls1';
+import {avaEditControl} from './patient-field-controls.mjs?v=20261127-shared1';
+import {clinicRosterUI} from './clinic-roster.mjs?v=20261127-shared1';
+import {bindRosterTips} from './roster-phone.mjs?v=20261127-shared1';
+import {oatPhoneControls,moreIcon} from './oat-row-controls.mjs?v=20261127-shared1';
 import {bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
 import {avaChartUrl} from './patient-links.mjs';
 import {appointmentsForDate,upcomingFriday,pacificDate} from './oat-schedule.mjs?v=20261117-purple1';
@@ -64,6 +65,7 @@ export function oatWorkspaceUI({host,clinic='oat-fh',title='OAT FH',onReload,onL
       copy.onclick=async()=>{try{await navigator.clipboard.writeText(digits);feedback.textContent='PHN copied.';}catch{feedback.textContent='Could not copy. Select the displayed PHN to copy it.';}};phn.append(copy);
     }else phn.textContent=slot.patientId||slot.sourceName?'Not recorded':'';
     if(slot.patient){
+      name.append(avaEditControl(slot.patient,{onEdit:()=>rosterUI.editAva(slot.patient.id),disabled:!onSave||loadState!=='ready'||busy}));
       phone.append(oatPhoneControls(slot.patient,{onEdit:()=>rosterUI.editPhone(slot.patient.id),disabled:!onSave||loadState!=='ready'||busy}));
       const more=document.createElement('button');more.type='button';more.className='clinic-phone-edit';more.innerHTML=moreIcon;more.title='Patient actions';more.setAttribute('aria-label','Actions for '+slot.patient.name);more.disabled=!onSave||loadState!=='ready'||busy;
       more.onclick=()=>rosterUI.patientMenu(slot.patient.id,more,{status:false});actions.append(more);

@@ -45,7 +45,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   const session=randomBytes(32).toString('hex');
   const notes=new LocalNotesStore(notesPath,path.join(process.env.LOCALAPPDATA||os.tmpdir(),'TRIMNotes','locks'));
   const types={'.ico':'image/x-icon','.ttf':'font/ttf','.js':'text/javascript','.gz':'application/gzip','.txt':'text/plain','.html':'text/html','.mjs':'text/javascript','.css':'text/css','.svg':'image/svg+xml'};
-  const allowed=new Set(['index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
+  const allowed=new Set(['patient-field-controls.mjs','roster-field-save.mjs','index.html','app.mjs','core.mjs','adapters.mjs','recovery.mjs','reports.mjs','styles.css','balanced.css','favicon.svg','workspace.mjs','time-entry.mjs','dates.mjs','ocr.mjs','workspace.css','vendor/ocr/tesseract.esm.min.js','vendor/ocr/worker.min.js','vendor/ocr/eng.traineddata.gz',...['','-simd','-relaxedsimd','-lstm','-simd-lstm','-relaxedsimd-lstm'].map(s=>`vendor/ocr/tesseract-core${s}.wasm.js`)]);
   const intake=new DocumentIntake({root:notesPath,notes,roster:async()=>(await rosterStore.load()).roster,ledger:async()=>(await store.load()).ledger,ai:chatgpt});
   allowed.add('context-refresh.mjs');allowed.add('service-lifecycle.mjs');
   for(const name of ['billing-corrections.mjs','billing-export.mjs','billing-pdf.mjs','billing-export-ui.mjs','billing-export.css','vendor/pdf/jspdf.umd.min.mjs','vendor/pdf/pdf.mjs','vendor/pdf/pdf.worker.mjs','vendor/pdf/NotoSans-Regular.ttf','vendor/pdf/NotoSans-Bold.ttf'])allowed.add(name);
@@ -69,7 +69,7 @@ export function createServer({rosterPath=process.env.TRIM_ROSTER_PATH||(testRoot
   allowed.add('oat-patient-status.mjs');
   allowed.add('oat-identifiers.mjs');
   allowed.add('oat-row-controls.mjs');allowed.add('ava-logo.ico');
-  allowed.add('visit-list.mjs');allowed.add('nurse-messages.mjs');allowed.add('nurse-messages-ui.mjs');allowed.add('roster-hospital.mjs');
+  allowed.add('roster-messages.mjs');allowed.add('visit-list.mjs');allowed.add('nurse-messages.mjs');allowed.add('nurse-messages-ui.mjs');allowed.add('roster-hospital.mjs');
   allowed.add('hosted-billing-access.mjs');
   let profileTask;const profiles=()=>profileTask||(profileTask=refreshProfileDisplay(notes,notesPath).finally(()=>{profileTask=null;}));
   const background=()=>{void intake.tick().then(profiles).catch(e=>{intake.service.error=e.message;});};

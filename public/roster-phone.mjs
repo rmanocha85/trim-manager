@@ -9,8 +9,9 @@ export function phoneControls(contact, label) {
   const number = phoneLink(raw, contact.extension);
   const details = [label,raw,contact.extension && 'Extension '+contact.extension].filter(Boolean).join('\n');
   const who = esc(label || 'contact');
+  const copyValue=raw+(contact.extension&&number?.extension&&!/\b(?:ext|extension|x)\.?\s*\d+|#\s*\d+/i.test(raw)?' ext. '+contact.extension:'');
   const call = number ? `<a class="roster-icon" href="${esc(number.href)}" aria-label="Call ${who} at ${esc(raw)}">${handset}</a>` : '';
-  const copy = raw ? `<button type="button" class="roster-icon" data-copy-value="${esc(raw)}" data-copy-feedback="Number copied" aria-label="Copy number for ${who}">${copyIcon}</button>` : '';
+  const copy = raw ? `<button type="button" class="roster-icon" data-copy-value="${esc(copyValue)}" data-copy-feedback="Number copied" aria-label="Copy number for ${who}">${copyIcon}</button>` : '';
   return `<span class="roster-phone" data-roster-tip="${esc(details)}">${call}${copy}${raw?'':'<span tabindex="0" aria-label="'+who+': phone not recorded">—</span>'}</span>`;
 }
 
