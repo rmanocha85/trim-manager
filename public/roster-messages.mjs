@@ -1,17 +1,6 @@
 import {individualNurseText,messageName} from './nurse-messages.mjs';
 import {contactGroup} from './clinic-contacts.mjs';
 
-// Relationships describe the contact relative to the patient. Reverse them for
-// the message, using neutral wording rather than inferring anyone's gender.
-const patientRelationship=new Map([
-  ...['son','daughter','child'].map(role=>[role,'parent']),
-  ...['mother','father','parent'].map(role=>[role,'child']),
-  ...['wife','husband','spouse'].map(role=>[role,'spouse']),
-  ['partner','partner'],...['sister','brother','sibling'].map(role=>[role,'sibling']),
-  ...['grandson','granddaughter','grandchild'].map(role=>[role,'grandparent']),
-  ...['grandmother','grandfather','grandparent'].map(role=>[role,'grandchild']),
-  ['friend','friend'],['cousin','cousin']
-]);
 export function familyMessageContact(patient){
   const contacts=(patient.familyContacts||[]).filter(c=>{
     if(!c)return false;
@@ -33,9 +22,8 @@ function firstName(contact){
 }
 export function familyMessageText(patient){
   const contact=familyMessageContact(patient),first=firstName(contact);
-  const relation=patientRelationship.get(String(contact?.relationship||'').trim().toLowerCase());
-  const subject=relation?'your '+relation:messageName(patient.name)||'your family member';
-  return `Hi${first?' '+first:''},\n\nThis is Dr Manocha from TRIM calling about ${subject}.\nCould I please speak to you urgently?\n\n-Dr Rahul Manocha`;
+  const subject=messageName(patient.name)||'your family member';
+  return `Hi${first?' '+first:''},\n\nThis is Dr Manocha from TRIM. I’d like to speak with you urgently about ${subject}.\nCould you please let me know when you’re available for a call?\n\nDr Rahul Manocha`;
 }
 export function rosterMessageText(kind,patient,units=[]){
   if(kind==='nurse')return individualNurseText(patient,units);
@@ -43,5 +31,5 @@ export function rosterMessageText(kind,patient,units=[]){
   throw new Error('Unknown message type.');
 }
 const svg='viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
-export const nurseMessageIcon=`<svg ${svg}><circle cx="9" cy="7" r="3.5"/><path d="M2 21v-3a7 7 0 0 1 12-4M18 11v10m-5-5h10"/></svg>`;
-export const familyMessageIcon=`<svg ${svg}><circle cx="7" cy="7" r="3"/><path d="M1 20v-2a6 6 0 0 1 10-4m3-10a3 3 0 0 1 0 6"/><path d="M14 13h7a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-4l-3 2v-8a1 1 0 0 1 1-1Z"/></svg>`;
+export const nurseMessageIcon=`<svg ${svg}><path d="M5 3h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H9l-6 4V5a2 2 0 0 1 2-2Z"/><path d="M12 6v9m-4.5-4.5h9"/></svg>`;
+export const familyMessageIcon=`<svg ${svg}><circle cx="8" cy="7" r="3.5"/><path d="M1.5 21v-3a6.5 6.5 0 0 1 13 0v3M16 3.5a3.5 3.5 0 0 1 0 7M18 14a5 5 0 0 1 4.5 5v2"/></svg>`;

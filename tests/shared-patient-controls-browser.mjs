@@ -11,7 +11,9 @@ await Promise.all([writeFile(rosterPath,JSON.stringify(roster)),writeFile(billin
 const server=createServer({rosterPath,billingPath,notesPath:path.join(dir,'notes'),lockPath:path.join(dir,'lock')});await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true}),page=await browser.newPage({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write']});page.setDefaultTimeout(12000);
 const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('https://**/*',route=>route.abort());
+if(process.env.TRIM_ASSET_BASE)await page.route('**/*',async route=>{const u=new URL(route.request().url());if(u.hostname==='127.0.0.1'&&!u.pathname.startsWith('/api/')&&(u.pathname==='/'||/\.(mjs|css|html)$/.test(u.pathname))){const response=await fetch(process.env.TRIM_ASSET_BASE+(u.pathname==='/'?'index.html':u.pathname.slice(1))+u.search);assert.ok(response.ok);await route.fulfill({status:200,contentType:response.headers.get('content-type'),body:await response.text()});}else await route.fallback();});
 const read=async()=>JSON.parse(await readFile(rosterPath,'utf8'));
+const billingAva=async()=>{assert.equal(await page.locator('#editor .ava-edit').isVisible(),false);await page.locator('#editor .workos-actions-toggle').click();await page.locator('#editor .ava-edit').click();assert.equal(await page.locator('#billing-patient-actions').isVisible(),false);};
 try{
   await page.goto('http://127.0.0.1:'+server.address().port);await page.locator('.patient').first().waitFor();
   await page.locator('[data-section=patients]').click();const root=page.locator('#patients-workspace'),row=id=>root.locator('[data-roster-patient="'+id+'"]');
@@ -28,13 +30,14 @@ try{
   await contact.getByLabel('Phone number',{exact:true}).fill('604-555-0199');await contact.getByRole('button',{name:'Save contact'}).click();await contact.waitFor({state:'hidden'});
   assert.equal((await read()).otherPatients[0].familyContacts[0].source,'Preserve me');
   await row('two').getByRole('button',{name:'Copy number for Example, Sam · Spouse'}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'604-555-0199 ext. 42');
-  await row('one').getByRole('button',{name:'Add Ava EMR number for Example, Alex'}).click();
+  assert.equal(await row('one').locator('.roster-name .ava-edit').count(),0);
+  await row('one').locator('.patient-actions-toggle').click();await row('one').getByRole('button',{name:'Add Ava EMR number for Example, Alex'}).click();
   await ava.getByLabel('Ava EMR number',{exact:true}).fill('1234567');await ava.getByRole('button',{name:'Save Ava number'}).click();await ava.getByRole('alert').filter({hasText:'already assigned'}).waitFor();
   await ava.getByLabel('Ava EMR number',{exact:true}).fill('7654321');await ava.getByRole('button',{name:'Save Ava number'}).click();await ava.waitFor({state:'hidden'});
   assert.equal((await read()).patients[0].ava,'7654321');assert.equal((await read()).patients[0].pFlag,undefined);
   await page.screenshot({path:'work/shared-controls-roster.png'});
   // Billing opens exactly the same editor while retaining its own unsaved ledger.
-  await row('one').getByRole('button',{name:'Open billing',exact:true}).click();await page.locator('#editor [data-code="00127"]').click();await page.locator('#editor .ava-edit').click();
+  await row('one').getByRole('button',{name:'Open billing',exact:true}).click();await page.locator('#editor [data-code="00127"]').click();await billingAva();
   assert.equal(await ava.getByLabel('Ava EMR number',{exact:true}).inputValue(),'7654321');
   await ava.getByLabel('Ava EMR number',{exact:true}).fill('7654322');await ava.getByRole('button',{name:'Save Ava number'}).click();await ava.waitFor({state:'hidden'});
   assert.equal((await read()).patients[0].ava,'7654322');assert.equal(await readFile(billingPath,'utf8'),ledger);assert.equal(await page.locator('#editor [data-code="00127"].on').count(),1,'Pending billing remains in the editor');
@@ -42,12 +45,13 @@ try{
   for(const width of [1440,390]){await page.setViewportSize({width,height:940});const box=await contact.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width);await page.screenshot({path:'work/shared-controls-contact-'+width+'.png'});}
   await contact.getByRole('button',{name:'Cancel'}).click();await page.setViewportSize({width:1440,height:1000});
   // Failed save retains input and shows no false success.
-  await page.locator('#editor .ava-edit').click();await ava.getByLabel('Ava EMR number',{exact:true}).fill('7654323');
+  await billingAva();await ava.getByLabel('Ava EMR number',{exact:true}).fill('7654323');
   await page.route('**/api/roster/document',route=>route.request().method()==='PUT'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic save unavailable'})}):route.continue());
   await ava.getByRole('button',{name:'Save Ava number'}).click();await ava.getByRole('alert').filter({hasText:'Synthetic save unavailable'}).waitFor();assert.equal(await ava.getByLabel('Ava EMR number',{exact:true}).inputValue(),'7654323');assert.equal((await read()).patients[0].ava,'7654322');
   await page.unroute('**/api/roster/document');await ava.getByRole('button',{name:'Save Ava number'}).click();await ava.waitFor({state:'hidden'});assert.equal((await read()).patients[0].ava,'7654323');
   // A concurrent change to the same field must stop this save.
-  await page.locator('#editor .ava-edit').click();const remote=await read();remote.patients[0].ava='7654399';await writeFile(rosterPath,JSON.stringify(remote));
+  for(const width of [1440,390]){await page.setViewportSize({width,height:940});const toggle=page.locator('#editor .workos-actions-toggle');await toggle.focus();await toggle.press('Enter');const menu=page.locator('#billing-patient-actions');await menu.waitFor({state:'visible'});const box=await menu.boundingBox();assert.ok(box.x>=0&&box.x+box.width<=width&&box.y>=0&&box.y+box.height<=940);await page.screenshot({path:'work/ava-menu-'+width+'.png'});await page.keyboard.press('Escape');assert.equal(await menu.isVisible(),false);}
+  await page.setViewportSize({width:1440,height:1000});await billingAva();const remote=await read();remote.patients[0].ava='7654399';await writeFile(rosterPath,JSON.stringify(remote));
   await ava.getByLabel('Ava EMR number',{exact:true}).fill('7654324');await ava.getByRole('button',{name:'Save Ava number'}).click();await ava.getByRole('alert').filter({hasText:'changed elsewhere'}).waitFor();assert.equal((await read()).patients[0].ava,'7654399');
   assert.equal(await readFile(billingPath,'utf8'),ledger);assert.deepEqual(errors,[]);
   console.log('PASS shared patient controls: both TRIM rosters, Billing, extensions, duplicate/stale Ava, failures, targeted saves, pending work, mobile.');

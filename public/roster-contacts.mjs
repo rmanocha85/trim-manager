@@ -1,6 +1,6 @@
 import {escapeHTML as esc} from './core.mjs';
-import {phoneControls} from './roster-phone.mjs?v=20261127-shared1';
-import {editablePhoneHTML,phoneAddIcon,patientFieldEditor} from './patient-field-controls.mjs?v=20261127-shared1';
+import {phoneControls} from './roster-phone.mjs?v=20261127-menus2';
+import {editablePhoneHTML,phoneAddIcon,patientFieldEditor} from './patient-field-controls.mjs?v=20261127-menus2';
 
 export function familyContactsCell(patient,{editable=false}={}) {
   const rows=(patient.familyContacts||[]).map((contact,index)=>{

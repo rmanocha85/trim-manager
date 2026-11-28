@@ -16,7 +16,7 @@ try{
     await page.goto(origin+'/?section='+clinic);const host=page.locator('#'+clinic+'-workspace'),panel=host.locator('[data-oat-patients]'),schedule=host.locator('.oat-schedule-table'),dialog=host.getByRole('dialog',{name:'Ava EMR number',exact:true}),input=dialog.getByRole('textbox',{name:'Ava EMR number',exact:true});
     await host.getByRole('button',{name:'Choose clinic date'}).click();await host.locator('.oat-calendar [data-date="'+pacificDate()+'"]').click();
     assert.deepEqual(await schedule.locator('th').allTextContents(),['Time','Finished','Patient','PHN','Phone','Actions']);
-    assert.equal(await schedule.getByRole('button',{name:/Ava EMR number/}).count(),2,'Ava editing is available beside each patient and in the menu');
+    assert.equal(await schedule.getByRole('button',{name:/Ava EMR number/}).count(),0,'Ava editing is available only through the patient actions menu');
     for(const width of [1440,390]){
       await page.setViewportSize({width,height:1000});
       const boxes=await schedule.locator('tbody tr').evaluateAll(rows=>rows.map(row=>{const phone=row.querySelector('.oat-phone-edit').getBoundingClientRect(),more=row.querySelector('.clinic-phone-edit').getBoundingClientRect();return {right:more.right,phoneY:phone.y+phone.height/2,moreY:more.y+more.height/2,width:more.width};}));

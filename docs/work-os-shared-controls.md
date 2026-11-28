@@ -18,8 +18,8 @@ The goal is consistent placement, symbols, hover labels, keyboard behaviour, val
 
 ## Ava EMR number controls
 
-- Use the same Add/Edit Ava EMR number action and editor across applicable apps. Put the action beside the patient identity/chart-link area and retain the existing OAT menu shortcut. TRIM keeps its seven-symbol action rail. A missing chart number must have an actionable Add control.
-- The patient name opens the chart when an Ava number is present. A separate edit control changes the identifier; chart navigation must not unexpectedly edit it.
+- Use the same Add/Edit Ava EMR number action and editor across applicable apps, exclusively in the patient's three-dot actions menu. Do not place an Ava edit button beside the patient name. A missing number shows Add Ava EMR number in the same menu; an existing number shows Edit Ava EMR number. This applies to TRIM My/Other Patients, Billing, and OAT FH/Purple schedules, active lists and history.
+- The patient name opens the chart when an Ava number is present. The menu action changes the identifier; chart navigation must not unexpectedly edit it. New-patient intake can collect the number in its form; editing existing identifiers uses the menu and the scoped editor.
 - The editor displays the selected patient's identity, validates the existing 6–10 digit format, checks duplicate assignment, and verifies the previous identifier before saving. Preserve identifier history where supported.
 - Label the field Ava EMR number. It is not the PHN. Do not create a second editable Ava field in Billing when the TRIM roster already owns it.
 
@@ -35,8 +35,8 @@ The scoped TRIM adapter is implemented in `public/roster-field-save.mjs` and con
 
 | App | Phone source | Ava source | Intended integration |
 | --- | --- | --- | --- |
-| TRIM Roster, My/Other Patients | Contact list on the selected roster record | Roster record | Add/edit in the appropriate cell using shared editors |
-| TRIM Billing | Referenced TRIM roster record where matched | Referenced TRIM roster record | Use the same record adapter; do not make a separate contact master or rewrite historical billing identity |
+| TRIM Roster, My/Other Patients | Contact list on the selected roster record | Roster record | Contact add/edit in the phone cell; Ava add/edit only in the three-dot menu |
+| TRIM Billing | Referenced TRIM roster record where matched | Referenced TRIM roster record | Same roster adapter and three-dot Ava menu; no separate contact master or historical billing identity rewrite |
 | OAT Fraser Health | OAT patient phone | OAT patient Ava field/history | Replace OAT-specific presentation with shared components, preserving current verified actions |
 | OAT Purple | Purple patient phone | Purple patient Ava field/history | Same controls and contract as OAT Fraser Health |
 | MAID | Patient/contact records with their documented roles | Matched MAID patient identifier | Share controls while preserving contact roles and its own record ownership |

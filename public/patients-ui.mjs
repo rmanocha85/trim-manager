@@ -1,11 +1,11 @@
-import {rosterMessageText,nurseMessageIcon,familyMessageIcon} from './roster-messages.mjs?v=20261127-direct-messages1';
-import {patientFieldEditor,avaEditHTML} from './patient-field-controls.mjs?v=20261127-shared1';
-import {prepareRosterFieldSave} from './roster-field-save.mjs?v=20261127-shared1';
+import {rosterMessageText,nurseMessageIcon,familyMessageIcon} from './roster-messages.mjs?v=20261127-menus2';
+import {patientFieldEditor,avaEditHTML} from './patient-field-controls.mjs?v=20261127-menus2';
+import {prepareRosterFieldSave} from './roster-field-save.mjs?v=20261127-menus2';
 import {visibleHospitalStay,hospitalSymbol,returnSymbol,hospitalShortDate} from './roster-hospital.mjs?v=20261125-pending-review1';
-import {nurseMessageDialog} from './nurse-messages-ui.mjs?v=20261127-direct-messages1';
+import {nurseMessageDialog} from './nurse-messages-ui.mjs?v=20261127-menus2';
 import {billingHistoryIcon} from './billing-icons.mjs?v=20261117-cards4';
-import {bindRosterTips} from './roster-phone.mjs?v=20261127-shared1';
-import {familyContactsCell,familyContactDialog} from './roster-contacts.mjs?v=20261127-shared1';
+import {bindRosterTips} from './roster-phone.mjs?v=20261127-menus2';
+import {familyContactsCell,familyContactDialog} from './roster-contacts.mjs?v=20261127-menus2';
 import {withProfile} from './profile-display.mjs?v=20261119-most-connection1';
 import {patientKey} from './core.mjs?v=20261119-export1';
 import {pmhxUploadedHTML,refreshPmhxUploads,flagIcon,patientFlagsHTML,nameHTML,demographicsHTML,newPatient,bindIdentity,validateDemographics,MOST_OPTIONS} from './patient-identity.mjs?v=20261119-most-connection1';
@@ -55,7 +55,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
   const style=document.createElement('style');
   style.textContent=css.replace(/body:not\(\.drive-connected\)/g,':host(:not(.drive-connected))').replace(/body\.drive-connected/g,':host(.drive-connected)').replace(/body\.history-mode/g,':host(.history-mode)').replace(/body\.pb/g,':host(.pb)').replace(/\bbody\b/g,':host').replace(/:root/g,':host')+'\n:host{display:block;min-height:0}header{position:static}#app-title{font-size:20px}';
   const identityCSS=await fetch('./patient-identity.css?v=20261115-roster1').then(r=>r.text());style.textContent+=identityCSS;root.append(style);bindIdentity(root);const content=document.createElement('div');content.innerHTML=html;root.append(content);
-  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261127-direct-messages1',import.meta.url);root.append(phoneStyles);
+  const phoneStyles=document.createElement('link');phoneStyles.rel='stylesheet';phoneStyles.href=new URL('./roster-phone.css?v=20261127-menus2',import.meta.url);root.append(phoneStyles);
   const hideRosterTip=bindRosterTips(root);
   let state={patients:[],otherPatients:[],removedPatients:[],units:[],billingDates:[]};
   let delId=null,editId=null,pendingDateKey=null,calYear=new Date().getFullYear(),calMonth=new Date().getMonth();
@@ -112,7 +112,7 @@ const MONTHS_S=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
     const contact=event.target.closest?.('[data-contact-index]'),ava=event.target.closest?.('.ava-edit');
     if((contact||ava)&&hospitalEditable()){
       const patient=hospitalPatient((contact||ava).closest('[data-roster-patient]').dataset.rosterPatient);
-      if(contact)contactEditor.show(patient,Number(contact.dataset.contactIndex));else avaEditor.show(patient);
+      if(contact)contactEditor.show(patient,Number(contact.dataset.contactIndex));else {ava.closest('[popover]')?.hidePopover();avaEditor.show(patient);}
     }
   });
   function editIdentityFromBilling(key,field){
@@ -485,7 +485,7 @@ async function saveEdit(id){
   const enteredName=g(`en-${id}`).value.trim();
   try{const fields=validateDemographics({
     name:enteredName && enteredName!==p.name ? formatRosterName(enteredName).trim() : p.name,phn:g(`ep-${id}`).value.trim(),unit:g(`eu-${id}`).value,
-    room:g(`er-${id}`).value.trim(),codes:g(`ec-${id}`).value.trim(),ava:g(`ea-${id}`).value.trim(),pFlag:g(`epf-${id}`).checked,palliativeFlag:g(`epal-${id}`).checked,dateOfBirth:g(`edob-${id}`).value,mostStatus:g(`emost-${id}`).disabled?p.mostStatus||'':g(`emost-${id}`).value
+    room:g(`er-${id}`).value.trim(),codes:g(`ec-${id}`).value.trim(),ava:p.ava||'',pFlag:g(`epf-${id}`).checked,palliativeFlag:g(`epal-${id}`).checked,dateOfBirth:g(`edob-${id}`).value,mostStatus:g(`emost-${id}`).disabled?p.mostStatus||'':g(`emost-${id}`).value
   });
   const initial=g(`edob-${id}`).defaultValue;
   if(fields.dateOfBirth===initial)delete fields.dateOfBirth;
@@ -668,7 +668,7 @@ function patientActionsMenu(p,other,secondary){
   const remove=svg('<circle cx="9" cy="7" r="4"/><path d="M2 21v-3a7 7 0 0 1 14 0v3M17 9h6"/>');
   const button=(label,icon,action,attrs='',className='')=>`<button type="button" class="btn btn-ghost menu-symbol ${className}" aria-label="${label}" data-roster-tip="${label}" data-click="${action}" ${attrs}>${icon}</button>`;
   const flags=['palliativeFlag','pFlag'].map(flag=>button(flag==='pFlag'?'Psychiatric consult':'Palliative protocol',flagIcon(flag)+`<span class="flag-check" aria-hidden="true">${p[flag]?'✓':''}</span>`,`togglePatientFlag('${id}','${flag}')`,`data-patient-flag-action data-flag="${flag}" aria-pressed="${p[flag]===true}" ${disabled}`,flag==='pFlag'?'menu-psych':'menu-palliative')).join('');
-  return `<div popover ${secondary?'':`id="patient-actions-${id}"`} class="patient-actions-menu" role="group" aria-label="Patient actions">${button('Active issue',activeIssueIcon+`<span class="flag-check" aria-hidden="true">${TrimRoster.hasActiveIssue(p)?'✓':''}</span>`,`openActiveIssue('${id}')`,`data-active-issue-action ${disabled}`,'menu-active-issue')}${flags}${button('Hospital dates',hospitalSymbol,`editHospitalDates('${id}')`,`data-hospital-roster-action ${disabled}`)}${button('Documents',documents,`uploadDocuments('${id}')`,'','upload-documents')}${button(other?'Edit unit & room':'Edit patient',edit,`startEdit('${id}'${secondary?',1':''})`,`data-roster-edit-action ${disabled}`)}<hr>${button('Remove from roster',remove,`promptDel('${id}')`,`data-roster-edit-action ${disabled}`,'btn-danger')}</div>`;
+  return `<div popover ${secondary?'':`id="patient-actions-${id}"`} class="patient-actions-menu" role="group" aria-label="Patient actions">${button('Active issue',activeIssueIcon+`<span class="flag-check" aria-hidden="true">${TrimRoster.hasActiveIssue(p)?'✓':''}</span>`,`openActiveIssue('${id}')`,`data-active-issue-action ${disabled}`,'menu-active-issue')}${flags}${button('Hospital dates',hospitalSymbol,`editHospitalDates('${id}')`,`data-hospital-roster-action ${disabled}`)}${button('Documents',documents,`uploadDocuments('${id}')`,'','upload-documents')}${avaEditHTML(p,{disabled:!hospitalEditable()})}${button(other?'Edit unit & room':'Edit patient',edit,`startEdit('${id}'${secondary?',1':''})`,`data-roster-edit-action ${disabled}`)}<hr>${button('Remove from roster',remove,`promptDel('${id}')`,`data-roster-edit-action ${disabled}`,'btn-danger')}</div>`;
 }
 function billingActions(p) {
   const icon = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
@@ -680,7 +680,7 @@ function billingActions(p) {
   return `<span class="roster-billing-actions">${inHistoryView ? '' : message+billing}${history}</span>`;
 }
 function rosterName(p,showIssue){
-  const name=`<div class="pnm roster-name">${nameHTML(p)}${avaEditHTML(p,{disabled:!hospitalEditable()})}</div>`;
+  const name=`<div class="pnm roster-name">${nameHTML(p)}</div>`;
   return showIssue?`<div class="roster-issue-identity">${name}<div class="active-issue-description" ${issueDescriptionsExpanded?'':'hidden'} aria-label="Active issue for ${esc(p.name)}">${esc(p.activeIssue.description)}</div></div>`:name;
 }
 function rosterRow(p,other=false,pinned=false,secondary=false,showIssue=false){return `<tr data-roster-patient="${esc(p.id)}"><td>${pinned?'<small class="pinned-unit">'+esc(state.units.find(u=>u.id===p.unit)?.name||p.unit||'—')+'</small>':''}<span class="prm">${esc(p.room)||'—'}</span></td><td>${rosterName(p,showIssue)}</td>${familyContactsCell(p,{editable:hospitalEditable()})}<td><span class="pphn">${phnWithCopy(p.phn)}</span></td><td class="roster-issue">${issueActions(p)}</td><td class="roster-hospital">${rosterHospital(p)}</td><td>${other?`<select class="sel doctor-select" data-other-doctor="${esc(p.id)}" aria-label="Doctor for ${esc(p.name)}" title="${esc(p.doctor||'Unassigned')}" ${canAssignOtherDoctor()?'':'disabled'}><option value=""${!p.doctor?' selected':''}>Unassigned</option>${doctorOptions(p.doctor||'')}</select>`:`<span class="pcd">${esc(p.codes)||'—'}</span>`}</td><td class="roster-profile">${rosterDemographics(p)}</td><td class="roster-actions-cell">${billingActions(p)}<button class="btn btn-ghost btn-sm patient-actions-toggle" aria-label="Actions for ${esc(p.name)}" data-click="showPatientActions('${esc(p.id)}',this)">⋯</button>${patientActionsMenu(p,other,secondary)}</td></tr>`;}
@@ -689,7 +689,7 @@ function rosterEditRow(p,other=false){
  return `<tr><td colspan="9"><div class="roster-edit">
 <label>Name<input class="einp" id="en-${esc(p.id)}" value="${esc(p.name)}"></label><label>PHN<input class="einp" id="ep-${esc(p.id)}" value="${esc(p.phn||'')}"></label>
 <div class="roster-location-fields"><label>Unit<select class="sel" id="eu-${esc(p.id)}">${state.units.map(u=>`<option value="${esc(u.id)}"${p.unit===u.id?' selected':''}>${esc(u.name)}</option>`).join('')}</select></label><label>Room<input class="einp" id="er-${esc(p.id)}" value="${esc(p.room)}"></label></div>
-<label>Ava chart ID<input class="einp" id="ea-${esc(p.id)}" value="${esc(p.ava||'')}"></label><label>ICD codes<input class="einp" id="ec-${esc(p.id)}" value="${esc(p.codes||'')}"></label><label>Date of birth<input class="einp" type="date" id="edob-${esc(p.id)}" value="${esc(withProfile(p).dateOfBirth||'')}"></label>
+<label>ICD codes<input class="einp" id="ec-${esc(p.id)}" value="${esc(p.codes||'')}"></label><label>Date of birth<input class="einp" type="date" id="edob-${esc(p.id)}" value="${esc(withProfile(p).dateOfBirth||'')}"></label>
 <label>MOST<select class="sel" id="emost-${esc(p.id)}" ${withProfile(p).structuredMost?'disabled title="From patient history. Update through Documents."':''}>${MOST_OPTIONS.map(v=>`<option value="${esc(v)}"${(withProfile(p).mostStatus||'')===v?' selected':''}>${esc(v||'Not recorded')}</option>`).join('')}</select></label><label class="p-toggle"><input id="epf-${esc(p.id)}" type="checkbox"${p.pFlag?' checked':''}>Ψ Psychiatric consult</label><label class="p-toggle"><input id="epal-${esc(p.id)}" type="checkbox"${p.palliativeFlag?' checked':''}>${flagIcon('palliativeFlag')} Palliative protocol</label>
 <div class="pact"><button class="btn btn-green btn-sm" data-click="saveEdit('${esc(p.id)}')">Save</button><button class="btn btn-ghost btn-sm" data-click="cancelEdit()">Cancel</button></div></div></td></tr>`;}
 

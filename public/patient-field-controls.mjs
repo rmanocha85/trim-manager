@@ -1,17 +1,24 @@
 import {escapeHTML as esc} from './core.mjs';
-import {handset,phoneControls} from './roster-phone.mjs?v=20261127-shared1';
+import {handset,phoneControls} from './roster-phone.mjs?v=20261127-menus2';
 import {phoneLink} from './clinic-contacts.mjs';
 
 export const phoneAddIcon=handset.replace('</svg>','<path d="M17 2v8m-4-4h8" stroke-linecap="round"/></svg>');
 export const phoneEditIcon=handset.replace('</svg>','<path d="m14 7 5-5 3 3-5 5-4 1z" fill="white"/></svg>');
 const chartIcon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="14" height="18" rx="2"/><path d="M6 7h7M6 11h5m3 7 6-6 2 2-6 6-3 1z"/></svg>';
-export function avaEditHTML(patient,{disabled=false}={}){
+export function avaEditHTML(patient,{disabled=false,showLabel=false}={}){
   const label=(patient.ava?'Edit':'Add')+' Ava EMR number';
-  return `<button type="button" class="workos-field-icon ava-edit" title="${label}" aria-label="${label} for ${esc(patient.name)}" ${disabled?'disabled':''}>${chartIcon}</button>`;
+  return `<button type="button" class="workos-field-icon ava-edit${showLabel?' workos-menu-item':' menu-symbol'}" title="${label}" data-roster-tip="${label}" aria-label="${label} for ${esc(patient.name)}" ${disabled?'disabled':''}>${chartIcon}${showLabel?'<span>'+label+'</span>':''}</button>`;
 }
-export function avaEditControl(patient,{onEdit,disabled=false}={}){
-  const wrap=document.createElement('span');wrap.innerHTML=avaEditHTML(patient,{disabled:disabled||!onEdit});
-  const button=wrap.firstElementChild;button.onclick=onEdit;return button;
+export function avaActionsHTML(patient,{menuId,disabled=false}={}){
+  return `<button type="button" class="workos-field-icon workos-actions-toggle" popovertarget="${esc(menuId)}" title="Patient actions" aria-label="Actions for ${esc(patient.name)}" ${disabled?'disabled':''}>⋯</button><span id="${esc(menuId)}" popover class="workos-actions-menu" role="group" aria-label="Patient actions">${avaEditHTML(patient,{disabled,showLabel:true})}</span>`;
+}
+export function bindAvaActions(root,onEdit){
+  for(const toggle of root.querySelectorAll('.workos-actions-toggle'))toggle.addEventListener('click',()=>{
+    const menu=toggle.popoverTargetElement,box=toggle.getBoundingClientRect();
+    menu.style.left=Math.max(8,Math.min(box.right-240,innerWidth-248))+'px';
+    menu.style.top=Math.max(8,Math.min(box.bottom+6,innerHeight-70))+'px';
+  });
+  for(const edit of root.querySelectorAll('.ava-edit'))edit.addEventListener('click',()=>{edit.closest('[popover]')?.hidePopover();onEdit(edit);});
 }
 export function editablePhoneHTML(contact,label,{disabled=false,action='Edit phone number'}={}){
   const wrapper=phoneControls(contact,label);

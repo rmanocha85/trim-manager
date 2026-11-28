@@ -123,6 +123,10 @@
 @media(pointer:coarse){.workos-field-icon,.roster-phone .roster-icon{width:44px;height:44px;min-height:44px}.workos-field-dialog button{min-height:44px}}
 
 .family-contact-list{display:flex;align-items:center;flex-wrap:wrap;gap:2px 8px}.family-contact-list .family-contact{display:inline-flex;align-items:center}
+.workos-actions-toggle{font-size:24px;line-height:1}
+.workos-actions-menu{position:fixed;inset:auto;margin:0;padding:6px;width:min(240px,calc(100vw - 16px));border:1px solid #cbd6ca;border-radius:10px;background:white;color:#294d36;box-shadow:0 8px 24px #16332122}
+.workos-actions-menu .workos-menu-item{display:flex;align-items:center;gap:10px;width:100%;height:auto;min-height:44px;padding:8px;text-align:left;font:14px/1.4 system-ui}
+.workos-actions-menu .workos-menu-item svg{flex:none;width:22px;height:22px}
 
 /* Shared location fields: select/input/buttons have one geometry. */
 .roster-edit .roster-location-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;grid-column:span 2;min-width:0}

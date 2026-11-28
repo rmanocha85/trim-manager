@@ -1,6 +1,6 @@
-import {patientFieldEditor,avaEditControl} from './patient-field-controls.mjs?v=20261127-shared1';
-import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs?v=20261127-shared1';
-import {oatPhoneControls,moreIcon,phoneAddIcon} from './oat-row-controls.mjs?v=20261127-shared1';
+import {patientFieldEditor} from './patient-field-controls.mjs?v=20261127-menus2';
+import {handset,phoneControls,bindRosterTips} from './roster-phone.mjs?v=20261127-menus2';
+import {oatPhoneControls,moreIcon,phoneAddIcon} from './oat-row-controls.mjs?v=20261127-menus2';
 import {bindIdentity} from './patient-identity.mjs?v=20261119-most-connection1';
 import {assessmentPlanningText} from './maid-assessment.mjs?v=20261112-provision1';
 import {dateCalendar} from './maid-date-calendar.mjs';
@@ -247,7 +247,6 @@ export function clinicRosterUI({host,kind,title=kind==='maid'?'MAID':'OAT FH',on
       const name=cell(row,'');const url=avaChartUrl(p);
       if(url){const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=p.name;link.title='Open Ava chart';name.append(link);}
       else {name.textContent=p.name;const hint=document.createElement('small');hint.textContent=maid?'Ava number needed':'Ava number pending';name.append(hint);}
-      if(onAva)name.append(avaEditControl(p,{onEdit:()=>openAva(p),disabled:!ready||busy}));
       if(!maid&&p.statusReview){const review=document.createElement('small');review.className='oat-status-review';review.textContent='Latest list differs';review.title='The '+p.statusReview.asOf+' list indicates '+p.statusReview.panelStatus+'. Review this patient’s status in the actions menu.';name.append(review);}
       const phn=cell(row,'');const digits=String(p.phn||'').replace(/\D/g,'');
       if(/^\d{10}$/.test(digits)){

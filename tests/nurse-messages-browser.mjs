@@ -28,7 +28,7 @@ try{
    const current=root.locator('[data-roster-patient="'+record.id+'"]').first();
    assert.equal(await current.getByRole('button',{name:'Copy nurse message',exact:true}).count(),1);
    await current.getByRole('button',{name:'Copy family message',exact:true}).click();
-   const expected=record.id==='Alex'?'Hi Alex,\n\nThis is Dr Manocha from TRIM calling about your parent.\nCould I please speak to you urgently?\n\n-Dr Rahul Manocha':'Hi,\n\nThis is Dr Manocha from TRIM calling about '+record.id+' Example.\nCould I please speak to you urgently?\n\n-Dr Rahul Manocha';
+   const expected=(record.id==='Alex'?'Hi Alex,':'Hi,')+'\n\nThis is Dr Manocha from TRIM. I’d like to speak with you urgently about '+record.id+' Example.\nCould you please let me know when you’re available for a call?\n\nDr Rahul Manocha';
    assert.equal((await page.evaluate(()=>navigator.clipboard.readText())).replace(/\r\n/g,'\n'),expected);
    assert.equal(await page.locator('dialog[open]').count(),0);
    assert.equal(await root.locator('dialog[open]').count(),0);
@@ -39,9 +39,9 @@ try{
  await messageButton.click();assert.equal(await individual.isVisible(),false);await page.locator('.patient-message-feedback').filter({hasText:'Could not copy'}).waitFor();
  await page.evaluate(()=>{navigator.clipboard.writeText=window.originalClipboardWrite;});
  await row.locator('.patient-actions-toggle').click();const menu=row.locator('.patient-actions-menu');
- const labels=['Active issue','Palliative protocol','Psychiatric consult','Hospital dates','Documents','Edit patient','Remove from roster'];
+ const labels=['Active issue','Palliative protocol','Psychiatric consult','Hospital dates','Documents','Add Ava EMR number for Example, Alex','Edit patient','Remove from roster'];
  assert.deepEqual(await menu.locator('button').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('aria-label'))),labels);
- for(const button of await menu.locator('button').all()){assert.match((await button.textContent()).trim(),/^[✓Ψ]*$/u);await button.hover();assert.equal(await root.locator('.roster-tip:popover-open').innerText(),await button.getAttribute('aria-label'));}
+ for(const button of await menu.locator('button').all()){assert.match((await button.textContent()).trim(),/^[✓Ψ]*$/u);await button.hover();assert.equal(await root.locator('.roster-tip:popover-open').innerText(),await button.getAttribute('data-roster-tip'));}
  assert.ok((await menu.boundingBox()).width<=66);await page.screenshot({path:'work/symbol-menu-desktop.png',fullPage:true});
  await menu.getByRole('button',{name:'Edit patient',exact:true}).click();assert.equal(await root.locator('#en-Alex').count(),1);const fields=await root.locator('.roster-location-fields input,.roster-location-fields select').evaluateAll(els=>els.map(e=>e.getBoundingClientRect().height));assert.equal(fields[0],fields[1]);await root.locator('[data-click="cancelEdit()"]:visible').click();
  await root.locator('#ss').filter({hasText:/Saved locally|Saved in Drive/}).waitFor({state:'attached'});
