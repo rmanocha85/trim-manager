@@ -1,6 +1,6 @@
 # Work OS shared controls
 
-Status: phone/contact and Ava controls implemented locally for TRIM Roster/Billing and both OAT apps, November 27, 2026. Production deployment is pending. Broader app coverage and presentation work is tracked in [the Work OS UI plan](work-os-ui-plan.md).
+Status: phone/contact and Ava controls published for TRIM Roster/Billing and both OAT apps, November 27, 2026, in release 03c3051. Deployed public assets matched the release and synthetic hosted browser checks passed. Broader app coverage and presentation work is tracked in [the Work OS UI plan](work-os-ui-plan.md).
 
 ## One product, several apps
 

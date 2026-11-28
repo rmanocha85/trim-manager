@@ -6,7 +6,7 @@ Reviewed November 27, 2026 against the current checkout. This is the maintained 
 
 One Work OS shell, one interaction library, several purpose-specific apps. Reuse the existing green, warm-neutral palette and compact patient rows. Unification means consistent action meanings, placement, accessibility, and feedback; it does not mean making clinical schedules, billing, and notes use the same screen or merging their records.
 
-The current release candidate implements shared phone/contact and Ava editors in TRIM Roster, TRIM Billing, OAT FH and OAT Purple, plus direct nurse/family message copying and matching Unit/Room fields in TRIM. Production verification is pending.
+Published and verified November 27, 2026: shared phone/contact and Ava editors in TRIM Roster, TRIM Billing, OAT FH and OAT Purple, plus direct nurse/family message copying and matching Unit/Room fields in TRIM. All 14 changed public assets matched release 03c3051. Synthetic browser tests using deployed assets passed for TRIM messages, Unit/Room editing and both OAT Ava workflows; local validation passed 347 unit tests and syntax checks for 225 modules. Other changes below remain planned.
 
 ## App coverage and ownership
 
@@ -39,7 +39,7 @@ MAID and facility editing must not be exposed as nonfunctional buttons. Until th
 
 ## Delivery sequence
 
-1. **Shared patient controls:** finish and release the tested phone/Ava integration for TRIM and both OAT apps, including Billing's roster-owned access. Keep legacy global Save to Drive for unrelated staged work.
+1. **Shared patient controls (released):** phone/Ava integration for TRIM and both OAT apps, including Billing's roster-owned access. Keep legacy global Save to Drive for unrelated staged work.
 2. **Complete owner coverage:** implement guarded MAID/facility contact and Ava actions and Notes links, each with explicit scope and metadata preservation. Do not automatically cross-copy contact data.
 3. **Shared presentation primitives:** migrate tooltips, search, menus, feedback and small dialogs one at a time. Update all applicable apps in the same release; document exceptions in the coverage table.
 4. **Shell and density:** retain the selected App bar layout. Improve responsive spacing with current app selection and drafts preserved.
